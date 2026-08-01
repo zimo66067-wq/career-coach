@@ -1,7 +1,7 @@
 # HANDOFF-002 · 前端原型 → 工具链
 
 - **input_commit**: `91f4fe3`（feat(baseline)）＋ `7be2204`（handoff 001）
-- **output_commit**: 本阶段提交后回填（见下方 git log）
+- **output_commit**: `6e954ba`（feat(ui): 5-page x 5-state static prototype + 7 prompts + demo-script）
 - **handoff_commit**: 本文件提交于 output_commit 之后
 
 ## 任务目标
