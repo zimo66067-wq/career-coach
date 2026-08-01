@@ -1,7 +1,7 @@
 # HANDOFF-003 · WorkBuddy 全部产物 → 百度 DuMate 搭子（主交接文件）
 
 - **input_commit**: `6e954ba`（feat(ui)）＋ `96ddc07`（handoff 002）
-- **output_commit**: 本阶段（review + 003）提交后回填；此前最后一个产物 commit 为 `903fbb6`（feat(tools)）
+- **output_commit**: `3431620`（docs(review): review.md dual-pass audit + handoffs/003）
 - **handoff_commit**: 本文件提交于 output_commit 之后
 - **接手人**: 百度 DuMate（Workflow Agent）。**你的唯一任务：搭建 WF-01~06 六个工作流并接通 F1-F4 主产品。**
 
