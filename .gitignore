@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node
+node_modules/
+
+# 工具运行临时输出
+out*.txt
+clean*.txt
+match*.json
+radar-option.json
+sample.log
+
+# 日志一律不入库（privacy：日志须脱敏后另行管理）
+*.log
+
+# 真实用户数据绝不入库（仅合成样本允许存在于 tests/fixtures-synthetic/）
+*.pdf
+!tests/fixtures-synthetic/**/*.pdf
+*.docx
+!tests/fixtures-synthetic/**/*.docx
+
+# 系统垃圾
+Thumbs.db
+.DS_Store
+~$*
