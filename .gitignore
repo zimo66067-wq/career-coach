@@ -22,6 +22,12 @@ sample.log
 *.docx
 !tests/fixtures-synthetic/**/*.docx
 
+# 预览截图（本地调试产物，不入库）
+preview-*.png
+
+# DuMate 运行时目录
+.dumate/
+
 # 系统垃圾
 Thumbs.db
 .DS_Store
