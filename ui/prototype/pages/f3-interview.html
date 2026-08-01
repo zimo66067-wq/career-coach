@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F3 模拟面试 · 职跃AI</title>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../css/main.css">
+<link rel="stylesheet" href="../css/states.css">
+</head>
+<body data-page="f3">
+<nav class="topnav">
+  <span class="brand">职跃AI</span>
+  <a class="nav" data-page="home" href="../index.html">首页</a>
+  <a class="nav" data-page="f1" href="f1-resume.html">F1 简历诊断</a>
+  <a class="nav" data-page="f2" href="f2-match.html">F2 岗位匹配</a>
+  <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
+  <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
+  <a class="nav" data-page="states" href="states.html">状态墙</a>
+</nav>
+<div class="wrap">
+  <h1 class="page-title">F3 · AI 模拟面试（文字主链路）</h1>
+  <p class="page-sub">最多 5 个主问题，每题最多 1 次追问 ｜ 追问必须引用你的上轮回答或指出 STAR 缺失项</p>
+
+  <div data-state-view="empty">
+    <div class="card empty-state">
+      <div class="art"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+      <h3>准备开始模拟面试</h3>
+      <p>基于你的简历与目标 JD 出题；语音为增强链路（按键说话），文字是等价稳定主链路</p>
+      <span class="btn">开始面试</span> <span class="btn ghost">启用语音（增强）</span>
+    </div>
+  </div>
+
+  <div data-state-view="processing">
+    <div class="card">
+      <div class="spin-row"><span class="spinner"></span>面试官正在基于你的上轮回答生成追问…（首响应 P95 ≤ 8 秒）</div>
+      <div class="skel h-md" style="margin:12px 0;width:70%"></div>
+      <div class="skel h-md" style="margin:12px 0;width:55%;margin-left:auto"></div>
+    </div>
+  </div>
+
+  <div data-state-view="success">
+    <div class="card">
+      <h3>面试记录（3 轮节选）与即时评估</h3>
+      <div id="turns"></div>
+      <div style="text-align:center;margin-top:8px"><span class="btn ghost">继续第 4 题</span></div>
+    </div>
+  </div>
+
+  <div data-state-view="error">
+    <div class="error-banner">
+      <div class="icon">⚠️</div>
+      <div>
+        <h3>本轮评估未完成</h3>
+        <p>评估输出未通过校验（answer_quote 不是回答原文），该轮已按规则作废，不计入分数。可重新作答本轮。</p>
+        <span class="btn">重新作答本轮</span>
+      </div>
+    </div>
+  </div>
+
+  <div data-state-view="degraded">
+    <div class="degraded-banner">
+      <div class="icon">🔶</div>
+      <div>
+        <h3>已切换降级路径 · 固定题库模式</h3>
+        <p>低延迟追问模型不可用，当前按固定题库顺序提问，追问使用模板（「请补充量化结果」）。文字作答不受影响。</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="bubble q"><div class="who">面试官（题库）</div>请介绍一个你最有成就感的项目，并说明你本人的贡献。</div>
+      <div class="bubble a"><div class="who">你</div>（文字输入框正常可用）</div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/mock-data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (window.APP.getState() !== "success") return;
+  var star = { situation: "情境S", task: "任务T", action: "行动A", result: "结果R", metric: "量化数据", reflection: "复盘" };
+  var html = "";
+  window.MOCK.interviews.forEach(function (t) {
+    html += '<div class="bubble q"><div class="who">面试官 · 第' + t.turn_id + "题（考察：" + t.targets.join(" / ") + "）</div>" + t.question + "</div>";
+    html += '<div class="bubble a"><div class="who">你</div>' + t.answer + "</div>";
+    html += '<div class="card" style="margin:4px 0 18px;background:#fbfcfe"><div style="font-size:13px">';
+    html += '<b>评估依据（引用原文）：</b><div class="quote-block">“' + t.answer_quote + '”</div>';
+    if (t.missing_elements.length) {
+      html += "<b>STAR 缺口：</b>" + t.missing_elements.map(function (m) { return '<span class="chip">' + (star[m] || m) + "</span>"; }).join("") + "<br>";
+    } else {
+      html += "<b>STAR 缺口：</b><span class=\"chip\">无</span><br>";
+    }
+    if (t.follow_up) {
+      html += '<div class="followup"><b>追问：</b>' + t.follow_up.question + '<br><span style="color:var(--c-text-2)">追问理由：' + t.follow_up.reason + "</span></div>";
+    }
+    var ss = t.subscores;
+    html += '<div style="margin-top:8px;color:var(--c-text-2)">结构 ' + ss.structure + " ｜ 相关 " + ss.relevance + " ｜ 具体 " + ss.specificity + " ｜ 追问适应 " + ss.followup_adaptation + " ｜ 清晰 " + ss.clarity + "</div>";
+    html += "</div></div>";
+  });
+  document.getElementById("turns").innerHTML = html;
+});
+</script>
+</body>
+</html>
