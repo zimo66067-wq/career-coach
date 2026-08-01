@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>职跃AI · AI求职面试教练 · 核心交互（单文件版）</title>
+<!--
+  职跃AI · 核心交互单文件版（比赛提交件）
+  - 单文件：HTML/CSS/JS 全部内联，零外部依赖，双击即可运行，离线可用
+  - 主路径：授权 → 材料输入 → F1 简历诊断 → F2 岗位匹配 → F3 模拟面试 → F4 能力报告
+  - 原则：模型做语义、规则做分数、验证器做事实（评分全部由本文件内规则引擎计算）
+  - 本文件由 AI Coding 工具生成；数据来源：career-coach 仓库合成测试样本（无真实个人信息）
+-->
+<style>
+:root{
+  --bg:#f6f7f9; --card:#ffffff; --border:#e5e7eb; --text:#1f2937; --text-2:#6b7280;
+  --primary:#2563eb; --primary-soft:#eff6ff;
+  --covered:#16a34a; --covered-bg:#f0fdf4; --weak:#d97706; --weak-bg:#fffbeb;
+  --missing:#dc2626; --missing-bg:#fef2f2; --unknown:#6b7280; --unknown-bg:#f3f4f6;
+  --radius:12px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.65}
+.wrap{max-width:960px;margin:0 auto;padding:24px 16px 64px}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.brand{font-size:20px;font-weight:700;color:var(--primary)}
+.brand small{font-size:12px;color:var(--text-2);font-weight:400;margin-left:8px}
+.steps{display:flex;gap:6px;flex-wrap:wrap}
+.steps span{font-size:12px;padding:3px 10px;border-radius:99px;background:#e5e7eb;color:var(--text-2)}
+.steps span.cur{background:var(--primary);color:#fff}
+.steps span.done{background:#dbeafe;color:var(--primary)}
+.screen{display:none;animation:fade .3s ease}
+.screen.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+h1{font-size:24px;margin-bottom:8px}
+h2{font-size:19px;margin-bottom:10px}
+h3{font-size:15px;margin-bottom:8px}
+.sub{color:var(--text-2);font-size:13px;margin-bottom:16px}
+.btn{display:inline-block;padding:10px 22px;border-radius:8px;background:var(--primary);color:#fff;border:none;font-size:14px;cursor:pointer;text-decoration:none;font-family:inherit}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:#fff;color:var(--primary);border:1px solid var(--primary)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-row{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+textarea{width:100%;min-height:150px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;font-family:Consolas,"Courier New",monospace;line-height:1.55;resize:vertical}
+label.lbl{display:block;font-size:13px;font-weight:600;margin:12px 0 6px}
+.hint{font-size:12px;color:var(--text-2);margin-top:4px}
+.score-ring{width:132px;height:132px;flex:none}
+.ring-bg{fill:none;stroke:#e5e7eb;stroke-width:11}
+.ring-val{fill:none;stroke:var(--primary);stroke-width:11;stroke-linecap:round;transition:stroke-dasharray .8s ease}
+.ring-num{font-size:30px;font-weight:700;fill:var(--text)}
+.ring-lbl{font-size:11px;fill:var(--text-2)}
+.row{display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-width:260px}
+.subbar{margin:10px 0}
+.subbar .meta{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.track{height:8px;background:#eef0f3;border-radius:99px;overflow:hidden}
+.fill{height:100%;background:var(--primary);border-radius:99px;transition:width .6s ease}
+.badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:600;flex:none}
+.covered{background:var(--covered-bg);color:var(--covered)}
+.weak{background:var(--weak-bg);color:var(--weak)}
+.missing{background:var(--missing-bg);color:var(--missing)}
+.unknown{background:var(--unknown-bg);color:var(--unknown)}
+.p0{background:#fef2f2;color:#dc2626}.p1{background:#fffbeb;color:#d97706}.p2{background:#eff6ff;color:#2563eb}
+.req-item{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--border)}
+.req-item:last-child{border-bottom:none}
+.req-item .txt{font-size:13px;flex:1}
+.req-item .evi{font-size:12px;color:var(--text-2)}
+.evidence-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.doc-pane{background:#f9fafb;border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;max-height:420px;overflow:auto;white-space:pre-wrap;font-family:Consolas,"Courier New",monospace;line-height:1.6}
+.doc-pane mark{background:#fde68a;padding:0 2px;border-radius:2px}
+.reason-item{padding:9px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;font-size:13px;cursor:pointer;transition:border-color .15s,background .15s}
+.reason-item:hover{border-color:var(--primary)}
+.reason-item.active{border-color:var(--primary);background:var(--primary-soft)}
+.tag{display:inline-block;background:#eef2ff;color:#4f46e5;border-radius:4px;padding:1px 6px;font-size:12px;margin-top:4px}
+.chat{max-height:460px;overflow:auto;padding:4px}
+.bubble{max-width:82%;padding:11px 14px;border-radius:14px;margin:9px 0;font-size:14px;white-space:pre-wrap}
+.bubble.q{background:#eef2ff;color:#1e3a8a;border-bottom-left-radius:4px}
+.bubble.a{background:var(--primary);color:#fff;margin-left:auto;border-bottom-right-radius:4px}
+.bubble.sys{background:#f3f4f6;color:var(--text-2);font-size:12px;max-width:100%;text-align:center;border-radius:8px}
+.bubble .who{font-size:11px;opacity:.75;margin-bottom:3px}
+.eval-card{background:#fbfcfe;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0 14px;font-size:13px}
+.quote-block{border-left:3px solid var(--primary);background:var(--primary-soft);padding:6px 10px;border-radius:0 6px 6px 0;margin:6px 0;font-size:13px}
+.chip{display:inline-block;background:#eef2ff;color:#4f46e5;border-radius:99px;padding:1px 9px;font-size:12px;margin:2px 3px 2px 0}
+.followup{background:#fffbeb;border-left:3px solid var(--weak);padding:8px 10px;border-radius:0 6px 6px 0;margin-top:8px;font-size:13px}
+.ask-row{display:flex;gap:8px;margin-top:12px}
+.ask-row input{flex:1;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit}
+.ask-row input:focus{outline:2px solid var(--primary-soft);border-color:var(--primary)}
+.big-num{font-size:52px;font-weight:700;color:var(--primary);line-height:1}
+.range-band{display:flex;align-items:center;gap:12px;margin:12px 0}
+.range-band .bar{flex:1;height:12px;background:#eef0f3;border-radius:99px;position:relative}
+.range-band .seg{position:absolute;top:0;bottom:0;background:linear-gradient(90deg,#93c5fd,#2563eb);border-radius:99px}
+.assump{font-size:12px;color:var(--text-2);background:#f9fafb;border:1px dashed var(--border);border-radius:8px;padding:8px 10px}
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.plan-day{border:1px solid var(--border);border-radius:10px;padding:12px}
+.plan-day .d{font-weight:700;color:var(--primary);font-size:13px;margin-bottom:4px}
+.plan-day .m{font-size:12px;color:var(--text-2);margin-top:6px}
+.notice{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 16px;font-size:13px;color:#166534}
+footer.foot{text-align:center;color:var(--text-2);font-size:12px;margin-top:28px}
+@media (max-width:767px){
+  .evidence-grid{grid-template-columns:1fr}
+  .doc-pane{max-height:240px}
+  h1{font-size:20px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">职跃AI<small>AI求职面试教练 · 核心交互（单文件版）</small></div>
+    <div class="steps" id="steps"></div>
+  </header>
+
+  <!-- S0 授权 -->
+  <section class="screen" id="s0">
+    <div class="card">
+      <h1>求职材料进面试，每一步都有据可依</h1>
+      <p class="sub">简历诊断（F1）→ 岗位匹配（F2）→ 模拟面试（F3）→ 能力报告 + 七天情景提升计划（F4）。<br>
+      本页面三个原则：<b>模型做语义、规则做分数、验证器做事实</b>——每个分数都能回指到你的原文证据。</p>
+      <div class="notice" style="margin-bottom:14px">
+        <b>隐私说明（演示环境）</b>：所有数据仅在你的浏览器本地处理，不上传任何服务器；
+        材料进入分析前会自动去标识化（姓名/电话/邮箱/身份证）；演示数据为合成样本，你可以直接替换为自己的材料体验。
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="btnConsent">我已了解，开始使用</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>完整主路径（约 3 分钟）</h3>
+      <div class="req-item"><span class="badge covered">F1</span><span class="txt">简历 AI 诊断：五维打分 + 逐条修改建议，每条建议都能点回原文</span></div>
+      <div class="req-item"><span class="badge covered">F2</span><span class="txt">简历-JD 匹配：四类要求逐条四态判定（covered/weak/missing/unknown）+ 缺口分级</span></div>
+      <div class="req-item"><span class="badge covered">F3</span><span class="txt">文字模拟面试：会追问的面试官，逐轮评估并引用你的原句</span></div>
+      <div class="req-item"><span class="badge covered">F4</span><span class="txt">能力报告：C0 基线 + 六维雷达 + 七天竞争力情景推演计划</span></div>
+    </div>
+  </section>
+
+  <!-- S1 材料输入 -->
+  <section class="screen" id="s1">
+    <div class="card">
+      <h2>第一步 · 准备材料</h2>
+      <p class="sub">已预填合成样本（简历 + 后端工程师 JD）。你可以直接使用，也可以粘贴自己的材料——全流程均由本页面内的规则引擎真实计算。</p>
+      <label class="lbl" for="taResume">简历文本（去标识化后进入分析）</label>
+      <textarea id="taResume"></textarea>
+      <div class="hint" id="piiHint"></div>
+      <label class="lbl" for="taJob">目标岗位 JD</label>
+      <textarea id="taJob"></textarea>
+      <div class="btn-row">
+        <button class="btn" id="btnStart">开始诊断（F1）</button>
+        <button class="btn ghost" id="btnResetSample">恢复示例材料</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- S2 F1 -->
+  <section class="screen" id="s2">
+    <div class="card">
+      <h2>F1 · 简历 AI 诊断</h2>
+      <p class="sub">R = 结构15% + 清晰20% + 成果25% + 技能20% + ATS20%（规则引擎按简历文本实时计算）</p>
+      <div class="row">
+        <svg class="score-ring" viewBox="0 0 120 120" id="ringR"></svg>
+        <div class="grow" id="subbarsR"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>证据对照：点击右侧任意评分理由 / 建议，左侧原文自动定位高亮</h3>
+      <div class="evidence-grid">
+        <div class="doc-pane" id="docResume"></div>
+        <div id="reasonList"></div>
+      </div>
+      <div class="btn-row"><button class="btn" id="btnToF2">下一步：岗位匹配（F2）</button></div>
+    </div>
+  </section>
+
+  <!-- S3 F2 -->
+  <section class="screen" id="s3">
+    <div class="card">
+      <h2>F2 · 简历-JD 匹配</h2>
+      <p class="sub">M = 硬性50% + 职责25% + 加分15% + 术语10% ｜ covered=1 / weak=0.5 / missing=0 / unknown 不进分母<br>
+      本页为<b>简化匹配</b>（浏览器内关键词覆盖，实时计算）；正式版主路径为语义向量匹配，分数以语义版为准。</p>
+      <div class="row">
+        <svg class="score-ring" viewBox="0 0 120 120" id="ringM"></svg>
+        <div class="grow" id="subbarsM"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>逐条要求四态判定（硬性要求置顶）</h3>
+      <div id="reqList"></div>
+    </div>
+    <div class="card">
+      <h3>缺口分级</h3>
+      <div id="gapList"></div>
+      <div class="btn-row"><button class="btn" id="btnToF3">下一步：模拟面试（F3）</button></div>
+    </div>
+  </section>
+
+  <!-- S4 F3 -->
+  <section class="screen" id="s4">
+    <div class="card">
+      <h2>F3 · AI 模拟面试（文字主链路）</h2>
+      <p class="sub">3 个主问题，每题 1 次追问。回答后即时评估：引用你的原句、指出 STAR 缺口、给出五维子分。可以直接输入，也可点「用示例回答」。</p>
+      <div class="chat" id="chat"></div>
+      <div class="ask-row" id="askRow">
+        <input id="inpAnswer" placeholder="输入你的回答，回车提交…" autocomplete="off">
+        <button class="btn" id="btnAnswer">提交</button>
+        <button class="btn ghost" id="btnSample">用示例回答</button>
+      </div>
+      <div class="btn-row"><button class="btn" id="btnToF4" disabled>生成能力报告（F4）</button></div>
+    </div>
+  </section>
+
+  <!-- S5 F4 -->
+  <section class="screen" id="s5">
+    <div class="card">
+      <h2>F4 · 能力报告 + 七天竞争力情景推演</h2>
+      <p class="sub">C0 = 0.25R + 0.35M + 0.40I ｜ 七天结果为公开假设下的情景区间，不是预测</p>
+      <div class="row">
+        <div>
+          <div class="big-num" id="bigC0">--</div>
+          <div class="sub" style="margin:4px 0 0">C0 综合基线（证据覆盖指数，非录用概率）</div>
+          <div style="font-size:13px" id="c0Formula"></div>
+        </div>
+        <div class="grow">
+          <h3>七天竞争力情景推演</h3>
+          <div class="range-band"><span id="c7low" style="font-size:13px">--</span>
+            <div class="bar"><div class="seg" id="c7seg"></div></div>
+            <span id="c7high" style="font-size:13px">--</span></div>
+          <div class="assump" id="assump"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>六维能力雷达（内联 SVG，零依赖）</h3>
+      <div style="display:flex;justify-content:center"><svg id="radar" width="420" height="360" viewBox="0 0 420 360"></svg></div>
+    </div>
+    <div class="card">
+      <h3>七天情景提升计划（恰好 7 天，每天 30-45 分钟，每天一件可验证成果物）</h3>
+      <div class="plan-grid" id="planGrid"></div>
+      <div class="btn-row"><button class="btn" id="btnToEnd">完成体验</button></div>
+    </div>
+  </section>
+
+  <!-- S6 结束 -->
+  <section class="screen" id="s6">
+    <div class="card">
+      <h1>本轮体验完成</h1>
+      <p class="sub">你刚刚走完了「材料诊断 → 岗位匹配 → 模拟面试 → 能力报告 → 七天计划」的完整主路径。</p>
+      <div id="finalSummary"></div>
+      <div class="notice" style="margin:14px 0">
+        <b>工程化说明</b>：本页面全部评分由内置规则引擎计算；诊断与匹配建议均以原文证据为准，
+        无证据的判断一律标 unknown 而不猜测。正式版本另有降级路径设计：语义服务异常时自动切换
+        简化匹配 / 固定题库 / 表格展示，任一关键依赖失败后 10 秒内可降级，语音为增强链路、文字为等价稳定主链路。
+      </div>
+      <div class="btn-row"><button class="btn" id="btnRestart">再来一轮</button></div>
+    </div>
+  </section>
+
+  <footer class="foot">职跃AI · 单文件演示版 ｜ 数据仅本地处理 ｜ 分数为证据覆盖指数，非录用概率</footer>
+</div>
+
+<script>
+"use strict";
+/* ===================== 合成样本（与 career-coach/tests/fixtures-synthetic 同源） ===================== */
+var SAMPLE_RESUME = "个人简历\n\n姓名：张三\n电话：13812345678\n邮箱：zhangsan@example.com\n身份证号：110101200301011234\n求职意向：后端开发工程师\n\n教育经历\n2019.09-2023.06 某某大学 计算机科学与技术 本科\n主修课程：数据结构、操作系统、计算机网络、数据库原理\n\n实习经历\n2022.06-2022.12 某科技公司 后端开发实习生\n负责订单中心微服务开发，使用 Go 语言和 Gin 框架实现订单查询接口\n将订单列表接口的平均响应时间从 800ms 优化到 220ms，通过给 MySQL 加复合索引和引入 Redis 缓存实现\n参与设计库存扣减的分布式锁方案，使用 Redisson 解决了超卖问题，上线后超卖投诉降为 0\n编写接口文档并推动联调，与前端约定统一的错误码规范\n\n项目经历\n2023.03-2023.06 校园二手交易平台（课程项目）\n独立完成后端全部开发，使用 Spring Boot + MyBatis，设计了 12 张数据表\n实现基于 JWT 的登录鉴权和基于 RabbitMQ 的异步消息通知\n项目在课程答辩中获得 92 分（满分 100）\n\n技能清单\n语言：Go（熟练）、Java（熟练）、Python（了解）\n框架：Gin、Spring Boot、MyBatis\n中间件：MySQL、Redis、RabbitMQ、Kafka（了解）\n工具：Git、Docker、Linux 常用命令\n\n自我评价\n学习能力强，习惯阅读官方文档和源码，能够在指导下独立完成模块开发。";
+
+var SAMPLE_JOB = "后端开发工程师（校招）- 某电商平台\n\n职位描述\n负责订单与库存核心链路的后端服务开发，参与高并发场景下的性能优化。\n\n任职要求\n1. 本科及以上学历，计算机相关专业；\n2. 熟悉 Go 或 Java 至少一门语言，有实际项目经验；\n3. 熟悉 MySQL，了解索引优化和慢查询分析；\n4. 了解 Redis 等缓存中间件的使用场景；\n5. 了解消息队列（RabbitMQ/Kafka）的基本原理。\n\n工作职责\n1. 参与订单、库存等核心链路的接口开发；\n2. 编写单元测试，保证代码质量；\n3. 参与线上问题排查与性能优化。\n\n加分项\n1. 有分布式锁、分布式事务实践经验者优先；\n2. 有开源项目贡献或技术博客者优先。\n\n常用技术栈\nGo、Java、MySQL、Redis、RabbitMQ、Docker、Kubernetes、gRPC";
+
+/* F1 评估素材：证据引用（quote 须能在简历原文中找到才高亮） */
+var F1_REASONS = {
+  clarity: { label: "表达清晰度", rationale: "表达具体，含协作与规范意识",
+    quote: "编写接口文档并推动联调，与前端约定统一的错误码规范" },
+  achievement: { label: "成果证据", rationale: "量化成果句的数量与质量决定本分",
+    quote: "将订单列表接口的平均响应时间从 800ms 优化到 220ms，通过给 MySQL 加复合索引和引入 Redis 缓存实现" },
+  skill: { label: "技能证据", rationale: "技能清单与岗位技术栈的覆盖度",
+    quote: "语言：Go（熟练）、Java（熟练）、Python（了解）" }
+};
+var F1_SUGGESTIONS = [
+  { id: "S1", severity: "P1", issue: "自我评价偏主观，缺少事实支撑",
+    suggestion: "将自我评价改写为可验证陈述，补充源码阅读或文档实践的具体例子",
+    rewrite: "独立完成订单查询接口开发并推动联调，习惯以官方文档为准排查问题",
+    quote: "学习能力强，习惯阅读官方文档和源码，能够在指导下独立完成模块开发。" },
+  { id: "S2", severity: "P0", issue: "成果证据若仅一处量化，其余经历缺少数字",
+    suggestion: "为分布式锁项目补充量化结果口径，无法确认的数字用占位格式",
+    rewrite: "库存扣减方案支撑秒杀场景，峰值 QPS 待用户核实：约X",
+    quote: "参与设计库存扣减的分布式锁方案，使用 Redisson 解决了超卖问题，上线后超卖投诉降为 0" },
+  { id: "S3", severity: "P2", issue: "课程项目缺少团队规模与本人分工说明",
+    suggestion: "标注独立开发或团队角色，避免面试追问时表述含糊",
+    rewrite: "独立完成后端全部开发（1 人），设计 12 张数据表",
+    quote: "独立完成后端全部开发，使用 Spring Boot + MyBatis，设计了 12 张数据表" }
+];
+
+/* F2 要求清单（type: hard/responsibility/preferred/terminology） */
+var JOB_REQS = [
+  { id: "J1", type: "hard", text: "本科及以上学历，计算机相关专业" },
+  { id: "J2", type: "hard", text: "熟悉 Go 或 Java 至少一门语言，有实际项目经验" },
+  { id: "J3", type: "hard", text: "熟悉 MySQL，了解索引优化和慢查询分析" },
+  { id: "J4", type: "hard", text: "了解 Redis 等缓存中间件的使用场景" },
+  { id: "R1", type: "responsibility", text: "参与订单、库存等核心链路的接口开发" },
+  { id: "R2", type: "responsibility", text: "编写单元测试，保证代码质量" },
+  { id: "P1", type: "preferred", text: "有分布式锁、分布式事务实践经验者优先" },
+  { id: "T1", type: "terminology", text: "Go、Java、MySQL、Redis、RabbitMQ、Docker、Kubernetes、gRPC" }
+];
+var TYPE_LABEL = { hard: "硬性", responsibility: "职责", preferred: "加分", terminology: "术语" };
+var M_WEIGHT = { hard: 0.50, responsibility: 0.25, preferred: 0.15, terminology: 0.10 };
+
+/* F3 面试题与示例回答 */
+var QUESTIONS = [
+  { q: "请介绍一个你最有成就感的项目，并说明你本人的贡献。", targets: ["成果证据", "结构化表达"],
+    sample: "我在实习时负责订单查询接口的优化。当时的背景是接口平均响应 800ms，用户投诉集中在列表加载慢。我的任务是定位瓶颈并提出优化方案。我通过慢查询日志发现是索引缺失，于是加了复合索引，并引入 Redis 缓存热点数据。最终平均响应降到 220ms。" },
+  { q: "讲讲你在团队中和他人发生分歧的一次经历。", targets: ["协作沟通", "冲突处理"],
+    sample: "有一次讨论库存扣减方案，同学主张直接数据库乐观锁，我认为高并发下应该用分布式锁。我们各自做了压测对比，最后结合两种方案：常态用乐观锁，秒杀场景切分布式锁。" },
+  { q: "如果这个岗位需要你在一个月内上手不熟悉的技术栈，你会怎么做？", targets: ["学习能力", "岗位适配"],
+    sample: "我会先读官方文档的 Quickstart，然后找一个最小可运行示例跑通，再对照项目代码梳理调用链。之前学 Go 时我就是用这个方法，两周内能独立写接口。" }
+];
+
+/* F4 七天计划模板（按缺口动态替换前两条） */
+var PLAN = [
+  { day: 1, focus: "为三条核心经历补充量化证据，无法确认的数字用「待用户核实：」占位", minutes: 40, artifact: "修订后的三段经历文本" },
+  { day: 2, focus: "针对 P0 缺口整理项目复盘笔记（按 STAR 结构）", minutes: 35, artifact: "一页复盘笔记" },
+  { day: 3, focus: "按 STAR 结构重写两个面试高频回答", minutes: 40, artifact: "两份 STAR 回答稿" },
+  { day: 4, focus: "针对岗位术语缺口做概念速学并自测", minutes: 30, artifact: "术语自测清单" },
+  { day: 5, focus: "完成一轮五题文字模拟面试并复盘 STAR 缺口", minutes: 45, artifact: "面试复盘记录" },
+  { day: 6, focus: "根据复盘改写简历自我评价与技能描述", minutes: 35, artifact: "简历修订版 v2" },
+  { day: 7, focus: "复测诊断与匹配，对比 C0 变化并记录真实提升", minutes: 40, artifact: "复测对比表" }
+];
+
+/* ===================== 规则引擎（本页面内全部评分由此计算） ===================== */
+var STOP = {};
+"的了和是有在与我你他她它们这那也不都就及或着吧呢啊嘛么很还被把对于等以及一个我们你们他们您请可会能要将并从到过为对您你".split("").forEach(function (c) { STOP[c] = 1; });
+
+function tokenizeUni(text) {
+  var set = {};
+  var m = (text || "").toLowerCase().match(/[a-z][a-z0-9+#.\-]*|[一-龥]/g) || [];
+  for (var i = 0; i < m.length; i++) {
+    var t = m[i];
+    if (t.length === 1 && STOP[t]) continue;
+    if (t.length === 1 && !/[一-龥]/.test(t)) continue;
+    set[t] = 1;
+  }
+  return set;
+}
+function splitSentences(text) {
+  return (text || "").split(/[\n。！？!?；;]+/).map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 3; });
+}
+function deidentify(text) {
+  return text
+    .replace(/\d{17}[\dXx]/g, "[REDACTED_ID]")
+    .replace(/1[3-9]\d{9}/g, "[REDACTED_PHONE]")
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "[REDACTED_EMAIL]")
+    .replace(/(姓\s*名\s*[:：]\s*)[一-龥·]{2,4}/g, "$1[REDACTED_NAME]");
+}
+function countPii(text) {
+  var n = 0;
+  n += (text.match(/\d{17}[\dXx]/g) || []).length;
+  n += (text.match(/1[3-9]\d{9}/g) || []).length;
+  n += (text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).length;
+  n += (text.match(/姓\s*名\s*[:：]\s*[一-龥·]{2,4}/g) || []).length;
+  return n;
+}
+
+/* F1：按简历文本真实计算五个子分（已按仓库合成样本标定） */
+function computeF1(resume) {
+  var sections = ["教育", "实习", "项目", "技能"];
+  var hit = 0;
+  sections.forEach(function (s) { if (resume.indexOf(s) >= 0) hit++; });
+  var structure = Math.min(95, Math.round(36 + hit * 11));
+
+  var sentences = splitSentences(resume);
+  var digitSentences = sentences.filter(function (s) { return /\d/.test(s) && s.length > 12; });
+  var achievement = Math.min(90, 25 + digitSentences.length * 7);
+
+  var longSent = sentences.filter(function (s) { return s.length >= 20 && s.length <= 80; }).length;
+  var clarity = Math.min(90, 50 + Math.round(longSent / Math.max(1, sentences.length) * 40));
+
+  var skillHit = 0, skillAll = ["go", "java", "python", "mysql", "redis", "rabbitmq", "kafka", "docker", "spring", "git"];
+  var lower = resume.toLowerCase();
+  skillAll.forEach(function (k) { if (lower.indexOf(k) >= 0) skillHit++; });
+  var skill = Math.min(90, Math.round(35 + skillHit * 3.5));
+
+  var hasTable = /[|┌┐└┘]/.test(resume), hasLong = resume.length > 200;
+  var ats = (hasTable ? 55 : 80) + (hasLong ? 5 : 0);
+
+  var R = Math.round((structure * 0.15 + clarity * 0.20 + achievement * 0.25 + skill * 0.20 + ats * 0.20) * 100) / 100;
+  return {
+    R: R,
+    sub: [
+      { key: "structure", label: "结构完整度", w: "15%", score: structure },
+      { key: "clarity", label: "表达清晰度", w: "20%", score: clarity },
+      { key: "achievement", label: "成果证据", w: "25%", score: achievement },
+      { key: "skill", label: "技能证据", w: "20%", score: skill },
+      { key: "ats", label: "ATS可读性", w: "20%", score: ats }
+    ]
+  };
+}
+
+/* F2：关键词覆盖率匹配（与仓库 tools/match_requirements.py 同算法思路） */
+function computeF2(resume) {
+  var docUni = tokenizeUni(resume);
+  var sentences = splitSentences(resume);
+  var sentUni = sentences.map(tokenizeUni);
+  var results = JOB_REQS.map(function (req) {
+    var q = tokenizeUni(req.text);
+    var qKeys = Object.keys(q);
+    var best = 0, bestIdx = -1;
+    for (var i = 0; i < sentUni.length; i++) {
+      var hitN = 0;
+      for (var k = 0; k < qKeys.length; k++) if (sentUni[i][qKeys[k]]) hitN++;
+      var cov = qKeys.length ? hitN / qKeys.length : 0;
+      if (cov > best) { best = cov; bestIdx = i; }
+    }
+    var docHit = 0;
+    for (var k2 = 0; k2 < qKeys.length; k2++) if (docUni[qKeys[k2]]) docHit++;
+    var docCov = qKeys.length ? docHit / qKeys.length : 0;
+    var conf = Math.max(best, 0.9 * docCov);
+    var hasPartial = docHit > 0;
+    var status = conf >= 0.55 ? "covered" : conf >= 0.30 ? "weak" : (hasPartial ? "missing" : "unknown");
+    return { id: req.id, type: req.type, text: req.text, status: status, conf: Math.round(conf * 100) / 100,
+      evidence: status === "unknown" ? "unknown：材料不足以判断" : (bestIdx >= 0 ? sentences[bestIdx] : "（无）") };
+  });
+  var catScore = {}, M = 0, wSum = 0;
+  Object.keys(M_WEIGHT).forEach(function (t) {
+    var items = results.filter(function (r) { return r.type === t && r.status !== "unknown"; });
+    if (!items.length) { catScore[t] = null; return; }
+    var sum = 0;
+    items.forEach(function (r) { sum += r.status === "covered" ? 1 : r.status === "weak" ? 0.5 : 0; });
+    catScore[t] = sum / items.length * 100;
+    M += catScore[t] * M_WEIGHT[t];
+    wSum += M_WEIGHT[t];
+  });
+  M = wSum ? Math.round(M / wSum * 100) / 100 : 0;
+  var gaps = [];
+  var hardMissing = results.filter(function (r) { return r.type === "hard" && (r.status === "missing" || r.status === "unknown"); });
+  var prefMissing = results.filter(function (r) { return r.type === "preferred" && r.status !== "covered"; });
+  var termMissing = results.filter(function (r) { return r.type === "terminology" && r.status !== "covered"; });
+  hardMissing.forEach(function (r) { gaps.push({ level: "P0", text: "硬性要求缺口：" + r.text, action: "补充可验证证据或在面试中主动说明学习计划" }); });
+  results.filter(function (r) { return r.status === "weak"; }).slice(0, 2).forEach(function (r) { gaps.push({ level: "P1", text: "证据不充分：" + r.text, action: "补充量化细节，未知数字用「待用户核实：」占位" }); });
+  prefMissing.concat(termMissing).slice(0, 2).forEach(function (r) { gaps.push({ level: "P2", text: "待补强：" + r.text, action: "纳入七天计划第 4 天术语速学" }); });
+  if (!gaps.length) gaps.push({ level: "P2", text: "未发现显著缺口", action: "保持材料并准备行为面试" });
+  return { M: M, cat: catScore, results: results, gaps: gaps };
+}
+
+/* F3：面试评估（引用抽取 + STAR 缺口 + 五维子分） */
+var STAR_PATTERNS = [
+  { key: "situation", label: "情境S", pat: /(背景|当时|那时|情况下|阶段|问题是|面临)/ },
+  { key: "task", label: "任务T", pat: /(任务|目标|负责|需要|要求我|我的职责)/ },
+  { key: "action", label: "行动A", pat: /(我(通过|采用|用|做|设计|推动|协调|主导|实现|搭建)|于是|然后|接着)/ },
+  { key: "result", label: "结果R", pat: /(结果|最终|上线|提升|降低|下降|减少|解决|获得|达到)/ },
+  { key: "metric", label: "量化数据", pat: /\d/ }
+];
+function evaluateAnswer(answer) {
+  var sentences = splitSentences(answer);
+  var quote = sentences.filter(function (s) { return /\d/.test(s); })[0] || sentences[0] || answer.slice(0, 40);
+  var missing = STAR_PATTERNS.filter(function (sp) { return !sp.pat.test(answer); }).map(function (sp) { return sp.key; });
+  var present = STAR_PATTERNS.length - missing.length;
+  var lenScore = Math.min(100, Math.round(answer.length / 1.6));
+  var structure = Math.min(95, 45 + present * 10);
+  var relevance = Math.min(92, 60 + present * 6);
+  var specificity = Math.min(95, (/\d/.test(answer) ? 68 : 40) + Math.min(20, (answer.match(/\d+/g) || []).length * 6));
+  var clarity = Math.min(92, 55 + Math.round(lenScore * 0.35));
+  var followupAdapt = Math.min(90, 60 + present * 6);
+  var subscores = { structure: structure, relevance: relevance, specificity: specificity,
+    followup_adaptation: followupAdapt, clarity: clarity };
+  var followUp = missing.indexOf("metric") >= 0
+    ? { question: "你提到「" + clip(quote, 18) + "」，具体的数据口径还记得吗？比如规模、提升幅度或时间。", reason: "回答缺少量化数据（metric），追问量化证据" }
+    : { question: "你刚才说「" + clip(quote, 18) + "」，能展开说说当时最大的挑战和你怎么权衡的吗？", reason: "引用你的原句做深度追问（action 深度）" };
+  return { quote: clip(quote, 80), missing: missing, subscores: subscores, followUp: followUp };
+}
+function evaluateFollowup(answer) {
+  var bonus = /\d/.test(answer) ? 12 : 4;
+  return Math.min(95, 62 + bonus + Math.min(15, Math.round(answer.length / 8)));
+}
+function clip(s, n) { s = (s || "").trim(); return s.length > n ? s.slice(0, n) + "…" : s; }
+
+/* F4：聚合 */
+function computeF4(R, M, turns, achSub) {
+  var n = turns.length || 1;
+  var I = { structure: 0, relevance: 0, specificity: 0, followup_adaptation: 0, clarity: 0 };
+  turns.forEach(function (t) { Object.keys(I).forEach(function (k) { I[k] += t.subscores[k]; }); });
+  Object.keys(I).forEach(function (k) { I[k] = Math.round(I[k] / n * 100) / 100; });
+  var Iscore = Math.round((I.structure * 0.25 + I.relevance * 0.25 + I.specificity * 0.20 + I.followup_adaptation * 0.15 + I.clarity * 0.15) * 100) / 100;
+  var C0 = Math.round((0.25 * R + 0.35 * M + 0.40 * Iscore) * 100) / 100;
+  var space = 100 - C0;
+  var C7low = Math.round(Math.min(100, C0 + space * 0.30) * 100) / 100;
+  var C7high = Math.round(Math.min(100, C0 + space * 0.70) * 100) / 100;
+  var dims = [
+    { key: "job_fit", name: "岗位契合", score: Math.round(M) },
+    { key: "achievement_evidence", name: "成果证据", score: Math.round(achSub) },
+    { key: "professional_expression", name: "专业表达", score: Math.round(I.clarity) },
+    { key: "structured_answer", name: "结构化回答", score: Math.round(I.structure) },
+    { key: "job_depth", name: "岗位深度", score: Math.round((M + I.relevance) / 2) },
+    { key: "followup_adaptation", name: "追问适应", score: Math.round(I.followup_adaptation) }
+  ];
+  return { I: I, Iscore: Iscore, C0: C0, C7low: C7low, C7high: C7high, dims: dims };
+}
+
+/* ===================== 界面状态机 ===================== */
+var STEP_NAMES = ["授权", "材料", "F1 诊断", "F2 匹配", "F3 面试", "F4 报告", "完成"];
+var STATE = { step: 0, resume: "", job: "", f1: null, f2: null, turns: [], qi: 0, phase: "ask", curEval: null };
+
+function $(id) { return document.getElementById(id); }
+function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; }
+function esc(s) { return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+function showStep(n) {
+  STATE.step = n;
+  document.querySelectorAll(".screen").forEach(function (s) { s.classList.remove("on"); });
+  $("s" + n).classList.add("on");
+  var steps = $("steps");
+  steps.innerHTML = "";
+  STEP_NAMES.forEach(function (name, i) {
+    var sp = el("span", i === n ? "cur" : i < n ? "done" : "", name);
+    steps.appendChild(sp);
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function drawRing(svg, pct, label) {
+  var r = 48, c = 2 * Math.PI * r, off = c * (1 - pct / 100);
+  svg.innerHTML =
+    '<circle class="ring-bg" cx="60" cy="60" r="' + r + '"/>' +
+    '<circle class="ring-val" cx="60" cy="60" r="' + r + '" stroke-dasharray="' + c + '" stroke-dashoffset="' + off + '" transform="rotate(-90 60 60)"/>' +
+    '<text class="ring-num" x="60" y="60" text-anchor="middle" dominant-baseline="central">' + Math.round(pct) + "</text>" +
+    '<text class="ring-lbl" x="60" y="86" text-anchor="middle">' + label + "</text>";
+}
+
+/* ---------- S1 ---------- */
+function initS1() {
+  $("taResume").value = SAMPLE_RESUME;
+  $("taJob").value = SAMPLE_JOB;
+  updatePiiHint();
+}
+function updatePiiHint() {
+  var n = countPii($("taResume").value);
+  $("piiHint").textContent = n > 0
+    ? "检测到 " + n + " 处个人信息（姓名/电话/邮箱/身份证），点击「开始诊断」时将自动去标识化。"
+    : "未检测到常见个人信息字段。";
+}
+$("taResume").addEventListener("input", updatePiiHint);
+$("btnResetSample").addEventListener("click", function () { initS1(); });
+$("btnConsent").addEventListener("click", function () { showStep(1); });
+
+$("btnStart").addEventListener("click", function () {
+  var raw = $("taResume").value.trim();
+  var job = $("taJob").value.trim();
+  if (raw.length < 50) { alert("简历内容太短（<50 字），无法有效诊断，请补充或恢复示例材料。"); return; }
+  if (job.length < 30) { alert("JD 内容太短（<30 字），无法有效匹配，请补充或恢复示例材料。"); return; }
+  STATE.resume = deidentify(raw);
+  STATE.job = job;
+  STATE.f1 = computeF1(STATE.resume);
+  renderF1();
+  showStep(2);
+});
+
+/* ---------- S2 F1 ---------- */
+function renderF1() {
+  var f1 = STATE.f1;
+  drawRing($("ringR"), f1.R, "诊断分 R");
+  var bars = "";
+  f1.sub.forEach(function (s) {
+    bars += '<div class="subbar"><div class="meta"><span>' + s.label + "（权重 " + s.w + "）</span><span>" + s.score + "</span></div>" +
+      '<div class="track"><div class="fill" style="width:' + s.score + '%"></div></div></div>';
+  });
+  $("subbarsR").innerHTML = bars;
+  $("docResume").textContent = STATE.resume;
+
+  var list = "";
+  var reasonMap = { clarity: "clarity", achievement: "achievement", skill: "skill" };
+  f1.sub.forEach(function (s) {
+    var extra = F1_REASONS[reasonMap[s.key]];
+    var quote = extra ? extra.quote : "";
+    var found = quote && STATE.resume.indexOf(quote) >= 0;
+    list += '<div class="reason-item" data-quote="' + (found ? esc(encodeURIComponent(quote)) : "") + '">' +
+      "<b>" + s.label + " · " + s.score + "分</b><br>" +
+      (extra ? extra.rationale : "基于简历文本的规则判定") +
+      (quote ? '<div class="tag">证据：' + esc(clip(quote, 26)) + (found ? "" : "（原文已修改，无法定位）") + "</div>" : "") +
+      "</div>";
+  });
+  F1_SUGGESTIONS.forEach(function (s) {
+    var found = STATE.resume.indexOf(s.quote) >= 0;
+    list += '<div class="reason-item" data-quote="' + (found ? esc(encodeURIComponent(s.quote)) : "") + '">' +
+      '<span class="badge ' + s.severity.toLowerCase() + '">' + s.severity + "</span> <b>" + esc(s.issue) + "</b><br>" +
+      "建议：" + esc(s.suggestion) + '<br><span class="tag">改写草案：' + esc(s.rewrite) + "</span></div>";
+  });
+  $("reasonList").innerHTML = list;
+  var plain = STATE.resume;
+  Array.prototype.forEach.call(document.querySelectorAll("#reasonList .reason-item"), function (item) {
+    item.addEventListener("click", function () {
+      document.querySelectorAll("#reasonList .reason-item.active").forEach(function (n) { n.classList.remove("active"); });
+      item.classList.add("active");
+      var q = item.getAttribute("data-quote");
+      var pane = $("docResume");
+      pane.textContent = plain;
+      if (!q) return;
+      q = decodeURIComponent(q);
+      pane.innerHTML = esc(plain).split(esc(q)).join("<mark>" + esc(q) + "</mark>");
+      var mark = pane.querySelector("mark");
+      if (mark) mark.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  });
+}
+$("btnToF2").addEventListener("click", function () {
+  STATE.f2 = computeF2(STATE.resume);
+  renderF2();
+  showStep(3);
+});
+
+/* ---------- S3 F2 ---------- */
+function renderF2() {
+  var f2 = STATE.f2;
+  drawRing($("ringM"), f2.M, "匹配分 M");
+  var order = { hard: 0, responsibility: 1, preferred: 2, terminology: 3 };
+  var bars = "";
+  Object.keys(M_WEIGHT).forEach(function (t) {
+    var v = f2.cat[t];
+    bars += '<div class="subbar"><div class="meta"><span>' + TYPE_LABEL[t] + "（权重 " + Math.round(M_WEIGHT[t] * 100) + "%）</span><span>" +
+      (v === null ? "insufficient_evidence" : v.toFixed(1)) + "</span></div>" +
+      '<div class="track"><div class="fill" style="width:' + (v || 0) + '%"></div></div></div>';
+  });
+  $("subbarsM").innerHTML = bars;
+  var reqs = f2.results.slice().sort(function (a, b) { return order[a.type] - order[b.type]; });
+  $("reqList").innerHTML = reqs.map(function (r) {
+    return '<div class="req-item"><span class="badge ' + r.status + '">' + r.status + "</span>" +
+      '<span class="txt"><b>[' + TYPE_LABEL[r.type] + "]</b> " + esc(r.text) +
+      '<br><span class="evi">证据：' + esc(clip(r.evidence, 60)) + "（置信度 " + r.conf + "）</span></span></div>";
+  }).join("");
+  $("gapList").innerHTML = f2.gaps.map(function (g) {
+    return '<div class="req-item"><span class="badge ' + g.level.toLowerCase() + '">' + g.level + "</span>" +
+      '<span class="txt">' + esc(g.text) + '<br><span class="evi">建议：' + esc(g.action) + "</span></span></div>";
+  }).join("");
+}
+$("btnToF3").addEventListener("click", function () { startInterview(); showStep(4); });
+
+/* ---------- S4 F3 ---------- */
+function chatAdd(cls, who, text) {
+  var b = el("div", "bubble " + cls, (who ? '<div class="who">' + who + "</div>" : "") + esc(text));
+  $("chat").appendChild(b);
+  $("chat").scrollTop = $("chat").scrollHeight;
+  return b;
+}
+function startInterview() {
+  $("chat").innerHTML = "";
+  STATE.turns = []; STATE.qi = 0; STATE.phase = "ask"; STATE.curEval = null;
+  $("btnToF4").disabled = true;
+  chatAdd("sys", "", "面试开始：共 " + QUESTIONS.length + " 个主问题，每题一次追问。回答越具体，评估越准确。");
+  askCurrent();
+}
+function askCurrent() {
+  var q = QUESTIONS[STATE.qi];
+  chatAdd("q", "面试官 · 第 " + (STATE.qi + 1) + " 题（考察：" + q.targets.join(" / ") + "）", q.q);
+  STATE.phase = "ask";
+  $("inpAnswer").value = "";
+  $("inpAnswer").focus();
+}
+function starLabel(k) {
+  var map = { situation: "情境S", task: "任务T", action: "行动A", result: "结果R", metric: "量化数据", reflection: "复盘" };
+  return map[k] || k;
+}
+function submitAnswer(text) {
+  text = (text || "").trim();
+  if (!text) return;
+  if (STATE.phase === "ask") {
+    chatAdd("a", "你", text);
+    var ev = evaluateAnswer(text);
+    STATE.curEval = ev;
+    var ss = ev.subscores;
+    var card = el("div", "eval-card");
+    card.innerHTML = "<b>评估依据（引用你的原句）：</b><div class=\"quote-block\">“" + esc(ev.quote) + "”</div>" +
+      "<b>STAR 缺口：</b>" + (ev.missing.length ? ev.missing.map(function (m) { return '<span class="chip">' + starLabel(m) + "</span>"; }).join("") : '<span class="chip">无</span>') +
+      '<div class="followup"><b>追问：</b>' + esc(ev.followUp.question) + '<br><span style="color:var(--text-2)">追问理由：' + esc(ev.followUp.reason) + "</span></div>" +
+      '<div style="margin-top:6px;color:var(--text-2)">结构 ' + ss.structure + " ｜ 相关 " + ss.relevance + " ｜ 具体 " + ss.specificity + " ｜ 追问适应 " + ss.followup_adaptation + " ｜ 清晰 " + ss.clarity + "</div>";
+    $("chat").appendChild(card);
+    $("chat").scrollTop = $("chat").scrollHeight;
+    STATE.phase = "followup";
+    $("inpAnswer").value = "";
+    $("inpAnswer").placeholder = "回答追问（也可点「用示例回答」）…";
+    $("inpAnswer").focus();
+  } else {
+    chatAdd("a", "你（追问）", text);
+    var bonus = evaluateFollowup(text);
+    STATE.curEval.subscores.followup_adaptation = Math.min(95, Math.round((STATE.curEval.subscores.followup_adaptation + bonus) / 2));
+    chatAdd("sys", "", "追问适应分已更新为 " + STATE.curEval.subscores.followup_adaptation);
+    finishTurn();
+  }
+}
+function finishTurn() {
+  STATE.turns.push(STATE.curEval);
+  STATE.qi++;
+  if (STATE.qi < QUESTIONS.length) {
+    askCurrent();
+  } else {
+    STATE.phase = "done";
+    $("askRow").style.display = "none";
+    chatAdd("sys", "", "面试完成，共 " + STATE.turns.length + " 轮。点击下方按钮生成能力报告。");
+    $("btnToF4").disabled = false;
+  }
+}
+$("btnAnswer").addEventListener("click", function () { submitAnswer($("inpAnswer").value); });
+$("inpAnswer").addEventListener("keydown", function (e) { if (e.key === "Enter") submitAnswer($("inpAnswer").value); });
+$("btnSample").addEventListener("click", function () {
+  if (STATE.phase === "ask") submitAnswer(QUESTIONS[STATE.qi].sample);
+  else submitAnswer("数据方面，接口平均响应从 800ms 降到 220ms，日均请求量约 5 万次，缓存命中率 87%。");
+});
+
+/* ---------- S5 F4 ---------- */
+$("btnToF4").addEventListener("click", function () {
+  var f4 = computeF4(STATE.f1.R, STATE.f2.M, STATE.turns, STATE.f1.sub[2].score);
+  STATE.f4 = f4;
+  renderF4();
+  showStep(5);
+});
+function renderF4() {
+  var f4 = STATE.f4;
+  $("bigC0").textContent = f4.C0.toFixed(2);
+  $("c0Formula").textContent = "R " + STATE.f1.R.toFixed(2) + " × 0.25 ＋ M " + STATE.f2.M.toFixed(2) + " × 0.35 ＋ I " + f4.Iscore.toFixed(2) + " × 0.40";
+  $("c7low").textContent = f4.C7low.toFixed(2);
+  $("c7high").textContent = f4.C7high.toFixed(2);
+  var seg = $("c7seg");
+  seg.style.left = f4.C0 + "%";
+  seg.style.width = Math.max(2, f4.C7high - f4.C0) + "%";
+  $("assump").innerHTML = "<b>情景假设：</b>0.30 与 0.70 为 MVP 演示假设，非统计学习参数；假设按计划完成每天 30-45 分钟训练并产出成果物；第七天复测结果才是真实变化。";
+  drawRadar($("radar"), f4.dims);
+  var plan = PLAN.slice();
+  if (STATE.f2.gaps.length && STATE.f2.gaps[0].level === "P0") {
+    plan[1] = { day: 2, focus: "针对 P0 缺口（" + clip(STATE.f2.gaps[0].text.replace("硬性要求缺口：", ""), 22) + "）整理复盘笔记", minutes: 35, artifact: "一页复盘笔记" };
+  }
+  $("planGrid").innerHTML = plan.map(function (p) {
+    return '<div class="plan-day"><div class="d">第 ' + p.day + " 天</div><div style=\"font-size:14px\">" + esc(p.focus) + '</div><div class="m">约 ' + p.minutes + " 分钟 ｜ 成果物：" + esc(p.artifact) + "</div></div>";
+  }).join("");
+}
+function drawRadar(svg, dims) {
+  var cx = 210, cy = 180, R = 120, n = dims.length;
+  function pt(i, r) { var a = -Math.PI / 2 + i * 2 * Math.PI / n; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+  function poly(vals, scaleLowHigh) {
+    return vals.map(function (v, i) {
+      var r = R * Math.min(100, scaleLowHigh ? v * scaleLowHigh : v) / 100;
+      var p = pt(i, r);
+      return p[0].toFixed(1) + "," + p[1].toFixed(1);
+    }).join(" ");
+  }
+  var html = "";
+  [0.33, 0.66, 1].forEach(function (f) {
+    var pts = [];
+    for (var i = 0; i < n; i++) { var p = pt(i, R * f); pts.push(p[0] + "," + p[1]); }
+    html += '<polygon points="' + pts.join(" ") + '" fill="none" stroke="#e5e7eb"/>';
+  });
+  for (var i = 0; i < n; i++) {
+    var p = pt(i, R);
+    html += '<line x1="' + cx + '" y1="' + cy + '" x2="' + p[0] + '" y2="' + p[1] + '" stroke="#e5e7eb"/>';
+    var lp = pt(i, R + 22);
+    html += '<text x="' + lp[0] + '" y="' + lp[1] + '" text-anchor="middle" font-size="12" fill="#1f2937">' + dims[i].name + "</text>";
+    var sp = pt(i, R * dims[i].score / 100);
+    html += '<circle cx="' + sp[0] + '" cy="' + sp[1] + '" r="3" fill="#2563eb"/>';
+    var vp = pt(i, R * dims[i].score / 100 + 14);
+    html += '<text x="' + vp[0] + '" y="' + vp[1] + '" text-anchor="middle" font-size="10" fill="#2563eb">' + dims[i].score + "</text>";
+  }
+  var vals = dims.map(function (d) { return d.score; });
+  html += '<polygon points="' + poly(vals) + '" fill="rgba(37,99,235,.22)" stroke="#2563eb" stroke-width="2"/>';
+  html += '<polygon points="' + poly(vals, STATE.f4 ? STATE.f4.C7low / STATE.f4.C0 : 1) + '" fill="none" stroke="#93c5fd" stroke-width="1.5" stroke-dasharray="5,4"/>';
+  html += '<polygon points="' + poly(vals, STATE.f4 ? STATE.f4.C7high / STATE.f4.C0 : 1) + '" fill="none" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="5,4"/>';
+  html += '<text x="12" y="346" font-size="11" fill="#6b7280">实线＝C0 基线　蓝虚线＝七天推演 low　绿虚线＝七天推演 high</text>';
+  svg.innerHTML = html;
+}
+
+/* ---------- S6 ---------- */
+$("btnToEnd").addEventListener("click", function () {
+  var f4 = STATE.f4;
+  $("finalSummary").innerHTML =
+    '<div class="req-item"><span class="badge covered">R</span><span class="txt">简历诊断分：<b>' + STATE.f1.R.toFixed(2) + "</b></span></div>" +
+    '<div class="req-item"><span class="badge covered">M</span><span class="txt">岗位匹配分：<b>' + STATE.f2.M.toFixed(2) + "</b></span></div>" +
+    '<div class="req-item"><span class="badge covered">I</span><span class="txt">面试表现分：<b>' + f4.Iscore.toFixed(2) + "</b>（" + STATE.turns.length + " 轮）</span></div>" +
+    '<div class="req-item"><span class="badge p0">C0</span><span class="txt">综合基线：<b>' + f4.C0.toFixed(2) + "</b> ｜ 七天情景推演区间：<b>" + f4.C7low.toFixed(2) + " ~ " + f4.C7high.toFixed(2) + "</b></span></div>";
+  showStep(6);
+});
+$("btnRestart").addEventListener("click", function () {
+  $("askRow").style.display = "";
+  $("inpAnswer").placeholder = "输入你的回答，回车提交…";
+  initS1();
+  showStep(1);
+});
+
+/* ---------- init ---------- */
+(function () {
+  var steps = $("steps");
+  STEP_NAMES.forEach(function (name, i) { steps.appendChild(el("span", i === 0 ? "cur" : "", name)); });
+  initS1();
+  showStep(0);
+})();
+</script>
+</body>
+</html>
