@@ -201,3 +201,68 @@ python -m pytest tests/test_contracts.py::test_interview_turns_valid -v
 - 禁止模型自报总分 I
 - 禁止 answer_quote 非子串时通过校验
 - 日志落盘前必须过 log_sanitize.py
+
+## 可执行合同（P0-01 更新）
+
+### 输入合同
+- 输入格式: `resume_profile_json`（WF-02）+ `job_profile_json`（WF-03）+ 用户文字回答（每轮）
+- 必填字段: `resume_profile_json` 已校验、`job_profile_json` 已校验且 `user_confirmed=true`、`user_answer` 非空
+- 校验: WF-02/WF-03 退出标准全部满足
+
+### 输出合同
+- 输出格式: InterviewTurn JSON 序列（符合 `contracts/interview-turn.schema.json`）+ 复盘报告 Markdown
+- 必填字段: 每轮含 `turn`/`question`/`targets`/`answer_text`/`answer_quote`/`missing_elements`/`follow_up`/`rubric_partial`/`safety_flags`；`answer_quote` 必须是 `answer_text` 的子串
+- 校验: `validate_schema.py --schema contracts/interview-turn.schema.json` + `redflag.py --against <resume_clean.txt> <jd_text.txt>`
+
+### 工具调用链
+1. 从 JobProfile 选取 importance 最高的 5 个要求作为 targets
+2. 装配 `prompts/interview/interviewer.md` + ResumeProfile + JobProfile + 历史轮次 + 本轮问答
+3. 调用模型（`interview_question` 路由），获取 InterviewTurn JSON
+4. `python tools/validate_schema.py --schema contracts/interview-turn.schema.json --instance /tmp/interview_turn_{N}.json`
+5. `python tools/redflag.py --output /tmp/interview_turn_{N}.json --against <resume_clean.txt> <jd_text.txt>`
+6. 检查 `safety_flags`（非空展示警告，敏感问题阻断提问）
+7. 循环步骤 2-6（最多 5 主问题 + 最多 5 追问 = 最多 10 轮）
+8. 5 主问题完成后规则引擎计算 I 分（`I = 结构*25% + 相关*25% + 具体*20% + 追问*15% + 表达*15%`）
+9. 装配 `prompts/interview/review.md` 生成复盘报告
+
+### 状态转换
+- 初始态: SETUP
+- 成功态: INTERVIEW_DONE
+- 降级态: 模板评估（Schema/redflag 连续失败 -> 模板 rubric）、固定题库（超时 -> 顺序提问）
+- 错误态: 该轮作废重评（answer_quote 非子串）、敏感问题阻断
+- 删除态: DELETED
+
+### 降级路径
+| 主路径失败原因 | 降级方案 | 标记 |
+|---|---|---|
+| Schema 校验失败 | 降低 temperature 重试一次；仍失败用模板评估 | degraded=true |
+| answer_quote 非子串 | 该轮作废，重新评估 | degraded=false（重试中） |
+| 事实锁阻断 | 该轮重评；仍阻断用模板评估 | degraded=true |
+| 模型超时（>8s 首响应） | 切固定题库顺序提问，追问降级为模板 | degraded=true |
+| 语音 ASR 故障 | 10s 内回退文字输入 | degraded=true |
+| ASR 置信度低（<0.75） | 100% 触发用户确认或文字编辑 | degraded=false（交互确认） |
+| 敏感问题 | 阻断提问，转向岗位相关话题 | degraded=false（安全阻断） |
+
+### 模型路由
+- 任务类型: `interview_question`（每轮评估）+ `interview_review`（复盘报告）
+- 参数: temperature=0.4, max_tokens=1024, timeout=15s（每轮）；temperature=0.3, max_tokens=4096, timeout=30s（复盘）
+- 降级: `DEGRADED_OUTPUTS["interview_question"]`（题库 fallback，generic_behavioral）；`DEGRADED_OUTPUTS["interview_review"]`（骨架报告）
+
+### 验收命令
+```bash
+python tools/validate_schema.py \
+  --schema contracts/interview-turn.schema.json \
+  --instance tests/fixtures-synthetic/interviews/interview-01.json
+python -m pytest tests/test_fault_injection.py::test_answer_quote_not_substring_rejected -v
+python -m pytest tests/test_fault_injection.py -v
+python -m pytest tests/test_contracts.py::test_interview_turns_valid -v
+```
+
+### 禁止事项
+- [X] 禁止模型自报总分
+- [X] 禁止跳过 deidentify（WF-01 前置保证）
+- [X] 禁止超过 5 个主问题
+- [X] 禁止每题超过 1 次追问
+- [X] 禁止询问婚育/籍贯/疾病/宗教/家庭资产等敏感内容
+- [X] 禁止 answer_quote 非子串时通过校验
+- [X] 禁止 DELETED 状态下调用模型

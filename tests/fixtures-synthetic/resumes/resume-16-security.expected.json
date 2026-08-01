@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 80,
+      "rationale": "教育/工作/项目/技能版块完整",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "教育经历",
+          "start": 89,
+          "end": 93
+        }
+      ]
+    },
+    "clarity": {
+      "score": 78,
+      "rationale": "安全事件响应有完整闭环",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "编写应急响应 SOP，安全事件平均响应时间从 2 小时缩短到 30 分钟",
+          "start": 318,
+          "end": 354
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 80,
+      "rationale": "量化成果丰富，安全口径准确",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "负责公司 Web 应用安全测试，完成 80+ 个项目的渗透测试，发现高危漏洞 30+ 个",
+          "start": 183,
+          "end": 227
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 78,
+      "rationale": "安全工具栈全面",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "语言：Python（熟练）、Go（熟悉）、Shell（熟悉）",
+          "start": 460,
+          "end": 490
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 82,
+      "rationale": "结构清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 455,
+          "end": 459
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P1",
+      "issue": "WAF 规则库缺少误报处理机制说明",
+      "suggestion": "补充误报优化策略",
+      "rewrite_draft": "搭建 WAF 规则库，结合白名单机制优化误报率至 5% 以下",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "搭建 WAF 规则库，拦截 SQL 注入和 XSS 攻击，误报率控制在 5% 以下",
+          "start": 228,
+          "end": 269
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "零信任架构缺少具体技术选型对比",
+      "suggestion": "补充架构选型理由",
+      "rewrite_draft": "选用 OAuth2.0+OIDC 方案（对比 SAML 后更适配微服务场景）",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "参与零信任网络架构设计，使用 OAuth2.0+OIDC 实现细粒度访问控制",
+          "start": 385,
+          "end": 423
+        }
+      ]
+    }
+  ]
+}

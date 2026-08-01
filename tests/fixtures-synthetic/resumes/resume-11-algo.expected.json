@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 85,
+      "rationale": "教育/实习/项目/技能版块完整，硕士学历",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "教育经历",
+          "start": 89,
+          "end": 93
+        }
+      ]
+    },
+    "clarity": {
+      "score": 78,
+      "rationale": "技术表述准确，有排查过程",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "使用 TensorBoard 进行训练可视化，定位梯度消失问题并优化网络层数",
+          "start": 308,
+          "end": 346
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 82,
+      "rationale": "量化成果丰富且专业口径准确",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "参与文本分类模型训练，使用 BERT 微调实现新闻分类，准确率从基线 82% 提升至 91%",
+          "start": 222,
+          "end": 268
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 78,
+      "rationale": "算法技能栈与岗位高度匹配",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "语言：Python（熟练）、C++（熟悉）",
+          "start": 470,
+          "end": 491
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 82,
+      "rationale": "结构清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 465,
+          "end": 469
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P1",
+      "issue": "论文发表缺少会议名称和影响因子",
+      "suggestion": "补充论文发表的具体会议信息",
+      "rewrite_draft": "论文发表于某国际会议（CCF-C 类，二作）",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "论文发表于某会议（二作）",
+          "start": 451,
+          "end": 463
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "Wide&Deep 模型缺少线上效果数据",
+      "suggestion": "如有线上 A/B 测试数据则补充",
+      "rewrite_draft": "Wide&Deep 模型线上 A/B 测试 CTR 提升待用户核实：X%",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "实现 Wide&Deep 模型，在公开数据集上 AUC 达到 0.82",
+          "start": 385,
+          "end": 420
+        }
+      ]
+    }
+  ]
+}

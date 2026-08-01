@@ -91,10 +91,17 @@
 
 <script src="../js/mock-data.js"></script>
 <script src="../js/app.js"></script>
+<script src="../js/data-bridge.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   if (window.APP.getState() !== "success") return;
-  var m = window.MOCK.matchResult;
+  // 主链路: 优先 DataBridge, MOCK 作为降级缓存
+  var DB = window.DataBridge;
+  function fetchSync(key) {
+    if (DB && DB.getMockData) { var d = DB.getMockData(key); if (d) return d; }
+    return window.MOCK ? window.MOCK[key] : null;
+  }
+  var m = fetchSync('matchResult');
   var order = { hard: 0, responsibility: 1, preferred: 2, terminology: 3 };
   var reqs = m.requirements.slice().sort(function (a, b) { return order[a.type] - order[b.type]; });
   var colors = { covered: "#16a34a", weak: "#d97706", missing: "#dc2626", unknown: "#6b7280" };

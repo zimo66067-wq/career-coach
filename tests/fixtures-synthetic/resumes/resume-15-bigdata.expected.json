@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 80,
+      "rationale": "教育/工作/项目/技能版块完整",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "教育经历",
+          "start": 90,
+          "end": 94
+        }
+      ]
+    },
+    "clarity": {
+      "score": 80,
+      "rationale": "ETL 优化表述准确，有前后对比",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "优化 Spark 任务，将 ETL 作业执行时间从 4 小时缩短到 1.5 小时，节省计算资源 40%",
+          "start": 274,
+          "end": 325
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 82,
+      "rationale": "大数据量级量化准确",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "负责用户行为日志处理管道开发，使用 Flink 实时处理日均 10 亿条日志",
+          "start": 192,
+          "end": 230
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 80,
+      "rationale": "大数据全栈技能匹配度高",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "语言：Scala（熟练）、Python（熟练）、Java（熟悉）、SQL（熟练）",
+          "start": 435,
+          "end": 475
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 82,
+      "rationale": "格式清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 430,
+          "end": 434
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P1",
+      "issue": "数仓分层模型缺少业务场景说明",
+      "suggestion": "补充数仓服务的业务场景",
+      "rewrite_draft": "设计 Hive 数仓分层模型（ODS-DWD-DWS-ADS），服务用户增长与商业化分析场景",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "设计 Hive 数仓分层模型（ODS-DWD-DWS-ADS），覆盖 200+ 张表",
+          "start": 231,
+          "end": 273
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "实时推荐缺少特征数量和模型信息",
+      "suggestion": "补充特征维度数量",
+      "rewrite_draft": "构建实时特征计算管道，产出 50+ 维用户实时特征",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "使用 Flink+Kafka 构建实时特征计算管道，特征更新延迟控制在秒级",
+          "start": 391,
+          "end": 428
+        }
+      ]
+    }
+  ]
+}

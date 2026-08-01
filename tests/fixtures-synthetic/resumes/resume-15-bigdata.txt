@@ -1,0 +1,28 @@
+个人简历（合成样本，非真实人物）
+
+姓名：[REDACTED_NAME]
+电话：[REDACTED_PHONE]
+邮箱：[REDACTED_EMAIL]
+求职意向：大数据工程师
+
+教育经历
+2017.09-2021.06 某某大学 计算机科学与技术 本科
+主修课程：数据挖掘、分布式计算、数据库系统、数据结构
+
+工作经历
+2021.07-2024.06 某数据公司 大数据开发工程师
+负责用户行为日志处理管道开发，使用 Flink 实时处理日均 10 亿条日志
+设计 Hive 数仓分层模型（ODS-DWD-DWS-ADS），覆盖 200+ 张表
+优化 Spark 任务，将 ETL 作业执行时间从 4 小时缩短到 1.5 小时，节省计算资源 40%
+搭建数据质量监控看板，数据延迟告警从平均 30 分钟降至 5 分钟
+
+项目经历
+2022.06-2022.12 实时推荐特征计算
+使用 Flink+Kafka 构建实时特征计算管道，特征更新延迟控制在秒级
+
+技能清单
+语言：Scala（熟练）、Python（熟练）、Java（熟悉）、SQL（熟练）
+框架：Spark、Flink、Hadoop、Hive、Kafka
+工具：Airflow、DolphinScheduler、ClickHouse、HBase
+
+pii_removed:true

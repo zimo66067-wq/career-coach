@@ -106,3 +106,57 @@ python -m pytest tests/test_extract.py tests/test_deidentify.py -v
 - 禁止将 PII 映射表（--map 输出）入库
 - 日志落盘前必须过 log_sanitize.py
 - 禁止跳过用户同意（CONSENT）直接处理
+
+## 可执行合同（P0-01 更新）
+
+### 输入合同
+- 输入格式: 文件（PDF/DOCX/TXT）或纯文本粘贴
+- 必填字段: `resume_file_path`（文件模式）或 `resume_raw_text`（粘贴模式）
+- 校验: 文件扩展名 ∈ {pdf, docx, txt}；粘贴模式文本非空（>50 字符）
+
+### 输出合同
+- 输出格式: 纯文本文件（`/tmp/resume_clean.txt`）
+- 必填字段: 文件尾部含 `pii_removed:true` 标记
+- 校验: `grep -c "pii_removed:true" /tmp/resume_clean.txt` == 1；手机号/邮箱/身份证正则扫描命中数 == 0
+
+### 工具调用链
+1. `python tools/extract_text.py --input <用户文件> --output /tmp/resume_raw.txt`（文件模式）
+2. `python tools/deidentify.py --input /tmp/resume_raw.txt --output /tmp/resume_clean.txt`
+3. 正则扫描确认无 PII 残留（手机号 `1[3-9]\d{9}`、邮箱、身份证 `\d{17}[\dXx]`）
+
+### 状态转换
+- 初始态: INIT
+- 成功态: RESUME_READY
+- 降级态: PARSE_FAILED
+- 错误态: PARSE_FAILED（提取失败 exit 2 / 去标识化失败 exit 3）
+- 删除态: DELETED
+
+### 降级路径
+| 主路径失败原因 | 降级方案 | 标记 |
+|---|---|---|
+| PDF 提取为空（扫描件） | 引导用户粘贴文本 | PARSE_FAILED |
+| DOCX 解析失败 | zipfile 降级 -> 仍失败则引导粘贴 | PARSE_FAILED |
+| 去标识化后残留 PII | 阻断流程，提示删除敏感信息后重试 | PARSE_FAILED |
+| 文件格式不支持 | 提示仅支持 PDF/DOCX/TXT | PARSE_FAILED |
+
+### 模型路由
+- 任务类型: 无模型调用（纯工具执行）
+- 参数: N/A
+- 降级: N/A（此 WF 不涉及模型调用）
+
+### 验收命令
+```bash
+python tools/extract_text.py --input tests/fixtures-synthetic/resumes/resume-01-swe.txt --output /tmp/wf01_raw.txt
+python tools/deidentify.py --input /tmp/wf01_raw.txt --output /tmp/wf01_clean.txt
+grep -c "pii_removed:true" /tmp/wf01_clean.txt  # 应为 1
+grep -cE "1[3-9][0-9]{9}" /tmp/wf01_clean.txt   # 应为 0
+python -m pytest tests/test_extract.py tests/test_deidentify.py -v
+```
+
+### 禁止事项
+- [X] 禁止将未脱敏文本送入模型
+- [X] 禁止跳过 deidentify
+- [X] 禁止保存原始文件副本到仓库
+- [X] 禁止将 PII 映射表入库
+- [X] 禁止跳过用户同意（CONSENT）直接处理
+- [X] 禁止 DELETED 状态下调用模型

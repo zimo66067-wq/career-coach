@@ -1,0 +1,29 @@
+个人简历（合成样本，非真实人物）
+
+姓名：[REDACTED_NAME]
+电话：[REDACTED_PHONE]
+邮箱：[REDACTED_EMAIL]
+求职意向：Java 高级开发工程师
+
+教育经历
+2015.09-2019.06 某某大学 计算机科学与技术 本科
+主修课程：Java 程序设计、数据结构与算法、数据库系统、分布式系统
+
+工作经历
+2019.07-2022.06 某电商公司 Java 开发工程师
+负责订单系统核心微服务开发，使用 Spring Cloud 构建服务集群，支撑日均 500 万订单
+设计分库分表方案，将 MySQL 单表 2 亿行数据拆分至 16 库 64 表，查询性能提升 60%
+引入 RocketMQ 实现订单异步处理，系统吞吐量从 2000 TPS 提升至 8000 TPS
+主导代码评审制度落地，团队代码缺陷率下降 40%
+
+2022.07-2024.06 某金融科技公司 高级 Java 开发工程师
+负责风控引擎重构，使用策略模式+规则引擎将规则迭代周期从 2 周缩短到 2 天
+优化 JVM 参数，Full GC 频率从每日 3 次降至每周 1 次
+
+技能清单
+语言：Java（精通）、Go（熟悉）、Python（了解）
+框架：Spring Boot、Spring Cloud、MyBatis、Dubbo
+中间件：MySQL、Redis、RocketMQ、Kafka、Elasticsearch
+工具：Git、Docker、Kubernetes、Jenkins
+
+pii_removed:true

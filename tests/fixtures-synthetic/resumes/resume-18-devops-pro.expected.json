@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 75,
+      "rationale": "工作经历完整但缺少项目经历版块",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "工作经历",
+          "start": 158,
+          "end": 162
+        }
+      ]
+    },
+    "clarity": {
+      "score": 82,
+      "rationale": "SRE 实践表述准确，有 SLO 闭环",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "推动 SRE 实践，设立 SLO 目标，服务可用性从 99.5% 提升至 99.95%",
+          "start": 433,
+          "end": 476
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 85,
+      "rationale": "量化成果丰富且 DevOps 口径准确",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "搭建 CI/CD 流水线，使用 Jenkins+GitLab+ArgoCD 实现全自动化部署，发布周期从 2 周缩短到 1 天",
+          "start": 197,
+          "end": 260
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 82,
+      "rationale": "DevOps 全栈技能匹配度高",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "语言：Python（熟练）、Go（熟悉）、Shell（熟练）",
+          "start": 483,
+          "end": 513
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 80,
+      "rationale": "格式清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 478,
+          "end": 482
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P0",
+      "issue": "缺少独立项目经历版块",
+      "suggestion": "补充 DevOps 转型或基础设施建设的项目案例",
+      "rewrite_draft": "2022.01-2022.06 Kubernetes 集群迁移项目：将 50 个服务从虚拟机迁移至 K8s",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "维护 300+ 节点 Kubernetes 集群，实现自动扩缩容，资源利用率从 45% 提升至 70%",
+          "start": 261,
+          "end": 312
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "AWS 标注但缺少具体服务使用说明",
+      "suggestion": "补充 AWS 具体服务的实践",
+      "rewrite_draft": "AWS：使用 EKS 托管 K8s 集群、RDS 管理 MySQL、S3 存储备份",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "云平台：阿里云、AWS",
+          "start": 605,
+          "end": 616
+        }
+      ]
+    }
+  ]
+}

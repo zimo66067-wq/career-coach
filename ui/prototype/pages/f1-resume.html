@@ -92,10 +92,17 @@
 <script src="../js/mock-data.js"></script>
 <script src="../js/app.js"></script>
 <script src="../js/evidence.js"></script>
+<script src="../js/data-bridge.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   if (window.APP.getState() !== "success") return;
-  var p = window.MOCK.resumeProfile;
+  // 主链路: 优先 DataBridge, MOCK 作为降级缓存
+  var DB = window.DataBridge;
+  function fetchSync(key) {
+    if (DB && DB.getMockData) { var d = DB.getMockData(key); if (d) return d; }
+    return window.MOCK ? window.MOCK[key] : null;
+  }
+  var p = fetchSync('resumeProfile');
   // 子分条
   var weights = { structure: "15%", clarity: "20%", achievement_evidence: "25%", skill_evidence: "20%", ats_readability: "20%" };
   var html = "";
@@ -106,7 +113,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   document.getElementById("subbars").innerHTML = html;
   // 证据对照
-  var highlight = window.EVIDENCE.renderDoc("resumeDoc", window.MOCK.resumeText);
+  var highlight = window.EVIDENCE.renderDoc("resumeDoc", fetchSync('resumeText'));
   var list = "";
   Object.keys(p.subscores).forEach(function (k) {
     var s = p.subscores[k];

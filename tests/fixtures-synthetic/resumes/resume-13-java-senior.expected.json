@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 78,
+      "rationale": "两段工作经历完整，缺少项目经历版块",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "工作经历",
+          "start": 170,
+          "end": 174
+        }
+      ]
+    },
+    "clarity": {
+      "score": 82,
+      "rationale": "技术方案表述准确，有架构决策依据",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "设计分库分表方案，将 MySQL 单表 2 亿行数据拆分至 16 库 64 表，查询性能提升 60%",
+          "start": 258,
+          "end": 308
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 85,
+      "rationale": "量化成果丰富且高级口径准确",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "引入 RocketMQ 实现订单异步处理，系统吞吐量从 2000 TPS 提升至 8000 TPS",
+          "start": 309,
+          "end": 358
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 82,
+      "rationale": "Java 全栈技能深度高",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "语言：Java（精通）、Go（熟悉）、Python（了解）",
+          "start": 505,
+          "end": 534
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 80,
+      "rationale": "格式清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 500,
+          "end": 504
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P0",
+      "issue": "缺少独立的项目经历版块",
+      "suggestion": "将工作经历中的关键项目拆分为独立项目经历",
+      "rewrite_draft": "2022.07-2024.06 风控引擎重构项目：主导架构设计，策略模式+规则引擎方案落地",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "负责风控引擎重构，使用策略模式+规则引擎将规则迭代周期从 2 周缩短到 2 天",
+          "start": 423,
+          "end": 462
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "JVM 调优缺少具体参数说明",
+      "suggestion": "补充 JVM 关键调优参数",
+      "rewrite_draft": "优化 JVM 参数（-Xmx8g -Xms8g -XX:+UseG1GC），Full GC 频率从每日 3 次降至每周 1 次",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "优化 JVM 参数，Full GC 频率从每日 3 次降至每周 1 次",
+          "start": 463,
+          "end": 498
+        }
+      ]
+    }
+  ]
+}

@@ -55,3 +55,42 @@
 ## 六、审查结论
 
 **通过（Go）。** WorkBuddy 阶段产物满足事实锁、合同一致性与全部自动化验收，可交接 DuMate 搭建六个工作流。
+
+## F4 逐维趋势算法冻结（P1-03 修复）
+
+### 六维能力定义与来源
+
+| 维度 key | 名称 | 来源 |
+|---|---|---|
+| job_fit | 岗位契合 | M 分直接映射 |
+| achievement_evidence | 成果证据 | R.achievement_evidence + I.specificity |
+| professional_expression | 专业表达 | I.clarity + I.relevance |
+| structured_answer | 结构化回答 | I.structure |
+| job_depth | 岗位深度 | R.skill_evidence + M.terminology |
+| followup_adaptation | 追问适应 | I.followup_adaptation |
+
+### C0 基线公式
+
+C0 = 0.25R + 0.35M + 0.40I（已冻结于 scoring.md）
+
+### C7 逐维 low/high 公式
+
+对每个维度 d：
+- C7_low(d) = score(d) + (100 - score(d)) * 0.30
+- C7_high(d) = score(d) + (100 - score(d)) * 0.70
+
+七天行动映射表：
+| 天 | 行动 | 影响维度 | 预期提升 |
+|---|---|---|---|
+| 1 | 补量化证据 | achievement_evidence | +15~25 |
+| 2 | P0缺口复盘 | job_fit | +10~20 |
+| 3 | STAR重写 | structured_answer | +10~15 |
+| 4 | 术语速学 | job_depth | +8~12 |
+| 5 | 模拟面试 | professional_expression | +8~15 |
+| 6 | 简历修订 | achievement_evidence | +5~10 |
+| 7 | 复测对比 | 全维度 | 验证提升 |
+
+假设条件：
+1. 每天行动按时完成，分钟数 30-45
+2. 行动产出物经过验收
+3. 这是情景推演，不是录用概率或真实预测

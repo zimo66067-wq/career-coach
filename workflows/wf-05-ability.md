@@ -251,3 +251,77 @@ python -m pytest tests/test_rescore.py tests/test_fault_injection.py -v
 - 禁止不标注"非录用概率、非真实预测"
 - 禁止雷达图失败时不降级表格
 - 日志落盘前必须过 log_sanitize.py
+
+## 可执行合同（P0-01 更新）
+
+### 输入合同
+- 输入格式: JSON（`score-input.json`，含 R/M/I 子分与匹配明细）+ 全部上游合同 JSON
+- 必填字段: `R`（五个子分）、`M`（requirements 四态明细）、`I`（五个子分）；上游 JSON: ResumeProfile + JobProfile + InterviewTurn 序列 + `contracts/scoring.md`
+- 校验: `rescore.py --input <score-input.json> --expect C0=<预期值>`（对拍容差 ±0.5）
+
+### 输出合同
+- 输出格式: JSON（符合 `contracts/ability-profile.schema.json`）+ ECharts option JSON
+- 必填字段: `resume_score`/`match_score`/`interview_score`/`dimensions[]`（6 维，每维含 score + sources）/`baseline`(C0)/`scenario_day7`/`plan[]`（恰好 7 条）
+- 校验: `validate_schema.py --schema contracts/ability-profile.schema.json` + `redflag.py --against <全部上游合同 JSON + scoring.md>`
+
+### 工具调用链
+1. 收集 R/M/I 子分及证据，构造 `score-input.json`
+2. `python tools/rescore.py --input /tmp/score-input.json --expect C0=<预期值>`
+3. 六维能力映射（R/M/I 子分 -> 6 个维度，sources 指向真实对象 ID）
+4. 装配 `prompts/plan/seven-day.md` + 缺口清单 + STAR 缺失 + unknown 待确认项
+5. 调用模型（`seven_day_plan` 路由），生成 plan JSON 数组（7 条）
+6. `python tools/validate_schema.py --schema contracts/ability-profile.schema.json --instance /tmp/ability_profile.json`
+7. `python tools/redflag.py --output /tmp/ability_profile.json --against <全部上游合同 + scoring.md>`
+8. `python tools/radar_adapter.py --input /tmp/ability_profile.json --output /tmp/radar_option.json`
+
+### 状态转换
+- 初始态: INTERVIEW_DONE
+- 成功态: REPORT_READY
+- 降级态: PLAN_FAILED（计划校验失败 -> 模板计划）、全 unknown（不生成 C0，只显示 F1/F2）
+- 错误态: RESCORE_MISMATCH（复算超差 -> 阻断排查）、TIMEOUT（>30s）
+- 删除态: DELETED
+
+### 降级路径
+| 主路径失败原因 | 降级方案 | 标记 |
+|---|---|---|
+| 复算超差（>0.5） | 阻断，排查语义层 | degraded=false（硬阻断） |
+| 全 unknown（证据不足） | 不生成 C0，只显示 F1/F2 阶段结果 | degraded=true |
+| 计划校验失败（第一次） | 降低 temperature 重试一次 | degraded=false（重试中） |
+| 计划校验失败（第二次） | 使用模板计划（7 天模板，标注"模板计划"） | degraded=true |
+| 事实锁阻断 | 阻断，检查幻觉数字来源 | degraded=false（硬阻断） |
+| 雷达图渲染失败 | 10s 内降级为六维表格展示 | degraded=true |
+| 模型超时（>30s） | 提示报告生成中，不展示未校验结果 | degraded=false（待重试） |
+
+### 模型路由
+- 任务类型: `seven_day_plan`（七天计划生成）
+- 参数: temperature=0.2, max_tokens=2048, timeout=20s
+- 降级: `DEGRADED_OUTPUTS["seven_day_plan"]`（7 条占位计划，title/artifact 均为 TBD，标注 `degraded=true`）
+
+### 验收命令
+```bash
+python tools/rescore.py \
+  --input tests/fixtures-synthetic/abilities/score-input-01.json --expect C0=68.27
+python tools/validate_schema.py \
+  --schema contracts/ability-profile.schema.json \
+  --instance tests/fixtures-synthetic/abilities/ability-01.json
+python tools/radar_adapter.py \
+  --input tests/fixtures-synthetic/abilities/ability-01.json --output /tmp/wf05_radar.json
+python tools/redflag.py \
+  --output tests/fixtures-synthetic/abilities/ability-01.json \
+  --against tests/fixtures-synthetic/resumes/resume-01-swe.expected.json \
+            tests/fixtures-synthetic/jobs/job-01-swe.expected.json \
+            tests/fixtures-synthetic/interviews/interview-01.json \
+            contracts/scoring.md
+python -m pytest tests/test_rescore.py tests/test_fault_injection.py -v
+```
+
+### 禁止事项
+- [X] 禁止模型自报总分
+- [X] 禁止跳过 deidentify（WF-01 前置保证）
+- [X] 禁止使用"预测"一词（统一口径"七天竞争力情景推演"）
+- [X] 禁止模型自报 C0 或 C7
+- [X] 禁止 plan 不是恰好 7 条
+- [X] 禁止不标注 0.30/0.70 演示假设
+- [X] 禁止不标注"非录用概率、非真实预测"
+- [X] 禁止雷达图失败时不降级表格
+- [X] 禁止 DELETED 状态下调用模型

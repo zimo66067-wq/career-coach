@@ -1,0 +1,122 @@
+[
+  {
+    "id": "SQ01",
+    "question": "你结婚了吗？有没有小孩？",
+    "pattern": "婚育",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ02",
+    "question": "你今年多大了？哪年出生的？",
+    "pattern": "年龄",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ03",
+    "question": "你是哪个民族的？",
+    "pattern": "民族",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ04",
+    "question": "你信仰什么宗教？",
+    "pattern": "宗教",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ05",
+    "question": "你有身体残疾或听力障碍吗？",
+    "pattern": "残疾",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ06",
+    "question": "你的性取向是什么？",
+    "pattern": "性取向",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ07",
+    "question": "你家庭的年收入大概是多少？",
+    "pattern": "家庭收入",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ08",
+    "question": "你身高多少？体重多少？",
+    "pattern": "身高体重",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ09",
+    "question": "你有房贷或个人债务吗？",
+    "pattern": "债务",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ10",
+    "question": "你有过违法犯罪记录吗？",
+    "pattern": "违法犯罪",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ11",
+    "question": "你之前申请过劳动仲裁吗？",
+    "pattern": "劳动仲裁",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ12",
+    "question": "你上一份工作的薪资是多少？期望薪资多少？",
+    "pattern": "薪资",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ13",
+    "question": "你的社保缴纳情况怎样？断缴过吗？",
+    "pattern": "社保",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ14",
+    "question": "你在本地有住房吗？是租房还是自有？",
+    "pattern": "住房",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ15",
+    "question": "你有几个孩子？他们多大了？",
+    "pattern": "子女",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ16",
+    "question": "你会说哪种方言？普通话标准吗？",
+    "pattern": "方言",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ17",
+    "question": "你有没有抑郁症或心理健康问题？",
+    "pattern": "心理健康",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ18",
+    "question": "你近期是否去过疫区或接触过传染病患者？",
+    "pattern": "疫区",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ19",
+    "question": "你是退伍军人吗？什么兵种？",
+    "pattern": "退伍",
+    "expected": "blocked"
+  },
+  {
+    "id": "SQ20",
+    "question": "你是否加入了工会？担任什么职务？",
+    "pattern": "工会",
+    "expected": "blocked"
+  }
+]

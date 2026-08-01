@@ -1,0 +1,129 @@
+{
+  "version": "1.0",
+  "user_confirmed": true,
+  "job_title": "数据分析师",
+  "requirements": [
+    {
+      "id": "J1",
+      "type": "hard",
+      "text": "本科及以上学历，统计/数学/计算机相关",
+      "source_span": {
+        "doc": "job",
+        "quote": "本科及以上学历，统计学/数学/计算机相关专业；",
+        "start": 72,
+        "end": 95
+      }
+    },
+    {
+      "id": "J2",
+      "type": "hard",
+      "text": "熟练使用 SQL 进行数据分析",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟练使用 SQL 进行数据提取和分析；",
+        "start": 99,
+        "end": 118
+      }
+    },
+    {
+      "id": "J3",
+      "type": "hard",
+      "text": "熟练使用 Python Pandas/NumPy",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟练使用 Python（Pandas/NumPy）进行数据处理；",
+        "start": 122,
+        "end": 154
+      }
+    },
+    {
+      "id": "J4",
+      "type": "hard",
+      "text": "了解 A/B 测试和统计显著性检验",
+      "source_span": {
+        "doc": "job",
+        "quote": "了解 A/B 测试原理和统计显著性检验；",
+        "start": 158,
+        "end": 178
+      }
+    },
+    {
+      "id": "J5",
+      "type": "hard",
+      "text": "具备数据可视化能力，熟悉 Tableau 或 Power BI",
+      "source_span": {
+        "doc": "job",
+        "quote": "具备数据可视化能力，熟悉 Tableau 或 Power BI；",
+        "start": 182,
+        "end": 214
+      }
+    },
+    {
+      "id": "R1",
+      "type": "responsibility",
+      "text": "搭建业务数据指标体系和看板",
+      "source_span": {
+        "doc": "job",
+        "quote": "搭建业务数据指标体系和看板；",
+        "start": 244,
+        "end": 258
+      }
+    },
+    {
+      "id": "R2",
+      "type": "responsibility",
+      "text": "开展用户行为分析和漏斗分析",
+      "source_span": {
+        "doc": "job",
+        "quote": "开展用户行为分析和漏斗分析；",
+        "start": 262,
+        "end": 276
+      }
+    },
+    {
+      "id": "R3",
+      "type": "responsibility",
+      "text": "设计并执行 A/B 测试方案",
+      "source_span": {
+        "doc": "job",
+        "quote": "设计并执行 A/B 测试方案；",
+        "start": 280,
+        "end": 295
+      }
+    },
+    {
+      "id": "P1",
+      "type": "preferred",
+      "text": "有金融/电商行业数据分析经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有金融/电商行业数据分析经验者优先；",
+        "start": 324,
+        "end": 342
+      }
+    },
+    {
+      "id": "P2",
+      "type": "preferred",
+      "text": "熟悉 R 语言或 SAS",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟悉 R 语言或 SAS 者优先。",
+        "start": 346,
+        "end": 363
+      }
+    },
+    {
+      "id": "T1",
+      "type": "terminology",
+      "text": "SQL",
+      "source_span": {
+        "doc": "job",
+        "quote": "SQL、Python、Pandas、NumPy、Matplotlib、Tableau、Excel、A/B Testing",
+        "start": 371,
+        "end": 431
+      }
+    }
+  ],
+  "prompt_injection_flags": []
+}

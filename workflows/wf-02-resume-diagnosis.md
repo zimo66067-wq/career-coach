@@ -154,3 +154,64 @@ python -m pytest tests/test_contracts.py tests/test_fault_injection.py -v
 - 禁止编造用户简历中不存在的事实
 - 禁止评价与求职无关的个人特征
 - 日志落盘前必须过 log_sanitize.py
+
+## 可执行合同（P0-01 更新）
+
+### 输入合同
+- 输入格式: 纯文本（`resume_clean_text`，来自 WF-01，已脱敏 `pii_removed:true`）
+- 必填字段: 非空文本；尾部含 `pii_removed:true`
+- 校验: WF-01 退出标准全部满足（PII 扫描无命中）
+
+### 输出合同
+- 输出格式: JSON（符合 `contracts/resume-profile.schema.json`）
+- 必填字段: `subscores`（五维子分）、`suggestions`（逐条建议含 `source_spans`）、`pii_removed`、`source_type`
+- 校验: `validate_schema.py --schema contracts/resume-profile.schema.json --instance <output>` + `redflag.py --output <output> --against <resume_clean.txt>`
+
+### 工具调用链
+1. 装配 `prompts/resume/diagnose.md` 系统提示 + `resume_clean_text` 用户输入
+2. 调用模型（`resume_diagnosis` 路由），获取 ResumeProfile JSON
+3. `python tools/validate_schema.py --schema contracts/resume-profile.schema.json --instance /tmp/resume_profile.json`
+4. `python tools/redflag.py --output /tmp/resume_profile.json --against <resume_clean.txt 路径>`
+5. 规则引擎按 `scoring.md` 公式计算 R 分（`R = 结构*15% + 表达*20% + 成果*25% + 技能*20% + ATS*20%`）
+6. （可选）装配 `prompts/resume/report-deep.md` 生成深度报告
+
+### 状态转换
+- 初始态: RESUME_READY
+- 成功态: DIAGNOSED
+- 降级态: SCHEMA_FAILED（重试后仍失败 -> 简化诊断）、REDFLAG_BLOCKED（事实锁阻断 -> 简化诊断）
+- 错误态: TIMEOUT（模型超时 >45s）
+- 删除态: DELETED
+
+### 降级路径
+| 主路径失败原因 | 降级方案 | 标记 |
+|---|---|---|
+| Schema 校验失败（第一次） | 降低 temperature 重试一次 | degraded=false（重试中） |
+| Schema 校验失败（第二次） | 规则静态结构检查（段落数/技能数/量化比例/ATS指标） | degraded=true |
+| 事实锁阻断 | 简化诊断，展示 redflag red 项 | degraded=true |
+| 模型超时（>45s） | 提示稍后查看，不展示未校验结果 | degraded=false（待重试） |
+| 模型返回非 JSON | 尝试提取 JSON 片段；仍失败走 Schema 失败降级 | degraded=true |
+
+### 模型路由
+- 任务类型: `resume_diagnosis`（主诊断）+ `resume_report`（可选深度报告）
+- 参数: temperature=0.1, max_tokens=4096, timeout=30s（诊断）；temperature=0.3, max_tokens=4096, timeout=30s（报告）
+- 降级: `DEGRADED_OUTPUTS["resume_diagnosis"]`（规则骨架，subscores 全 None，标注 `degraded=true`）
+
+### 验收命令
+```bash
+python tools/validate_schema.py \
+  --schema contracts/resume-profile.schema.json \
+  --instance tests/fixtures-synthetic/resumes/resume-01-swe.expected.json
+python tools/redflag.py \
+  --output tests/fixtures-synthetic/resumes/resume-01-swe.expected.json \
+  --against tests/fixtures-synthetic/resumes/resume-01-swe.txt
+python -m pytest tests/test_contracts.py tests/test_fault_injection.py -v
+```
+
+### 禁止事项
+- [X] 禁止模型自报总分
+- [X] 禁止跳过 deidentify（WF-01 前置保证）
+- [X] 禁止无证据打分（必须标 unknown）
+- [X] 禁止跳过 validate_schema 或 redflag 直接展示
+- [X] 禁止展示未校验的模型输出
+- [X] 禁止编造用户简历中不存在的事实
+- [X] 禁止 DELETED 状态下调用模型

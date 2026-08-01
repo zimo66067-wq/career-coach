@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 80,
+      "rationale": "教育/工作/项目/技能版块完整",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "教育经历",
+          "start": 89,
+          "end": 93
+        }
+      ]
+    },
+    "clarity": {
+      "score": 80,
+      "rationale": "全栈方案表述清晰，有前后端联调描述",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "设计 RESTful API 40+ 个，编写 API 文档并推动前后端联调，接口联调效率提升 50%",
+          "start": 281,
+          "end": 332
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 78,
+      "rationale": "量化成果多样且口径合理",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "使用 Docker Compose 编排 8 个服务，部署到阿里云，月运维成本控制在 500 元以内",
+          "start": 333,
+          "end": 383
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 75,
+      "rationale": "前后端技能栈均衡",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "前端：React、TypeScript、Ant Design、TailwindCSS",
+          "start": 498,
+          "end": 540
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 82,
+      "rationale": "结构清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 493,
+          "end": 497
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P1",
+      "issue": "RBAC 权限系统缺少安全细节",
+      "suggestion": "补充鉴权方案和安全措施说明",
+      "rewrite_draft": "实现 RBAC 权限系统，基于 JWT 鉴权，支持 5 种角色和 20+ 权限项的精细控制",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "实现 RBAC 权限系统，支持 5 种角色和 20+ 权限项的精细控制",
+          "start": 245,
+          "end": 280
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "AWS 标注但缺少具体服务使用经验",
+      "suggestion": "补充 AWS 具体服务的使用场景",
+      "rewrite_draft": "AWS：使用 EC2 部署应用、S3 存储静态资源",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "工具：Docker、Git、Nginx、AWS",
+          "start": 597,
+          "end": 620
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+个人简历（合成样本，非真实人物）
+
+姓名：[REDACTED_NAME]
+电话：[REDACTED_PHONE]
+邮箱：[REDACTED_EMAIL]
+求职意向：运维工程师
+
+教育经历
+2019.09-2023.06 某某大学 计算机科学与技术 本科
+主修课程：Linux 系统管理、计算机网络、操作系统、shell 编程
+
+工作经历
+2022.07-2024.06 某互联网公司 运维工程师
+负责 200+ 台服务器的日常监控与维护，使用 Prometheus+Grafana 搭建监控告警体系
+通过 Shell 脚本自动化日志清理和备份任务，减少人工干预 80%
+处理线上故障 30+ 次，平均故障恢复时间（MTTR）从 45 分钟缩短到 12 分钟
+推动容器化改造，将 15 个服务从虚拟机迁移到 Docker，资源利用率提升 35%
+
+技能清单
+系统：Linux（熟练）、Shell（熟练）
+工具：Docker、Kubernetes（了解）、Prometheus、Grafana、Ansible、Nginx
+语言：Python（熟悉）、Go（了解）
+
+pii_removed:true

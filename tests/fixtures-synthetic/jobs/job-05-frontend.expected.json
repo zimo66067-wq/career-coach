@@ -1,0 +1,140 @@
+{
+  "version": "1.0",
+  "user_confirmed": true,
+  "job_title": "前端开发工程师（React/Vue）",
+  "requirements": [
+    {
+      "id": "J1",
+      "type": "hard",
+      "text": "本科及以上学历，计算机相关专业",
+      "source_span": {
+        "doc": "job",
+        "quote": "本科及以上学历，计算机相关专业；",
+        "start": 84,
+        "end": 100
+      }
+    },
+    {
+      "id": "J2",
+      "type": "hard",
+      "text": "熟悉 HTML/CSS/JavaScript 及 ES6+",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟悉 HTML/CSS/JavaScript，掌握 ES6+ 语法；",
+        "start": 104,
+        "end": 138
+      }
+    },
+    {
+      "id": "J3",
+      "type": "hard",
+      "text": "熟练使用 React 或 Vue 并有项目经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟练使用 React 或 Vue 框架，有实际项目经验；",
+        "start": 142,
+        "end": 170
+      }
+    },
+    {
+      "id": "J4",
+      "type": "hard",
+      "text": "了解 Webpack 或 Vite 构建工具",
+      "source_span": {
+        "doc": "job",
+        "quote": "了解 Webpack 或 Vite 等构建工具；",
+        "start": 196,
+        "end": 220
+      }
+    },
+    {
+      "id": "J5",
+      "type": "hard",
+      "text": "具备代码规范和 Code Review 习惯",
+      "source_span": {
+        "doc": "job",
+        "quote": "具备良好的代码规范和 Code Review 习惯。",
+        "start": 224,
+        "end": 250
+      }
+    },
+    {
+      "id": "R1",
+      "type": "responsibility",
+      "text": "前端组件库开发和维护",
+      "source_span": {
+        "doc": "job",
+        "quote": "负责前端组件库开发和维护；",
+        "start": 260,
+        "end": 273
+      }
+    },
+    {
+      "id": "R2",
+      "type": "responsibility",
+      "text": "页面性能优化和首屏加载优化",
+      "source_span": {
+        "doc": "job",
+        "quote": "参与页面性能优化和首屏加载优化；",
+        "start": 277,
+        "end": 293
+      }
+    },
+    {
+      "id": "R3",
+      "type": "responsibility",
+      "text": "与后端协作完成接口联调",
+      "source_span": {
+        "doc": "job",
+        "quote": "与后端协作完成接口联调；",
+        "start": 297,
+        "end": 309
+      }
+    },
+    {
+      "id": "P1",
+      "type": "preferred",
+      "text": "熟悉 TypeScript",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟悉 TypeScript 者优先；",
+        "start": 174,
+        "end": 192
+      }
+    },
+    {
+      "id": "P2",
+      "type": "preferred",
+      "text": "有开源项目贡献经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有开源项目贡献经验者优先；",
+        "start": 339,
+        "end": 352
+      }
+    },
+    {
+      "id": "P3",
+      "type": "preferred",
+      "text": "有大型 Web 应用性能优化经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有大型 Web 应用性能优化经验者优先。",
+        "start": 356,
+        "end": 376
+      }
+    },
+    {
+      "id": "T1",
+      "type": "terminology",
+      "text": "React",
+      "source_span": {
+        "doc": "job",
+        "quote": "React、Vue3、TypeScript、Webpack、Vite、Jest、Cypress、TailwindCSS",
+        "start": 384,
+        "end": 443
+      }
+    }
+  ],
+  "prompt_injection_flags": []
+}

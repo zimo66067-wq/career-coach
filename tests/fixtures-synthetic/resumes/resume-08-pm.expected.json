@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 80,
+      "rationale": "教育/工作/项目/技能版块完整",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "教育经历",
+          "start": 88,
+          "end": 92
+        }
+      ]
+    },
+    "clarity": {
+      "score": 80,
+      "rationale": "STAR 结构清晰，有完整情境-行动-结果",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "通过用户访谈收集 200+ 条反馈，迭代核心功能 5 轮，次月留存率从 28% 提升至 45%",
+          "start": 239,
+          "end": 286
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 75,
+      "rationale": "多处量化且口径多样",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "负责社区产品从 0 到 1 搭建，主导需求调研、原型设计和开发跟进，上线后 3 个月获 10 万注册用户",
+          "start": 186,
+          "end": 238
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 70,
+      "rationale": "产品工具栈完整但缺少技术深度",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "工具：Axure、Figma、Jira、Tableau、Excel",
+          "start": 424,
+          "end": 457
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 80,
+      "rationale": "格式清晰可解析",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 419,
+          "end": 423
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P1",
+      "issue": "缺少竞品分析经历",
+      "suggestion": "补充竞品分析的具体案例与结论",
+      "rewrite_draft": "完成 3 款竞品功能对比分析，输出差异化定位报告",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "设计基于用户行为的推荐策略，人均阅读时长从 8 分钟提升到 15 分钟",
+          "start": 353,
+          "end": 388
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "技能清单缺少数据分析工具的熟练度标注",
+      "suggestion": "为 Tableau 和 Excel 补充熟练度标注",
+      "rewrite_draft": "工具：Axure（熟练）、Figma（熟练）、Jira（熟练）、Tableau（熟悉）、Excel（熟练）",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "工具：Axure、Figma、Jira、Tableau、Excel",
+          "start": 424,
+          "end": 457
+        }
+      ]
+    }
+  ]
+}

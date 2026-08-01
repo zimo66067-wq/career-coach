@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 65,
+      "rationale": "缺少实习和工作经历版块，仅有教育经历和项目经历",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "教育经历",
+          "start": 95,
+          "end": 99
+        }
+      ]
+    },
+    "clarity": {
+      "score": 70,
+      "rationale": "表述简单但清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "使用 Python+Flask 实现 student/course/enrollment 的 CRUD 接口",
+          "start": 198,
+          "end": 252
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 50,
+      "rationale": "量化成果极少",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "数据库设计 5 张表，编写基本单元测试 20 条",
+          "start": 253,
+          "end": 277
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 55,
+      "rationale": "技能偏基础，深度不足",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "Python（熟悉）、Java（熟悉）、MySQL（了解）、Git（基本操作）",
+          "start": 365,
+          "end": 404
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 78,
+      "rationale": "格式简单可解析",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 360,
+          "end": 364
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P0",
+      "issue": "缺少实习经历，竞争力不足",
+      "suggestion": "建议补充实习或校企合作项目经历",
+      "rewrite_draft": "2024.07-2024.09 某科技公司后端开发实习：参与 API 开发与单元测试",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "使用 Java+Socket 实现多人聊天，支持群聊和私聊",
+          "start": 307,
+          "end": 336
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P1",
+      "issue": "技能清单缺少框架和工具维度",
+      "suggestion": "补充 Web 框架和开发工具",
+      "rewrite_draft": "Python（熟悉）、Java（熟悉）、Flask（入门）、MySQL（了解）、Git（基本操作）、Linux（基本操作）",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "Python（熟悉）、Java（熟悉）、MySQL（了解）、Git（基本操作）",
+          "start": 365,
+          "end": 404
+        }
+      ]
+    }
+  ]
+}

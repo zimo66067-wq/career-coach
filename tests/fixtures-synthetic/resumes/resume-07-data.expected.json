@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 80,
+      "rationale": "教育/工作/项目/技能版块完整",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "教育经历",
+          "start": 89,
+          "end": 93
+        }
+      ]
+    },
+    "clarity": {
+      "score": 76,
+      "rationale": "分析逻辑清晰，有因果关系表述",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "通过漏斗分析定位支付转化率下降原因，提出优化方案后转化率从 62% 提升至 78%",
+          "start": 240,
+          "end": 281
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 78,
+      "rationale": "多处量化成果且口径合理",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "编写 Python 脚本自动化日报生成流程，每日节省 2 小时人工",
+          "start": 282,
+          "end": 315
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 73,
+      "rationale": "SQL/Python/Tableau 技能与岗位匹配",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "语言：Python（熟练）、SQL（熟练）、R（了解）",
+          "start": 425,
+          "end": 452
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 82,
+      "rationale": "结构清晰可解析",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 420,
+          "end": 424
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P1",
+      "issue": "项目经历缺少数据来源说明",
+      "suggestion": "补充数据来源和数据处理量级",
+      "rewrite_draft": "基于某电商平台脱敏数据集（1.2 万用户行为记录）进行 K-Means 分群",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "使用 K-Means 聚类将 1.2 万用户分为 5 个群体，输出差异化运营策略",
+          "start": 353,
+          "end": 393
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "R 语言标注为了解但无实践场景",
+      "suggestion": "补充 R 的使用场景或移除",
+      "rewrite_draft": "R：完成时间序列分析课程作业（ARIMA 模型预测）",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "语言：Python（熟练）、SQL（熟练）、R（了解）",
+          "start": 425,
+          "end": 452
+        }
+      ]
+    }
+  ]
+}

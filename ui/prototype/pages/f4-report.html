@@ -102,6 +102,7 @@
 <script src="../js/mock-data.js"></script>
 <script src="../js/app.js"></script>
 <script src="../js/radar.js"></script>
+<script src="../js/data-bridge.js"></script>
 <script>
 function renderPlan(elId, plan) {
   document.getElementById(elId).innerHTML = plan.map(function (p) {
@@ -110,7 +111,13 @@ function renderPlan(elId, plan) {
 }
 document.addEventListener("DOMContentLoaded", function () {
   var state = window.APP.getState();
-  var a = window.MOCK.ability;
+  // 主链路: 优先 DataBridge, MOCK 作为降级缓存
+  var DB = window.DataBridge;
+  function fetchSync(key) {
+    if (DB && DB.getMockData) { var d = DB.getMockData(key); if (d) return d; }
+    return window.MOCK ? window.MOCK[key] : null;
+  }
+  var a = fetchSync('ability');
   if (state === "success") {
     document.getElementById("assump").innerHTML = "<b>情景假设：</b>" + a.scenario_day7.assumptions.join("；");
     window.RADAR.mount("radar", a, false);

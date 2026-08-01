@@ -1,0 +1,129 @@
+{
+  "version": "1.0",
+  "user_confirmed": true,
+  "job_title": "产品经理",
+  "requirements": [
+    {
+      "id": "J1",
+      "type": "hard",
+      "text": "本科及以上学历",
+      "source_span": {
+        "doc": "job",
+        "quote": "本科及以上学历，专业不限；",
+        "start": 64,
+        "end": 77
+      }
+    },
+    {
+      "id": "J2",
+      "type": "hard",
+      "text": "2 年以上互联网产品管理经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "具备 2 年以上互联网产品管理经验；",
+        "start": 81,
+        "end": 99
+      }
+    },
+    {
+      "id": "J3",
+      "type": "hard",
+      "text": "熟练使用 Axure 或 Figma",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟练使用 Axure 或 Figma 进行原型设计；",
+        "start": 103,
+        "end": 129
+      }
+    },
+    {
+      "id": "J4",
+      "type": "hard",
+      "text": "具备数据驱动决策能力",
+      "source_span": {
+        "doc": "job",
+        "quote": "具备数据驱动决策能力，熟悉漏斗分析和留存分析；",
+        "start": 133,
+        "end": 156
+      }
+    },
+    {
+      "id": "J5",
+      "type": "hard",
+      "text": "有敏捷开发实践经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有敏捷开发实践经验。",
+        "start": 178,
+        "end": 188
+      }
+    },
+    {
+      "id": "R1",
+      "type": "responsibility",
+      "text": "产品需求调研和用户研究",
+      "source_span": {
+        "doc": "job",
+        "quote": "负责产品需求调研和用户研究；",
+        "start": 198,
+        "end": 212
+      }
+    },
+    {
+      "id": "R2",
+      "type": "responsibility",
+      "text": "撰写 PRD 文档并推动评审",
+      "source_span": {
+        "doc": "job",
+        "quote": "撰写 PRD 文档并推动评审；",
+        "start": 216,
+        "end": 231
+      }
+    },
+    {
+      "id": "R3",
+      "type": "responsibility",
+      "text": "协调团队推进项目交付",
+      "source_span": {
+        "doc": "job",
+        "quote": "协调开发、设计、测试团队推进项目交付；",
+        "start": 235,
+        "end": 254
+      }
+    },
+    {
+      "id": "P1",
+      "type": "preferred",
+      "text": "有从 0 到 1 产品搭建经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有从 0 到 1 产品搭建经验者优先；",
+        "start": 285,
+        "end": 304
+      }
+    },
+    {
+      "id": "P2",
+      "type": "preferred",
+      "text": "有社区或社交产品经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有社区或社交产品经验者优先。",
+        "start": 308,
+        "end": 322
+      }
+    },
+    {
+      "id": "T1",
+      "type": "terminology",
+      "text": "Axure/Figma",
+      "source_span": {
+        "doc": "job",
+        "quote": "Axure、Figma、Jira、Confluence、Tableau、Excel、SQL",
+        "start": 330,
+        "end": 375
+      }
+    }
+  ],
+  "prompt_injection_flags": []
+}

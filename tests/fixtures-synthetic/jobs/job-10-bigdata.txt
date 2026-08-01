@@ -1,0 +1,25 @@
+大数据工程师 - 某数据公司（合成 JD，非真实招聘）
+
+职位描述
+负责大数据平台开发和数据管道建设。
+
+任职要求
+1. 本科及以上学历，计算机相关专业；
+2. 熟练使用 SQL 和至少一门大数据语言（Scala/Python/Java）；
+3. 熟悉 Hadoop 生态，有 Hive/Spark 实际经验；
+4. 了解 Flink 或 Kafka Streams 流处理框架；
+5. 有数仓建模经验，了解分层设计；
+6. 具备分布式系统调试能力。
+
+工作职责
+1. 开发和维护 ETL 数据管道；
+2. 设计和优化数仓分层模型；
+3. 负责实时数据处理管道开发；
+4. 保障数据质量和监控告警。
+
+加分项
+1. 有 ClickHouse 或 HBase 使用经验者优先；
+2. 有 PB 级数据处理经验者优先。
+
+常用技术栈
+Hadoop、Hive、Spark、Flink、Kafka、ClickHouse、HBase、Airflow、Docker

@@ -1,0 +1,26 @@
+个人简历（合成样本，非真实人物）
+
+姓名：[REDACTED_NAME]
+电话：[REDACTED_PHONE]
+邮箱：[REDACTED_EMAIL]
+求职意向：DevOps 工程师
+
+教育经历
+2017.09-2021.06 某某大学 计算机科学与技术 本科
+主修课程：操作系统、计算机网络、软件工程、云计算
+
+工作经历
+2021.07-2024.06 某互联网公司 DevOps 工程师
+搭建 CI/CD 流水线，使用 Jenkins+GitLab+ArgoCD 实现全自动化部署，发布周期从 2 周缩短到 1 天
+维护 300+ 节点 Kubernetes 集群，实现自动扩缩容，资源利用率从 45% 提升至 70%
+编写 Terraform 脚本管理云基础设施，实现 IaC，环境搭建时间从 2 天缩短到 30 分钟
+设计监控告警体系，使用 Prometheus+Alertmanager+Loki 实现 metrics/logs/traces 统一观测
+推动 SRE 实践，设立 SLO 目标，服务可用性从 99.5% 提升至 99.95%
+
+技能清单
+语言：Python（熟练）、Go（熟悉）、Shell（熟练）
+平台：Kubernetes、Docker、ArgoCD、Terraform、Ansible
+工具：Jenkins、GitLab CI、Prometheus、Grafana、Loki
+云平台：阿里云、AWS
+
+pii_removed:true

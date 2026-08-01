@@ -1,0 +1,25 @@
+前端开发工程师（React/Vue）- 某互联网公司（合成 JD，非真实招聘）
+
+职位描述
+负责 Web 前端应用开发与维护，参与用户交互体验优化。
+
+任职要求
+1. 本科及以上学历，计算机相关专业；
+2. 熟悉 HTML/CSS/JavaScript，掌握 ES6+ 语法；
+3. 熟练使用 React 或 Vue 框架，有实际项目经验；
+4. 熟悉 TypeScript 者优先；
+5. 了解 Webpack 或 Vite 等构建工具；
+6. 具备良好的代码规范和 Code Review 习惯。
+
+工作职责
+1. 负责前端组件库开发和维护；
+2. 参与页面性能优化和首屏加载优化；
+3. 与后端协作完成接口联调；
+4. 编写前端单元测试和 E2E 测试。
+
+加分项
+1. 有开源项目贡献经验者优先；
+2. 有大型 Web 应用性能优化经验者优先。
+
+常用技术栈
+React、Vue3、TypeScript、Webpack、Vite、Jest、Cypress、TailwindCSS

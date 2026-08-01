@@ -1,0 +1,148 @@
+# ci.yml · GitHub Actions CI 流水线 (P1-06)
+# 触发：push to main / pull_request to main
+# 步骤：checkout → setup-python 3.11 → install → pytest → schema validation → 敏感信息扫描
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # --- 步骤1: 检出代码 ---
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --- 步骤2: 安装 Python 3.11 ---
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: tools/requirements.txt
+
+      # --- 步骤3: 安装依赖 ---
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r tools/requirements.txt
+          pip install jsonschema pypdf python-docx pytest
+
+      # --- 步骤4: 运行 pytest 测试套件 ---
+      - name: Run pytest
+        run: |
+          python -m pytest tests/ -v --tb=short
+
+      # --- 步骤5: Schema 校验（对所有 fixtures 执行 validate_schema） ---
+      - name: Schema validation
+        run: |
+          echo "=== Validating all fixtures against their schemas ==="
+          # ResumeProfile fixtures
+          for f in tests/fixtures-synthetic/resumes/*.expected.json; do
+            echo "Validating: $f"
+            python tools/validate_schema.py \
+              --schema contracts/resume-profile.schema.json \
+              --instance "$f"
+          done
+          # JobProfile fixtures
+          for f in tests/fixtures-synthetic/jobs/*.expected.json; do
+            echo "Validating: $f"
+            python tools/validate_schema.py \
+              --schema contracts/job-profile.schema.json \
+              --instance "$f"
+          done
+          # Interview fixtures
+          for f in tests/fixtures-synthetic/interviews/*.json; do
+            echo "Validating: $f"
+            python tools/validate_schema.py \
+              --schema contracts/interview-turn.schema.json \
+              --instance "$f"
+          done
+          # Ability fixtures
+          for f in tests/fixtures-synthetic/abilities/*.json; do
+            echo "Validating: $f"
+            python tools/validate_schema.py \
+              --schema contracts/ability-profile.schema.json \
+              --instance "$f"
+          done
+          echo "=== All schema validations passed ==="
+
+      # --- 步骤6: 敏感信息扫描 ---
+      # 用 grep 检查是否有 API key / secret / password 硬编码
+      - name: Sensitive info scan
+        run: |
+          echo "=== Scanning for hardcoded secrets ==="
+          # 定义白名单文件（这些文件可以包含变量名模式但不包含真实密钥）
+          WHITELIST=".env.example|.gitignore|SECURITY.md|.github/workflows/ci.yml|docs/observability.md"
+          
+          # 扫描 API Key 硬编码（排除占位符和白名单）
+          echo "--- Checking for API_KEY with real values ---"
+          grep -rn --include='*.py' --include='*.md' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.txt' \
+            -E '(api_key|API_KEY|apikey)\s*[=:]\s*["'"'"'][^"'"'"']{8,}["'"'"']' \
+            --exclude-dir=.git --exclude-dir=node_modules . \
+            | grep -vE "$WHITELIST" \
+            | grep -vE '(your_|example|placeholder|here|xxx|TODO|CHANGE|REPLACE|<)' \
+            || echo "No API key leaks found"
+          
+          # 扫描 Secret Key 硬编码
+          echo "--- Checking for SECRET_KEY with real values ---"
+          grep -rn --include='*.py' --include='*.md' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.txt' \
+            -E '(secret|SECRET_KEY|secret_key)\s*[=:]\s*["'"'"'][^"'"'"']{8,}["'"'"']' \
+            --exclude-dir=.git --exclude-dir=node_modules . \
+            | grep -vE "$WHITELIST" \
+            | grep -vE '(your_|example|placeholder|here|xxx|TODO|CHANGE|REPLACE|<)' \
+            || echo "No secret key leaks found"
+          
+          # 扫描密码硬编码
+          echo "--- Checking for password hardcoding ---"
+          grep -rn --include='*.py' --include='*.md' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.txt' \
+            -iE '(password|passwd|pwd)\s*[=:]\s*["'"'"'][^"'"'"']{4,}["'"'"']' \
+            --exclude-dir=.git --exclude-dir=node_modules . \
+            | grep -vE "$WHITELIST" \
+            | grep -vE '(your_|example|placeholder|here|xxx|TODO|CHANGE|REPLACE|<|prompt|enter|input)' \
+            || echo "No password leaks found"
+          
+          # 扫描 Bearer Token
+          echo "--- Checking for Bearer tokens ---"
+          grep -rn --include='*.py' --include='*.md' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.txt' \
+            -E 'Bearer\s+[A-Za-z0-9._-]{16,}' \
+            --exclude-dir=.git --exclude-dir=node_modules . \
+            | grep -vE "$WHITELIST" \
+            || echo "No bearer token leaks found"
+          
+          # 扫描千帆 sk- 前缀密钥
+          echo "--- Checking for sk- prefixed keys ---"
+          grep -rn --include='*.py' --include='*.md' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.txt' \
+            -E 'sk-[A-Za-z0-9]{16,}' \
+            --exclude-dir=.git --exclude-dir=node_modules . \
+            | grep -vE "$WHITELIST" \
+            || echo "No sk- key leaks found"
+          
+          # 扫描 .env 文件是否误入库
+          echo "--- Checking for .env file ---"
+          if [ -f .env ]; then
+            echo "ERROR: .env file found in repository! This file should not be committed."
+            exit 1
+          fi
+          echo "No .env file in repository"
+          
+          echo "=== Sensitive info scan complete ==="
+
+      # --- 步骤7: 依赖安全扫描（可选，pip-audit） ---
+      - name: Dependency security scan (pip-audit)
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          echo "=== Scanning dependencies for known vulnerabilities ==="
+          pip-audit -r tools/requirements.txt || true
+          echo "=== pip-audit complete (non-blocking) ==="

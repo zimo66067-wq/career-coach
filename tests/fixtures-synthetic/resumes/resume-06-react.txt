@@ -1,0 +1,29 @@
+个人简历（合成样本，非真实人物）
+
+姓名：[REDACTED_NAME]
+电话：[REDACTED_PHONE]
+邮箱：[REDACTED_EMAIL]
+求职意向：前端开发工程师（React）
+
+教育经历
+2020.09-2024.06 某某大学 软件工程 本科
+主修课程：Web 前端开发、数据结构、人机交互、计算机网络
+
+工作经历
+2023.07-2024.03 某互联网公司 前端开发实习生
+参与电商平台商品中心 React 组件库开发，使用 TypeScript + Ant Design 搭建 30+ 业务组件
+将商品详情页首屏加载时间从 3.2s 优化到 1.1s，通过路由懒加载和图片懒加载实现
+推动团队引入 ESLint + Prettier 统一代码规范，代码审查通过率提升 40%
+
+项目经历
+2023.01-2023.05 在线协作白板（个人项目）
+基于 React + Konva.js 实现 Canvas 实时绘制，支持多人协同编辑
+使用 WebSocket 同步操作状态，延迟控制在 200ms 以内
+项目在 GitHub 获得 85 stars
+
+技能清单
+语言：JavaScript（熟练）、TypeScript（熟练）、HTML/CSS（熟练）
+框架：React、Next.js、Vue3（了解）
+工具：Webpack、Vite、Git、Figma
+
+pii_removed:true

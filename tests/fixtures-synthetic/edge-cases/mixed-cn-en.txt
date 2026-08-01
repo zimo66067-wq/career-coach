@@ -1,0 +1,36 @@
+个人简历（合成样本，非真实人物 / Synthetic sample, not a real person）
+
+姓名：[REDACTED_NAME]
+电话：[REDACTED_PHONE]
+邮箱：[REDACTED_EMAIL]
+求职意向：Full-stack Engineer / 全栈工程师
+
+教育经历 Education
+2019.09-2023.06 某某大学 Computer Science and Technology 本科
+主修课程：Data Structures、操作系统 Operating Systems、Computer Networks、Database Principles
+
+工作经历 Work Experience
+2023.07-2024.06 某科技公司 Backend Developer 后端开发工程师
+Res aponsável for microservice development using Go and Gin framework
+将 API response time 从 800ms 优化到 220ms，通过 MySQL composite index 和 Redis caching 实现
+Participated in designing distributed lock solution using Redisson，解决了超卖问题
+编写 API documentation 并推动 frontend-backend integration，与前端 team 约定 error code 规范
+
+项目经历 Projects
+2023.03-2023.06 Campus Trading Platform (Course Project)
+独立完成后端全部开发，使用 Spring Boot + MyBatis，设计了 12 张 data tables
+Implemented JWT-based authentication and RabbitMQ-based async notification
+项目获得课程答辩 92 分（满分 100）
+
+技能清单 Skills
+Languages: Go (Proficient)、Java (Proficient)、Python (Familiar)
+Frameworks: Gin、Spring Boot、MyBatis
+Middleware: MySQL、Redis、RabbitMQ、Kafka (Familiar)
+Tools: Git、Docker、Linux commands
+
+自我评价 Self-evaluation
+Fast learner，习惯 reading official documentation 和 source code
+能够在 guidance 下独立完成 module 开发
+Strong communication skills，能够与 cross-functional teams 高效协作
+
+pii_removed:true

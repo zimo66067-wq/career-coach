@@ -24,3 +24,36 @@
 ### Added - 审查与交接（commit E）
 - docs/review.md（一审结构合规 + 二审跨文件一致性）
 - handoffs/003-tools-to-dumate.md（交 DuMate 主交接文件）
+
+## [Unreleased] - 2026-08-02
+
+### Added
+- P0-01: 六工作流可执行合同章节（WF-01~WF-06）
+- P0-02: 前端数据接口层 data-bridge.js（三级降级）
+- P0-03: 模型路由层 model_router.py
+- P0-04: 文字自适应面试引擎 interview_engine.py
+- P0-05: 语音增强 voice_handler.py + voice.js
+- P0-06: capability_matrix.md
+- P0-07: G8/G9 交付包结构
+- P1-01: 扩充至 20 份简历、10 份 JD、20 条敏感问题、6 个异常场景
+- P1-02: 千帆 embedding 实现 + BM25 降级标识
+- P1-03: F4 逐维趋势算法冻结
+- P1-04: privacy_lifecycle.py
+- P1-06: CI 配置
+- P1-07: .env.example + SECURITY.md
+- P1-08: 根 HANDOFF.md
+- P1-09: 移动端无障碍测试文档
+- P2-01~06: 状态声明、模型记录、观测、版本锁定、用户研究、答辩索引
+- 新增 21 项测试（总计 63 项）
+
+### Changed
+- README.md: 增加项目状态声明
+- tools/match_requirements.py: 千帆 embedding 实现
+- tools/requirements.txt: 添加 requests 依赖
+- workflows/wf-*.md: 追加可执行合同
+- ui/prototype/pages/f3-interview.html: 增加语音组件
+- ui/prototype/pages/f1-resume.html: 引入 data-bridge.js, 主链路优先 DataBridge
+- ui/prototype/pages/f2-match.html: 引入 data-bridge.js, 主链路优先 DataBridge
+- ui/prototype/pages/f4-report.html: 引入 data-bridge.js, 主链路优先 DataBridge
+- ui/prototype/index.html: 引入 data-bridge.js
+- ui/prototype/pages/f3-interview.html: 主链路优先 DataBridge, MOCK 降级为缓存

@@ -6,7 +6,7 @@
       --backend bm25|embedding [--output match.json]
 
 后端:
-  - embedding: 千帆 Qwen3-Embedding（仅接口；未配置 QIANFAN_API_KEY 时 raise NotImplementedError，提示用 bm25）
+  - embedding: 千帆 Embedding-V1（HTTP API；需配置 QIANFAN_API_KEY + QIANFAN_SECRET_KEY）
   - bm25: 纯 stdlib TF-IDF/BM25 实现（默认，标注「简化匹配」）
 
 输出: 逐条 requirement 的 {status: covered|weak|missing|unknown, evidence}
@@ -104,23 +104,78 @@ class Bm25Matcher:
         return conf, idx
 
 
-# ---------------- Embedding（千帆，仅接口） ----------------
+# ---------------- Embedding（千帆 HTTP API） ----------------
 class EmbedderBase:
     def similarity(self, a, b):
         raise NotImplementedError
 
 
 class QianfanEmbedder(EmbedderBase):
-    def __init__(self, api_key=None, model="Qwen3-Embedding-4B"):
-        self.api_key = api_key or os.environ.get("QIANFAN_API_KEY")
-        self.model = model
-        if not self.api_key:
-            raise NotImplementedError(
-                "千帆 embedding 未配置 QIANFAN_API_KEY；请改用 --backend bm25（简化匹配）"
-            )
+    """千帆 Embedding-V1 HTTP API 封装。
 
-    def similarity(self, a, b):  # pragma: no cover - 需要真实 key
-        raise NotImplementedError("千帆 embedding 调用未在 WorkBuddy 阶段实现（接口预留，DuMate 侧接入）")
+    鉴权流程: AK/SK -> access_token -> 调用 embedding 接口。
+    降级策略: AK/SK 缺失时 raise NotImplementedError，调用方应回退到 BM25。
+    """
+
+    TOKEN_URL = "https://aip.baidubce.com/oauth/2.0/token"
+    EMBED_URL = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenniu/embedding_v1"
+
+    def __init__(self, api_key=None, secret_key=None, model="Embedding-V1"):
+        self.api_key = api_key or os.environ.get("QIANFAN_API_KEY")
+        self.secret_key = secret_key or os.environ.get("QIANFAN_SECRET_KEY")
+        self.model = model
+        if not self.api_key or not self.secret_key:
+            raise NotImplementedError(
+                "千帆 embedding 未配置 QIANFAN_API_KEY/QIANFAN_SECRET_KEY；"
+                "请改用 --backend bm25（简化匹配）"
+            )
+        self._token = None
+        self._token_expiry = 0
+
+    def _get_token(self):
+        """获取 access_token，带简易缓存。"""
+        import time
+        if self._token and time.time() < self._token_expiry:
+            return self._token
+        import requests
+        params = {
+            "grant_type": "client_credentials",
+            "client_id": self.api_key,
+            "client_secret": self.secret_key,
+        }
+        resp = requests.post(self.TOKEN_URL, params=params, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        self._token = data["access_token"]
+        self._token_expiry = time.time() + data.get("expires_in", 2592000) - 60
+        return self._token
+
+    def embed(self, texts):
+        """批量嵌入，返回 List[List[float]]。单次最多 16 条。"""
+        import requests
+        token = self._get_token()
+        url = self.EMBED_URL + "?access_token=" + token
+        payload = {"input": texts, "model": self.model}
+        resp = requests.post(url, json=payload, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        if "error_code" in data:
+            raise RuntimeError("千帆 embedding 错误 %s: %s" % (
+                data.get("error_code"), data.get("error_msg", "")))
+        return [item["embedding"] for item in data["data"]]
+
+    def similarity(self, a, b):
+        """计算两段文本的余弦相似度，返回 [0, 1] 浮点数。"""
+        vecs = self.embed([a, b])
+        va, vb = vecs[0], vecs[1]
+        dot = sum(x * y for x, y in zip(va, vb))
+        norm_a = math.sqrt(sum(x * x for x in va))
+        norm_b = math.sqrt(sum(x * x for x in vb))
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+        # 余弦相似度范围 [-1,1]，线性映射到 [0,1]
+        cos_sim = dot / (norm_a * norm_b)
+        return (cos_sim + 1) / 2
 
 
 def judge(conf, has_partial):
@@ -174,14 +229,51 @@ def main():
     resume_tokens = unigrams(resume_text)
 
     if args.backend == "embedding":
+        embedder = None
         try:
             embedder = QianfanEmbedder()
         except NotImplementedError as e:
-            print("[match] %s" % e, file=sys.stderr)
-            sys.exit(4)
-        _ = embedder  # DuMate 侧实现后启用
-        print("[match] embedding 后端尚未实现", file=sys.stderr)
-        sys.exit(4)
+            print("[match] %s，降级到 BM25" % e, file=sys.stderr)
+
+        if embedder is not None:
+            results = []
+            for req in requirements:
+                best_conf = 0.0
+                best_idx = -1
+                for si, sent in enumerate(sentences):
+                    try:
+                        conf = embedder.similarity(req["text"], sent)
+                    except Exception as exc:
+                        print("[match] embedding 调用失败: %s" % exc, file=sys.stderr)
+                        conf = 0.0
+                    if conf > best_conf:
+                        best_conf = conf
+                        best_idx = si
+                req_tokens = unigrams(req["text"])
+                has_partial = bool(req_tokens & resume_tokens)
+                status = judge(best_conf, has_partial)
+                results.append({
+                    "id": req["id"], "type": req["type"], "text": req["text"],
+                    "status": status, "confidence": round(best_conf, 3),
+                    "evidence": sentences[best_idx] if best_idx >= 0 and best_conf >= WEAK_TH else "",
+                })
+            output = {
+                "backend": "embedding", "degraded": False,
+                "model": embedder.model,
+                "note": "千帆 embedding 语义匹配",
+                "thresholds": {"covered": COVERED_TH, "weak": WEAK_TH, "unknown": UNKNOWN_TH},
+                "results": results,
+            }
+            payload = json.dumps(output, ensure_ascii=False, indent=2)
+            if args.output:
+                with io.open(args.output, "w", encoding="utf-8") as f:
+                    f.write(payload + "\n")
+                print("[match] OK -> %s（%d 条要求, embedding）" % (args.output, len(results)))
+            else:
+                print(payload)
+            return
+        # embedding 初始化失败，降级到 BM25
+        print("[match] 降级到 BM25 简化匹配", file=sys.stderr)
 
     matcher = Bm25Matcher()
     results = []
@@ -196,8 +288,11 @@ def main():
             "evidence": sentences[best_idx] if best_idx >= 0 and conf >= WEAK_TH else "",
         })
 
+    degraded = args.backend == "embedding"
     output = {
-        "backend": "bm25", "note": "简化匹配（本地 BM25）",
+        "backend": "bm25",
+        "degraded": degraded,
+        "note": "简化匹配（本地 BM25）" + ("（从 embedding 降级）" if degraded else ""),
         "thresholds": {"covered": COVERED_TH, "weak": WEAK_TH, "unknown": UNKNOWN_TH},
         "results": results,
     }

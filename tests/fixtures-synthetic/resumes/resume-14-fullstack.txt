@@ -1,0 +1,30 @@
+个人简历（合成样本，非真实人物）
+
+姓名：[REDACTED_NAME]
+电话：[REDACTED_PHONE]
+邮箱：[REDACTED_EMAIL]
+求职意向：全栈工程师
+
+教育经历
+2018.09-2022.06 某某大学 软件工程 本科
+主修课程：Web 开发、数据库系统、操作系统、软件工程
+
+工作经历
+2022.07-2024.06 某创业公司 全栈工程师
+独立负责 SaaS 后台管理系统全栈开发，前端 React+Ant Design，后端 Node.js+Express
+实现 RBAC 权限系统，支持 5 种角色和 20+ 权限项的精细控制
+设计 RESTful API 40+ 个，编写 API 文档并推动前后端联调，接口联调效率提升 50%
+使用 Docker Compose 编排 8 个服务，部署到阿里云，月运维成本控制在 500 元以内
+
+项目经历
+2023.05-2023.10 实时协作编辑器（开源项目）
+前端使用 React+Quill，后端使用 WebSocket+Redis 实现多人实时协作
+项目在 GitHub 获得 200+ stars
+
+技能清单
+前端：React、TypeScript、Ant Design、TailwindCSS
+后端：Node.js、Express、Python Flask
+数据库：MySQL、MongoDB、Redis
+工具：Docker、Git、Nginx、AWS
+
+pii_removed:true

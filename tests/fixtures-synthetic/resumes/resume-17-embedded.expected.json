@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 80,
+      "rationale": "教育/工作/项目/技能版块完整",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "教育经历",
+          "start": 90,
+          "end": 94
+        }
+      ]
+    },
+    "clarity": {
+      "score": 78,
+      "rationale": "OTA 方案有技术细节描述",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "设计 OTA 升级方案，支持差分升级，固件包体积减少 70%",
+          "start": 290,
+          "end": 320
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 82,
+      "rationale": "量化成果丰富，硬件口径准确",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "优化固件功耗，通过休眠唤醒策略将设备待机功耗从 50mA 降至 8mA，续航提升 5 倍",
+          "start": 245,
+          "end": 289
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 80,
+      "rationale": "嵌入式技能栈匹配度高",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "语言：C（精通）、C++（熟悉）、Python（了解）",
+          "start": 461,
+          "end": 488
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 82,
+      "rationale": "格式清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 456,
+          "end": 460
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P1",
+      "issue": "MQTT 通信缺少断线重连机制说明",
+      "suggestion": "补充断线重连策略",
+      "rewrite_draft": "实现 MQTT+TLS 加密通信，含心跳保活与指数退避重连机制，设备连接成功率 99.5%",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "主导通信协议栈开发，实现 MQTT+TLS 加密通信，设备连接成功率 99.5%",
+          "start": 321,
+          "end": 361
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "Python 标注为了解但未说明使用场景",
+      "suggestion": "补充 Python 在嵌入式中的使用场景",
+      "rewrite_draft": "Python：用于编写上位机测试脚本和固件烧录工具",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "语言：C（精通）、C++（熟悉）、Python（了解）",
+          "start": 461,
+          "end": 488
+        }
+      ]
+    }
+  ]
+}

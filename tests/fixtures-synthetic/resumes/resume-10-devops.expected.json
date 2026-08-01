@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 72,
+      "rationale": "缺少项目经历版块，教育和工作经历完整",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "工作经历",
+          "start": 164,
+          "end": 168
+        }
+      ]
+    },
+    "clarity": {
+      "score": 77,
+      "rationale": "故障处理有闭环表述",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "处理线上故障 30+ 次，平均故障恢复时间（MTTR）从 45 分钟缩短到 12 分钟",
+          "start": 285,
+          "end": 328
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 78,
+      "rationale": "多处量化且口径丰富",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "推动容器化改造，将 15 个服务从虚拟机迁移到 Docker，资源利用率提升 35%",
+          "start": 329,
+          "end": 371
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 73,
+      "rationale": "运维工具栈匹配度高",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "系统：Linux（熟练）、Shell（熟练）",
+          "start": 378,
+          "end": 400
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 80,
+      "rationale": "格式清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 373,
+          "end": 377
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P0",
+      "issue": "缺少项目经历版块",
+      "suggestion": "补充独立负责或主导的运维项目",
+      "rewrite_draft": "主导监控体系建设项目，从 0 搭建 Prometheus+Grafana 监控告警平台",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "负责 200+ 台服务器的日常监控与维护，使用 Prometheus+Grafana 搭建监控告警体系",
+          "start": 198,
+          "end": 249
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "Kubernetes 标注为了解但未展开实践",
+      "suggestion": "补充 K8s 实际使用场景或诚实标注",
+      "rewrite_draft": "Kubernetes：完成官方入门教程，部署过 3 个微服务到 Minikube",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "工具：Docker、Kubernetes（了解）、Prometheus、Grafana、Ansible、Nginx",
+          "start": 401,
+          "end": 458
+        }
+      ]
+    }
+  ]
+}

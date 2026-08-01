@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 80,
+      "rationale": "教育/工作/项目/技能版块完整",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "教育经历",
+          "start": 93,
+          "end": 97
+        }
+      ]
+    },
+    "clarity": {
+      "score": 78,
+      "rationale": "可用性测试有完整闭环描述",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "主导用户可用性测试 8 轮，收集 120+ 条反馈，核心功能完成率从 55% 提升至 82%",
+          "start": 234,
+          "end": 280
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 75,
+      "rationale": "多处量化成果，口径多样",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "与开发团队协作确保还原度，上线后 App Store 评分从 3.8 提升至 4.5",
+          "start": 307,
+          "end": 349
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 72,
+      "rationale": "设计工具栈完整",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "工具：Figma（熟练）、Sketch、Adobe XD、Photoshop、Illustrator",
+          "start": 413,
+          "end": 463
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 80,
+      "rationale": "格式清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 408,
+          "end": 412
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P1",
+      "issue": "项目经历缺少团队规模和分工",
+      "suggestion": "补充品牌官网改版项目的团队信息",
+      "rewrite_draft": "独立负责品牌官网改版设计（1 人），与 2 名开发协作落地",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "从用户调研到视觉落地全流程负责，官网跳出率降低 25%",
+          "start": 379,
+          "end": 406
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "Sketch 和 Adobe XD 缺少熟练度标注",
+      "suggestion": "补充各工具熟练度",
+      "rewrite_draft": "工具：Figma（熟练）、Sketch（熟悉）、Adobe XD（熟悉）、Photoshop（熟练）、Illustrator（熟练）",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "工具：Figma（熟练）、Sketch、Adobe XD、Photoshop、Illustrator",
+          "start": 413,
+          "end": 463
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 78,
+      "rationale": "教育/实习/项目/技能版块齐全",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "教育经历",
+          "start": 89,
+          "end": 93
+        }
+      ]
+    },
+    "clarity": {
+      "score": 75,
+      "rationale": "缺陷跟踪有闭环描述",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "发现并跟踪 45 个缺陷，推动开发修复，线上漏测率降低 30%",
+          "start": 279,
+          "end": 310
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 72,
+      "rationale": "量化成果丰富且口径多样",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "使用 Postman 和 Python+Requests 实现接口自动化测试，自动化覆盖率达 60%",
+          "start": 228,
+          "end": 278
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 68,
+      "rationale": "测试工具栈匹配但 Java 深度待证",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "语言：Python（熟悉）、Java（了解）",
+          "start": 431,
+          "end": 453
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 82,
+      "rationale": "结构清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 426,
+          "end": 430
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P1",
+      "issue": "压力测试缺少环境说明",
+      "suggestion": "补充测试环境配置信息",
+      "rewrite_draft": "在 4 核 8G 测试环境下使用 JMeter 模拟 500 并发用户",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "对选课系统进行压力测试，使用 JMeter 模拟 500 并发用户，定位数据库连接池瓶颈",
+          "start": 348,
+          "end": 392
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "Selenium 标注但缺少具体使用场景",
+      "suggestion": "补充 UI 自动化的具体案例",
+      "rewrite_draft": "Selenium：用于 App 登录流程的 UI 自动化回归测试",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "工具：Postman、JMeter、Selenium、Jira、Git",
+          "start": 454,
+          "end": 489
+        }
+      ]
+    }
+  ]
+}

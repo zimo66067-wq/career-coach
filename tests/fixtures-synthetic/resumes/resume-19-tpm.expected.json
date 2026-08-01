@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 80,
+      "rationale": "教育/工作/项目/技能版块完整",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "教育经历",
+          "start": 90,
+          "end": 94
+        }
+      ]
+    },
+    "clarity": {
+      "score": 80,
+      "rationale": "敏捷转型有完整闭环描述",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "推动敏捷转型，引入 Scrum+看板模式，团队迭代速率提升 30%",
+          "start": 295,
+          "end": 328
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 78,
+      "rationale": "量化成果丰富，管理口径准确",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "建立项目风险预警机制，提前识别风险 15 次，项目按时交付率达 92%",
+          "start": 329,
+          "end": 364
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 72,
+      "rationale": "项目管理技能匹配但技术深度不足",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "语言：Java（熟悉）、Python（了解）",
+          "start": 488,
+          "end": 510
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 80,
+      "rationale": "格式清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 483,
+          "end": 487
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P1",
+      "issue": "技术选型评审缺少具体案例",
+      "suggestion": "补充技术选型的具体决策案例",
+      "rewrite_draft": "主导 API 网关选型评审（对比 Kong/APISIX），最终选择 APISIX 并输出决策文档",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "主导技术选型评审 8 次，输出技术决策文档，降低技术债务",
+          "start": 365,
+          "end": 393
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "PMP 标注但缺少认证编号",
+      "suggestion": "如有 PMP 认证则补充编号，否则标注为方法论",
+      "rewrite_draft": "PMP：持有认证（编号待用户核实），应用敏捷与瀑布混合管理",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "方法论：Scrum、Kanban、PMP、风险管理",
+          "start": 552,
+          "end": 577
+        }
+      ]
+    }
+  ]
+}

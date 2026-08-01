@@ -155,3 +155,68 @@ python -m pytest tests/ -v
 - 禁止降级超过 10 秒
 - 禁止人工放行被 redflag 阻断的结果
 - 禁止降级时不告知用户（必须展示降级横幅）
+
+## 可执行合同（P0-01 更新）
+
+### 输入合同
+- 输入格式: 异常信号（工具退出码 / 网络异常 / 超时）或用户删除请求（自然语言意图）
+- 必填字段: `trace_id`（全链路追踪）、`error_type`（异常分类）或 `delete_intent`（删除意图）
+- 校验: 异常退出码匹配降级映射表；删除意图需用户二次确认
+
+### 输出合同
+- 输出格式: 状态标记（`DEGRADED` / `FATAL_ERROR` / `DELETED`）+ 脱敏日志
+- 必填字段: 降级态含 `degraded=true` + 降级原因；删除态含 `DELETED` 终态标记；日志经 `log_sanitize.py` 处理
+- 校验: `log_sanitize.py` 扫描日志无 PII 残留；DELETED 状态后无模型调用记录
+
+### 工具调用链
+1. 捕获异常（工具退出码 / 网络异常 / 超时），记录 `trace_id` + 输入摘要哈希
+2. 查降级映射表，选择对应降级路径
+3. 10s 内执行降级（保留已确认数据，只回退当前节点，展示降级横幅）
+4. `python tools/log_sanitize.py --input /tmp/app.log --output /tmp/app.clean.log`
+5. （删除路径）用户确认 -> 清除会话状态与 `/tmp/` 中间文件 -> 记录 `trace_id`（不含内容）-> DELETED
+
+### 状态转换
+- 初始态: 任意运行态
+- 成功态: DEGRADED（降级后继续服务）
+- 降级态: DEGRADED（此 WF 本身即降级处理）
+- 错误态: FATAL_ERROR（不可恢复）
+- 删除态: DELETED（终态，不再调用任何模型）
+
+### 降级路径
+| 主路径失败原因 | 降级方案 | 标记 |
+|---|---|---|
+| 模型超时/断网 | 重试一次后切降级横幅，保留已确认数据 | degraded=true |
+| 语音 ASR 故障 | 10s 内回退文字主链路 | degraded=true |
+| 图表渲染失败 | 10s 内降级为六维表格 | degraded=true |
+| PDF 解析失败 | 引导粘贴文本 | degraded=true |
+| Schema 校验失败 | 降低 temperature 重试；仍失败切简化模式 | degraded=true |
+| 事实锁阻断 | 切简化模式并标注阻断 | degraded=true |
+| 千帆 embedding 不可用 | 切 BM25 并标注"简化匹配" | degraded=true |
+| 模型返回非 JSON | 尝试提取 JSON 片段；仍失败走降级 | degraded=true |
+
+### 模型路由
+- 任务类型: 无模型调用（纯运维操作）
+- 参数: N/A
+- 降级: N/A（此 WF 本身即降级与删除处理，不涉及模型调用）
+
+### 验收命令
+```bash
+# 日志脱敏测试
+echo "姓名：张三 电话：13800138000 邮箱：test@example.com Bearer eyJabc.def.ghi api_key=sk-1234567890" \
+  | python tools/log_sanitize.py
+# 故障注入测试
+python -m pytest tests/test_fault_injection.py -v
+# 全部测试
+python -m pytest tests/ -v
+```
+
+### 禁止事项
+- [X] 禁止模型自报总分
+- [X] 禁止跳过 deidentify（日志落盘前必须过 log_sanitize.py）
+- [X] 禁止失败时回退用户已确认的数据
+- [X] 禁止删除后继续调用任何模型
+- [X] 禁止日志中包含 PII
+- [X] 禁止降级超过 10s
+- [X] 禁止人工放行被 redflag 阻断的结果
+- [X] 禁止降级时不告知用户
+- [X] 禁止 DELETED 状态下调用模型

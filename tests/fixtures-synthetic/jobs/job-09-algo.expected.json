@@ -1,0 +1,129 @@
+{
+  "version": "1.0",
+  "user_confirmed": true,
+  "job_title": "算法工程师",
+  "requirements": [
+    {
+      "id": "J1",
+      "type": "hard",
+      "text": "硕士及以上学历",
+      "source_span": {
+        "doc": "job",
+        "quote": "硕士及以上学历，计算机/数学/统计相关专业；",
+        "start": 71,
+        "end": 93
+      }
+    },
+    {
+      "id": "J2",
+      "type": "hard",
+      "text": "熟练使用 Python，掌握 PyTorch 或 TensorFlow",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟练使用 Python，掌握 PyTorch 或 TensorFlow；",
+        "start": 97,
+        "end": 133
+      }
+    },
+    {
+      "id": "J3",
+      "type": "hard",
+      "text": "熟悉机器学习基础算法",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟悉机器学习基础算法（分类/回归/聚类）；",
+        "start": 137,
+        "end": 158
+      }
+    },
+    {
+      "id": "J4",
+      "type": "hard",
+      "text": "了解 NLP 或推荐系统领域知识",
+      "source_span": {
+        "doc": "job",
+        "quote": "了解 NLP 或推荐系统领域知识；",
+        "start": 162,
+        "end": 179
+      }
+    },
+    {
+      "id": "J5",
+      "type": "hard",
+      "text": "有模型训练和调优实际经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有模型训练和调优实际经验；",
+        "start": 183,
+        "end": 196
+      }
+    },
+    {
+      "id": "R1",
+      "type": "responsibility",
+      "text": "模型训练、评估和调优",
+      "source_span": {
+        "doc": "job",
+        "quote": "负责模型训练、评估和调优；",
+        "start": 222,
+        "end": 235
+      }
+    },
+    {
+      "id": "R2",
+      "type": "responsibility",
+      "text": "设计特征工程方案",
+      "source_span": {
+        "doc": "job",
+        "quote": "设计特征工程方案；",
+        "start": 239,
+        "end": 248
+      }
+    },
+    {
+      "id": "R3",
+      "type": "responsibility",
+      "text": "参与模型部署和线上推理服务",
+      "source_span": {
+        "doc": "job",
+        "quote": "参与模型部署和线上推理服务；",
+        "start": 252,
+        "end": 266
+      }
+    },
+    {
+      "id": "P1",
+      "type": "preferred",
+      "text": "有顶会论文发表经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有顶会论文发表经验者优先；",
+        "start": 293,
+        "end": 306
+      }
+    },
+    {
+      "id": "P2",
+      "type": "preferred",
+      "text": "有 Kaggle 竞赛获奖经历",
+      "source_span": {
+        "doc": "job",
+        "quote": "有 Kaggle 竞赛获奖经历者优先。",
+        "start": 310,
+        "end": 329
+      }
+    },
+    {
+      "id": "T1",
+      "type": "terminology",
+      "text": "Python/PyTorch",
+      "source_span": {
+        "doc": "job",
+        "quote": "Python、PyTorch、TensorFlow、scikit-learn、CUDA、Docker、TensorBoard",
+        "start": 337,
+        "end": 399
+      }
+    }
+  ],
+  "prompt_injection_flags": []
+}

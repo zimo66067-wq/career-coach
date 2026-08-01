@@ -1,0 +1,129 @@
+{
+  "version": "1.0",
+  "user_confirmed": true,
+  "job_title": "测试工程师",
+  "requirements": [
+    {
+      "id": "J1",
+      "type": "hard",
+      "text": "本科及以上学历，计算机相关专业",
+      "source_span": {
+        "doc": "job",
+        "quote": "本科及以上学历，计算机相关专业；",
+        "start": 69,
+        "end": 85
+      }
+    },
+    {
+      "id": "J2",
+      "type": "hard",
+      "text": "熟悉测试理论，掌握黑盒用例设计",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟悉软件测试理论和方法，掌握黑盒测试用例设计；",
+        "start": 89,
+        "end": 112
+      }
+    },
+    {
+      "id": "J3",
+      "type": "hard",
+      "text": "熟练使用 Postman 或 JMeter 接口测试",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟练使用 Postman 或 JMeter 进行接口测试；",
+        "start": 116,
+        "end": 145
+      }
+    },
+    {
+      "id": "J4",
+      "type": "hard",
+      "text": "至少掌握一门编程语言 Python/Java",
+      "source_span": {
+        "doc": "job",
+        "quote": "至少掌握一门编程语言（Python/Java）；",
+        "start": 149,
+        "end": 173
+      }
+    },
+    {
+      "id": "J5",
+      "type": "hard",
+      "text": "了解 Selenium 或 Appium 自动化框架",
+      "source_span": {
+        "doc": "job",
+        "quote": "了解 Selenium 或 Appium 自动化测试框架；",
+        "start": 177,
+        "end": 206
+      }
+    },
+    {
+      "id": "R1",
+      "type": "responsibility",
+      "text": "编写测试计划和测试用例",
+      "source_span": {
+        "doc": "job",
+        "quote": "编写测试计划和测试用例；",
+        "start": 234,
+        "end": 246
+      }
+    },
+    {
+      "id": "R2",
+      "type": "responsibility",
+      "text": "执行功能/接口/回归测试",
+      "source_span": {
+        "doc": "job",
+        "quote": "执行功能测试、接口测试和回归测试；",
+        "start": 250,
+        "end": 267
+      }
+    },
+    {
+      "id": "R3",
+      "type": "responsibility",
+      "text": "参与性能测试和压力测试",
+      "source_span": {
+        "doc": "job",
+        "quote": "参与性能测试和压力测试；",
+        "start": 271,
+        "end": 283
+      }
+    },
+    {
+      "id": "P1",
+      "type": "preferred",
+      "text": "有 CI/CD 流水线集成测试经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有 CI/CD 流水线集成测试经验者优先；",
+        "start": 310,
+        "end": 331
+      }
+    },
+    {
+      "id": "P2",
+      "type": "preferred",
+      "text": "有安全测试经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有安全测试经验者优先。",
+        "start": 335,
+        "end": 346
+      }
+    },
+    {
+      "id": "T1",
+      "type": "terminology",
+      "text": "Python/Postman/JMeter",
+      "source_span": {
+        "doc": "job",
+        "quote": "Python、Java、Postman、JMeter、Selenium、Appium、Jira、Jenkins",
+        "start": 354,
+        "end": 409
+      }
+    }
+  ],
+  "prompt_injection_flags": []
+}
