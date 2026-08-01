@@ -1,0 +1,96 @@
+{
+  "version": "1.0",
+  "user_confirmed": true,
+  "job_title": "数据分析师（校招）",
+  "requirements": [
+    {
+      "id": "J1",
+      "type": "hard",
+      "text": "熟练使用 SQL 复杂查询",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟练使用 SQL 进行复杂查询；",
+        "start": 93,
+        "end": 109
+      }
+    },
+    {
+      "id": "J2",
+      "type": "hard",
+      "text": "熟练使用 Python pandas 或 R 处理数据",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟练使用 Python（pandas）或 R 进行数据处理；",
+        "start": 113,
+        "end": 143
+      }
+    },
+    {
+      "id": "J3",
+      "type": "hard",
+      "text": "掌握漏斗/留存/A-B 测试分析方法",
+      "source_span": {
+        "doc": "job",
+        "quote": "掌握常见分析方法：漏斗分析、留存分析、A/B 测试；",
+        "start": 147,
+        "end": 173
+      }
+    },
+    {
+      "id": "J4",
+      "type": "hard",
+      "text": "熟练使用至少一种 BI 工具",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟练使用至少一种 BI 工具（Tableau/Power BI/FineBI）。",
+        "start": 177,
+        "end": 217
+      }
+    },
+    {
+      "id": "R1",
+      "type": "responsibility",
+      "text": "搭建和维护经营看板",
+      "source_span": {
+        "doc": "job",
+        "quote": "搭建和维护经营看板；",
+        "start": 227,
+        "end": 237
+      }
+    },
+    {
+      "id": "R2",
+      "type": "responsibility",
+      "text": "输出专题分析报告并推动落地",
+      "source_span": {
+        "doc": "job",
+        "quote": "输出专题分析报告并推动落地。",
+        "start": 241,
+        "end": 255
+      }
+    },
+    {
+      "id": "P1",
+      "type": "preferred",
+      "text": "零售/电商行业分析经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有零售/电商行业分析经验者优先；",
+        "start": 264,
+        "end": 280
+      }
+    },
+    {
+      "id": "T1",
+      "type": "terminology",
+      "text": "SQL/Python/pandas/Tableau",
+      "source_span": {
+        "doc": "job",
+        "quote": "SQL、Python、pandas、Tableau、Excel",
+        "start": 305,
+        "end": 336
+      }
+    }
+  ],
+  "prompt_injection_flags": []
+}

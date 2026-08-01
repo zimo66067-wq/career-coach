@@ -1,0 +1,107 @@
+{
+  "version": "1.0",
+  "user_confirmed": true,
+  "job_title": "后端开发工程师（校招）",
+  "requirements": [
+    {
+      "id": "J1",
+      "type": "hard",
+      "text": "本科及以上学历，计算机相关专业",
+      "source_span": {
+        "doc": "job",
+        "quote": "本科及以上学历，计算机相关专业；",
+        "start": 79,
+        "end": 95
+      }
+    },
+    {
+      "id": "J2",
+      "type": "hard",
+      "text": "熟悉 Go 或 Java 至少一门语言并有项目经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟悉 Go 或 Java 至少一门语言，有实际项目经验；",
+        "start": 99,
+        "end": 127
+      }
+    },
+    {
+      "id": "J3",
+      "type": "hard",
+      "text": "熟悉 MySQL 索引优化与慢查询分析",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟悉 MySQL，了解索引优化和慢查询分析；",
+        "start": 131,
+        "end": 153
+      }
+    },
+    {
+      "id": "J4",
+      "type": "hard",
+      "text": "了解 Redis 缓存使用场景",
+      "source_span": {
+        "doc": "job",
+        "quote": "了解 Redis 等缓存中间件的使用场景；",
+        "start": 157,
+        "end": 178
+      }
+    },
+    {
+      "id": "R1",
+      "type": "responsibility",
+      "text": "参与订单、库存核心链路接口开发",
+      "source_span": {
+        "doc": "job",
+        "quote": "参与订单、库存等核心链路的接口开发；",
+        "start": 239,
+        "end": 257
+      }
+    },
+    {
+      "id": "R2",
+      "type": "responsibility",
+      "text": "编写单元测试保证代码质量",
+      "source_span": {
+        "doc": "job",
+        "quote": "编写单元测试，保证代码质量；",
+        "start": 261,
+        "end": 275
+      }
+    },
+    {
+      "id": "P1",
+      "type": "preferred",
+      "text": "分布式锁/分布式事务实践经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有分布式锁、分布式事务实践经验者优先；",
+        "start": 300,
+        "end": 319
+      }
+    },
+    {
+      "id": "T1",
+      "type": "terminology",
+      "text": "Go",
+      "source_span": {
+        "doc": "job",
+        "quote": "Go、Java、MySQL、Redis、RabbitMQ、Docker、Kubernetes、gRPC",
+        "start": 347,
+        "end": 398
+      }
+    },
+    {
+      "id": "T2",
+      "type": "terminology",
+      "text": "消息队列 RabbitMQ/Kafka",
+      "source_span": {
+        "doc": "job",
+        "quote": "了解消息队列（RabbitMQ/Kafka）的基本原理；",
+        "start": 182,
+        "end": 210
+      }
+    }
+  ],
+  "prompt_injection_flags": []
+}

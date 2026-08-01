@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 82,
+      "rationale": "版块齐全，教育/实习/项目/技能层次清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "实习经历",
+          "start": 112,
+          "end": 116
+        }
+      ]
+    },
+    "clarity": {
+      "score": 78,
+      "rationale": "技术栈表述具体，版本号明确",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "参与电商中台管理系统开发，使用 React 18 + TypeScript",
+          "start": 146,
+          "end": 183
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 75,
+      "rationale": "多处量化成果",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "使用虚拟列表优化万级数据表格渲染，首屏渲染时间从 3.2s 降到 1.1s",
+          "start": 239,
+          "end": 276
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 72,
+      "rationale": "技能覆盖岗位要求，Vue 仅了解",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "框架：React、Next.js、Vue3（了解）",
+          "start": 450,
+          "end": 475
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 85,
+      "rationale": "文本规范，机器可读性好",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 411,
+          "end": 415
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P1",
+      "issue": "个人项目缺少用户或效果数据",
+      "suggestion": "补充 Lighthouse 之外的使用数据，未知数字用占位格式",
+      "rewrite_draft": "简历生成器累计使用人数待用户核实：约X人",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "支持 Markdown 编辑实时预览，本地存储草稿",
+          "start": 384,
+          "end": 409
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P2",
+      "issue": "测试覆盖率可进一步说明统计口径",
+      "suggestion": "注明覆盖率是行覆盖还是分支覆盖",
+      "rewrite_draft": "Vitest 单元测试 40 个，行覆盖率 85%",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "编写了 40 个单元的 Vitest 测试，模块覆盖率达到 85%",
+          "start": 277,
+          "end": 310
+        }
+      ]
+    }
+  ]
+}

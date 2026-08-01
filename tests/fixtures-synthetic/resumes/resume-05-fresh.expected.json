@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 70,
+      "rationale": "缺少实习经历版块",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "项目经历",
+          "start": 152,
+          "end": 156
+        }
+      ]
+    },
+    "clarity": {
+      "score": 68,
+      "rationale": "表述朴素但清晰",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "使用 Java + Servlet + MySQL 实现借阅、归还、逾期提醒功能",
+          "start": 186,
+          "end": 226
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 45,
+      "rationale": "几乎无量化成果",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "数据库设计包含 8 张表，写了基本的单元测试",
+          "start": 227,
+          "end": 249
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 58,
+      "rationale": "技能深度偏入门",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "Java（熟悉）、MySQL（熟悉）、Spring Boot（入门）、Git（基本操作）",
+          "start": 329,
+          "end": 373
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 80,
+      "rationale": "格式简单可解析",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 324,
+          "end": 328
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P0",
+      "issue": "缺少可验证的成果证据",
+      "suggestion": "为博客系统补充部署后的可验证事实，未知数字用占位格式",
+      "rewrite_draft": "个人博客部署于学校服务器，累计发布文章待用户核实：X篇",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "实现了文章管理和评论功能",
+          "start": 310,
+          "end": 322
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "severity": "P1",
+      "issue": "自我评价没有事实支撑",
+      "suggestion": "用课程设计中的具体行动替代形容词",
+      "rewrite_draft": "在图书管理系统中独立完成逾期提醒模块并通过单元测试",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "踏实认真，愿意从基础工作做起，希望在实际项目中快速成长。",
+          "start": 380,
+          "end": 408
+        }
+      ]
+    }
+  ]
+}

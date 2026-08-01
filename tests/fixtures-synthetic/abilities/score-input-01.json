@@ -1,0 +1,61 @@
+{
+  "note": "与 contracts/scoring.md 第6节手算示例完全一致；expected 为对拍基准（±0.5）",
+  "R": {
+    "structure": 80,
+    "clarity": 75,
+    "achievement_evidence": 60,
+    "skill_evidence": 70,
+    "ats_readability": 85
+  },
+  "M": {
+    "requirements": [
+      {
+        "type": "hard",
+        "status": "covered"
+      },
+      {
+        "type": "hard",
+        "status": "weak"
+      },
+      {
+        "type": "hard",
+        "status": "missing"
+      },
+      {
+        "type": "hard",
+        "status": "unknown"
+      },
+      {
+        "type": "responsibility",
+        "status": "covered"
+      },
+      {
+        "type": "responsibility",
+        "status": "covered"
+      },
+      {
+        "type": "preferred",
+        "status": "missing"
+      },
+      {
+        "type": "terminology",
+        "status": "covered"
+      }
+    ]
+  },
+  "I": {
+    "structure": 70,
+    "relevance": 80,
+    "specificity": 65,
+    "followup_adaptation": 75,
+    "clarity": 72
+  },
+  "expected": {
+    "R": 73.0,
+    "M": 60.0,
+    "I": 72.55,
+    "C0": 68.27,
+    "C7_low": 77.79,
+    "C7_high": 90.48
+  }
+}

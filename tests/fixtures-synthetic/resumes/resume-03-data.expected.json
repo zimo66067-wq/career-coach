@@ -1,0 +1,83 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 78,
+      "rationale": "结构完整，课程与技能对应岗位",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "实习经历",
+          "start": 128,
+          "end": 132
+        }
+      ]
+    },
+    "clarity": {
+      "score": 74,
+      "rationale": "分析动作与结论表述清楚",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "通过漏斗分析定位到支付环节流失率异常（38%），推动收银台改版后流失率降至 25%",
+          "start": 194,
+          "end": 235
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 72,
+      "rationale": "有业务结果数字",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "使用 Python pandas 清洗 200 万行订单数据，建立了可复用的数据校验脚本",
+          "start": 236,
+          "end": 280
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 76,
+      "rationale": "SQL/pandas/Tableau 与岗位匹配",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "SQL（熟练）、Python pandas（熟练）、Tableau、Excel 透视表",
+          "start": 377,
+          "end": 420
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 82,
+      "rationale": "格式规范",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 372,
+          "end": 376
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P1",
+      "issue": "建模项目缺少业务落点说明",
+      "suggestion": "说明 AUC 0.81 的业务含义与可应用场景",
+      "rewrite_draft": "用户流失预测 AUC 0.81，可支撑流失用户召回名单圈选",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "使用逻辑回归和 XGBoost 建模，AUC 达到 0.81",
+          "start": 340,
+          "end": 370
+        }
+      ]
+    }
+  ]
+}

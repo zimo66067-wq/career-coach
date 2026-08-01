@@ -1,0 +1,83 @@
+{
+  "version": "1.0",
+  "pii_removed": true,
+  "subscores": {
+    "structure": {
+      "score": 80,
+      "rationale": "版块完整，实习描述详实",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "实习经历",
+          "start": 118,
+          "end": 122
+        }
+      ]
+    },
+    "clarity": {
+      "score": 76,
+      "rationale": "方法论表述清楚",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "整理出 40 条需求并建立 RICE 优先级模型",
+          "start": 178,
+          "end": 202
+        }
+      ]
+    },
+    "achievement_evidence": {
+      "score": 78,
+      "rationale": "使用率提升有量化",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "独立完成报表订阅功能的 PRD，上线后周使用率从 12% 提升到 31%",
+          "start": 203,
+          "end": 239
+        }
+      ]
+    },
+    "skill_evidence": {
+      "score": 70,
+      "rationale": "技能与产品岗匹配，SQL 仅基础",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "需求分析、PRD 撰写、原型设计（Figma）、SQL 基础、数据分析基础",
+          "start": 366,
+          "end": 403
+        }
+      ]
+    },
+    "ats_readability": {
+      "score": 84,
+      "rationale": "格式规范",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "技能清单",
+          "start": 361,
+          "end": 365
+        }
+      ]
+    }
+  },
+  "suggestions": [
+    {
+      "id": "S1",
+      "severity": "P2",
+      "issue": "冷启动数据缺少留存口径",
+      "suggestion": "补充 2000 用户的周留存或活跃口径，未知用占位格式",
+      "rewrite_draft": "冷启动 3 周获取 2000 名用户，次周留存待用户核实：约X%",
+      "source_spans": [
+        {
+          "doc": "resume",
+          "quote": "主导产品设计，冷启动 3 周获取 2000 名用户",
+          "start": 334,
+          "end": 359
+        }
+      ]
+    }
+  ]
+}

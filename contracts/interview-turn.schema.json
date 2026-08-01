@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://career-coach/contracts/interview-turn.schema.json",
+  "title": "InterviewTurn · F3 面试轮次合同 v1.0（冻结）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["turn_id", "question", "targets", "answer", "answer_quote", "missing_elements", "follow_up", "asr_confidence", "subscores"],
+  "properties": {
+    "turn_id": { "type": "integer", "minimum": 1 },
+    "question": { "type": "string", "minLength": 1 },
+    "targets": {
+      "type": "array",
+      "description": "本题考察点（关联 JD 关键要求）",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "answer": { "type": "string", "description": "用户回答全文（去标识化后）" },
+    "answer_quote": {
+      "type": "string",
+      "description": "评价依据的原文引用；业务规则：必须是 answer 的子串，否则该轮作废"
+    },
+    "missing_elements": {
+      "type": "array",
+      "description": "STAR 缺口项",
+      "items": { "type": "string", "enum": ["situation", "task", "action", "result", "metric", "reflection"] }
+    },
+    "follow_up": {
+      "type": ["object", "null"],
+      "description": "追问；每题最多一次，必须引用上一轮回答短句或指出 STAR 缺失项",
+      "properties": {
+        "question": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      },
+      "required": ["question", "reason"],
+      "additionalProperties": false
+    },
+    "asr_confidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "description": "语音模式 ASR 置信度，<0.75 触发用户确认；文字模式为 null"
+    },
+    "subscores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["structure", "relevance", "specificity", "followup_adaptation", "clarity"],
+      "properties": {
+        "structure": { "type": "number", "minimum": 0, "maximum": 100 },
+        "relevance": { "type": "number", "minimum": 0, "maximum": 100 },
+        "specificity": { "type": "number", "minimum": 0, "maximum": 100 },
+        "followup_adaptation": { "type": "number", "minimum": 0, "maximum": 100 },
+        "clarity": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    }
+  }
+}

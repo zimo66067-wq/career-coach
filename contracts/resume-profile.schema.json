@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://career-coach/contracts/resume-profile.schema.json",
+  "title": "ResumeProfile · F1 简历诊断合同 v1.0（冻结）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "pii_removed", "subscores", "suggestions"],
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "pii_removed": {
+      "type": "boolean",
+      "const": true,
+      "description": "必须为 true：进入评分前已完成去标识化（见 docs/privacy.md）"
+    },
+    "subscores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["structure", "clarity", "achievement_evidence", "skill_evidence", "ats_readability"],
+      "properties": {
+        "structure": { "$ref": "#/$defs/subscore" },
+        "clarity": { "$ref": "#/$defs/subscore" },
+        "achievement_evidence": { "$ref": "#/$defs/subscore" },
+        "skill_evidence": { "$ref": "#/$defs/subscore" },
+        "ats_readability": { "$ref": "#/$defs/subscore" }
+      }
+    },
+    "suggestions": {
+      "type": "array",
+      "minItems": 1,
+      "description": "逐条修改建议，每条必须带证据",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "issue", "suggestion", "source_spans"],
+        "properties": {
+          "id": { "type": "string" },
+          "severity": { "type": "string", "enum": ["P0", "P1", "P2"] },
+          "issue": { "type": "string", "minLength": 1 },
+          "suggestion": { "type": "string", "minLength": 1 },
+          "rewrite_draft": { "type": "string", "description": "改写草案；未核实数字必须带「待用户核实：」前缀" },
+          "source_spans": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/$defs/source_span" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "subscore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "rationale", "source_spans"],
+      "properties": {
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "rationale": { "type": "string", "minLength": 1, "description": "评分理由，必须引用证据" },
+        "source_spans": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/source_span" }
+        }
+      }
+    },
+    "source_span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["doc", "quote", "start", "end"],
+      "properties": {
+        "doc": { "type": "string", "enum": ["resume", "job", "interview"] },
+        "quote": { "type": "string", "minLength": 1, "description": "原文引用，必须逐字摘自输入材料" },
+        "start": { "type": "integer", "minimum": 0 },
+        "end": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

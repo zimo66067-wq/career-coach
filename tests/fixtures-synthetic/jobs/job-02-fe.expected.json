@@ -1,0 +1,96 @@
+{
+  "version": "1.0",
+  "user_confirmed": true,
+  "job_title": "前端开发工程师（校招）",
+  "requirements": [
+    {
+      "id": "J1",
+      "type": "hard",
+      "text": "本科及以上学历",
+      "source_span": {
+        "doc": "job",
+        "quote": "本科及以上学历；",
+        "start": 70,
+        "end": 78
+      }
+    },
+    {
+      "id": "J2",
+      "type": "hard",
+      "text": "熟练掌握 TypeScript 和 React",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟练掌握 TypeScript 和 React；",
+        "start": 82,
+        "end": 106
+      }
+    },
+    {
+      "id": "J3",
+      "type": "hard",
+      "text": "熟悉前端工程化",
+      "source_span": {
+        "doc": "job",
+        "quote": "熟悉前端工程化（Vite/Webpack）；",
+        "start": 110,
+        "end": 132
+      }
+    },
+    {
+      "id": "J4",
+      "type": "hard",
+      "text": "有性能优化实践经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有性能优化实践经验；",
+        "start": 136,
+        "end": 146
+      }
+    },
+    {
+      "id": "R1",
+      "type": "responsibility",
+      "text": "与产品和设计协作高质量交付",
+      "source_span": {
+        "doc": "job",
+        "quote": "与产品和设计协作完成高质量交付；",
+        "start": 181,
+        "end": 197
+      }
+    },
+    {
+      "id": "R2",
+      "type": "responsibility",
+      "text": "维护组件库与公共工具",
+      "source_span": {
+        "doc": "job",
+        "quote": "维护组件库与公共工具。",
+        "start": 201,
+        "end": 212
+      }
+    },
+    {
+      "id": "P1",
+      "type": "preferred",
+      "text": "SSR/Next.js 经验",
+      "source_span": {
+        "doc": "job",
+        "quote": "有 SSR/Next.js 经验者优先；",
+        "start": 221,
+        "end": 241
+      }
+    },
+    {
+      "id": "T1",
+      "type": "terminology",
+      "text": "React/Next.js/Vite",
+      "source_span": {
+        "doc": "job",
+        "quote": "TypeScript、React、Next.js、Vite、ECharts、Node.js",
+        "start": 265,
+        "end": 310
+      }
+    }
+  ],
+  "prompt_injection_flags": []
+}

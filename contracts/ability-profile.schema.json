@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://career-coach/contracts/ability-profile.schema.json",
+  "title": "AbilityProfile · F4 能力聚合合同 v1.0（冻结）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "resume_score", "match_score", "interview_score", "dimensions", "baseline", "scenario_day7", "plan"],
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "resume_score": { "type": "number", "minimum": 0, "maximum": 100, "description": "R，见 contracts/scoring.md" },
+    "match_score": { "type": "number", "minimum": 0, "maximum": 100, "description": "M" },
+    "interview_score": { "type": "number", "minimum": 0, "maximum": 100, "description": "I" },
+    "dimensions": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "description": "恰好六维，key 不允许重复（业务规则校验）",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "name", "score", "evidence"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": ["job_fit", "achievement_evidence", "professional_expression", "structured_answer", "job_depth", "followup_adaptation"]
+          },
+          "name": { "type": "string", "minLength": 1 },
+          "score": { "type": "number", "minimum": 0, "maximum": 100 },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "description": "该维度的证据引用（source_span quote 或合同字段路径）",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "baseline": { "type": "number", "minimum": 0, "maximum": 100, "description": "C0 = 0.25R + 0.35M + 0.40I" },
+    "scenario_day7": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["low", "high", "assumptions"],
+      "properties": {
+        "low": { "type": "number", "minimum": 0, "maximum": 100, "description": "C7_low = C0 + 空间×0.30（演示假设）" },
+        "high": { "type": "number", "minimum": 0, "maximum": 100, "description": "C7_high = C0 + 空间×0.70（演示假设）" },
+        "assumptions": {
+          "type": "array",
+          "minItems": 1,
+          "description": "情景假设，必须如实列出；0.30/0.70 为 MVP 演示假设而非统计参数",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "plan": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "description": "恰好七条；day 1-7 不重复（业务规则校验）",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["day", "focus", "minutes", "artifact"],
+        "properties": {
+          "day": { "type": "integer", "minimum": 1, "maximum": 7 },
+          "focus": { "type": "string", "minLength": 1 },
+          "minutes": { "type": "integer", "minimum": 30, "maximum": 45 },
+          "artifact": { "type": "string", "minLength": 1, "description": "当天必须产出的可验证成果物" }
+        }
+      }
+    }
+  }
+}

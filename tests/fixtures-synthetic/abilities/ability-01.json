@@ -1,0 +1,112 @@
+{
+  "version": "1.0",
+  "resume_score": 73.0,
+  "match_score": 60.0,
+  "interview_score": 72.55,
+  "dimensions": [
+    {
+      "key": "job_fit",
+      "name": "岗位契合",
+      "score": 60.0,
+      "evidence": [
+        "M=60.00（硬性要求 50.00）",
+        "熟悉 MySQL，了解索引优化和慢查询分析；"
+      ]
+    },
+    {
+      "key": "achievement_evidence",
+      "name": "成果证据",
+      "score": 60.0,
+      "evidence": [
+        "将订单列表接口的平均响应时间从 800ms 优化到 220ms，通过给 MySQL 加复合索引和引入 Redis 缓存实现"
+      ]
+    },
+    {
+      "key": "professional_expression",
+      "name": "专业表达",
+      "score": 75.0,
+      "evidence": [
+        "编写接口文档并推动联调，与前端约定统一的错误码规范"
+      ]
+    },
+    {
+      "key": "structured_answer",
+      "name": "结构化回答",
+      "score": 70.0,
+      "evidence": [
+        "interview-01 turn_2：missing_elements=[metric]"
+      ]
+    },
+    {
+      "key": "job_depth",
+      "name": "岗位深度",
+      "score": 65.0,
+      "evidence": [
+        "缓存一致性追问能展开回答，深度中等",
+        "interview-01 turn_1 follow_up"
+      ]
+    },
+    {
+      "key": "followup_adaptation",
+      "name": "追问适应",
+      "score": 75.0,
+      "evidence": [
+        "interview-01 三轮 followup_adaptation 均值 72.3"
+      ]
+    }
+  ],
+  "baseline": 68.27,
+  "scenario_day7": {
+    "low": 77.79,
+    "high": 90.48,
+    "assumptions": [
+      "0.30 与 0.70 为 MVP 演示假设，非统计学习参数",
+      "假设用户按计划完成每天 30-45 分钟训练并产出 artifact",
+      "第七天复测结果才是真实变化"
+    ]
+  },
+  "plan": [
+    {
+      "day": 1,
+      "focus": "为三条核心经历补充量化证据，无法确认的数字用「待用户核实：」占位",
+      "minutes": 40,
+      "artifact": "修订后的三段经历文本"
+    },
+    {
+      "day": 2,
+      "focus": "针对 P0 缺口（分布式实践经验）整理项目复盘笔记",
+      "minutes": 35,
+      "artifact": "一页复盘笔记"
+    },
+    {
+      "day": 3,
+      "focus": "按 STAR 结构重写两个面试高频回答",
+      "minutes": 40,
+      "artifact": "两份 STAR 回答稿"
+    },
+    {
+      "day": 4,
+      "focus": "针对岗位术语（gRPC/Kubernetes）做概念速学并自测",
+      "minutes": 30,
+      "artifact": "术语自测清单"
+    },
+    {
+      "day": 5,
+      "focus": "完成一轮五题文字模拟面试并复盘 missing_elements",
+      "minutes": 45,
+      "artifact": "面试复盘记录"
+    },
+    {
+      "day": 6,
+      "focus": "根据复盘改写简历自我评价与技能描述",
+      "minutes": 35,
+      "artifact": "简历修订版 v2"
+    },
+    {
+      "day": 7,
+      "focus": "复测诊断与匹配，对比 C0 变化并记录真实提升",
+      "minutes": 40,
+      "artifact": "复测对比表"
+    }
+  ]
+}
