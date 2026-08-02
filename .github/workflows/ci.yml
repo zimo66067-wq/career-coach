@@ -71,8 +71,12 @@ jobs:
               --schema contracts/interview-turn.schema.json \
               --instance "$f"
           done
-          # Ability fixtures
+          # Ability fixtures (排除 score-input，它不是 ability-profile schema)
           for f in tests/fixtures-synthetic/abilities/*.json; do
+            # 跳过 score-input 文件（这些是评分计算的输入，非 AbilityProfile）
+            case "$f" in
+              *score-input*) echo "Skipping score-input fixture: $f"; continue ;;
+            esac
             echo "Validating: $f"
             python tools/validate_schema.py \
               --schema contracts/ability-profile.schema.json \
