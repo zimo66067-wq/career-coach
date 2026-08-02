@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F2 岗位匹配 · 职跃AI</title>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../css/main.css">
+<link rel="stylesheet" href="../css/states.css">
+</head>
+<body data-page="f2">
+<nav class="topnav">
+  <span class="brand">职跃AI</span>
+  <a class="nav" data-page="home" href="../index.html">首页</a>
+  <a class="nav" data-page="f1" href="f1-resume.html">F1 简历诊断</a>
+  <a class="nav" data-page="f2" href="f2-match.html">F2 岗位匹配</a>
+  <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
+  <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
+  <a class="nav" data-page="states" href="states.html">状态墙</a>
+</nav>
+<div class="wrap">
+  <h1 class="page-title">F2 · 简历-JD 匹配</h1>
+  <p class="page-sub">M = 硬性50% + 职责25% + 加分15% + 术语10% ｜ covered=1 / weak=0.5 / missing=0 / unknown 不进分母</p>
+
+  <div data-state-view="empty">
+    <div class="card empty-state">
+      <div class="art"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></div>
+      <h3>粘贴目标岗位的 JD</h3>
+      <p>解析出硬性要求/职责/加分项/术语四类清单，你确认后才进入匹配（JD 中的指令会被当作普通文本）</p>
+      <span class="btn">粘贴 JD</span>
+    </div>
+  </div>
+
+  <div data-state-view="processing">
+    <div class="card">
+      <div class="spin-row"><span class="spinner"></span>正在做要求级语义匹配…（P95 ≤ 25 秒）</div>
+      <div class="skel h-md" style="margin:12px 0"></div>
+      <div class="skel h-md" style="margin:12px 0"></div>
+      <div class="skel h-md"></div>
+    </div>
+  </div>
+
+  <div data-state-view="success">
+    <div class="card" style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+      <div class="score-ring" style="--pct:60"><div class="inner"><span class="num">60</span><span class="lbl">匹配分 M</span></div></div>
+      <div style="flex:1;min-width:260px">
+        <div class="subbar"><div class="meta"><span>硬性要求（50%）</span><span>50.0</span></div><div class="track"><div class="fill" style="width:50%"></div></div></div>
+        <div class="subbar"><div class="meta"><span>职责匹配（25%）</span><span>100.0</span></div><div class="track"><div class="fill" style="width:100%"></div></div></div>
+        <div class="subbar"><div class="meta"><span>加分项（15%）</span><span>0.0</span></div><div class="track"><div class="fill" style="width:2%"></div></div></div>
+        <div class="subbar"><div class="meta"><span>术语覆盖（10%）</span><span>100.0</span></div><div class="track"><div class="fill" style="width:100%"></div></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>逐条要求四态判定（硬性要求置顶）</h3>
+      <div class="cover-track" style="margin-bottom:12px" id="coverTrack"></div>
+      <div id="reqList"></div>
+    </div>
+    <div class="card">
+      <h3>缺口分级与行动建议</h3>
+      <div id="gapList"></div>
+    </div>
+  </div>
+
+  <div data-state-view="error">
+    <div class="error-banner">
+      <div class="icon">⚠️</div>
+      <div>
+        <h3>匹配未完成</h3>
+        <p>JD 解析结果未通过合同校验（或检测到注入内容需你确认），已阻断计分。请确认要求清单后重试。</p>
+        <span class="btn">重新确认 JD</span>
+      </div>
+    </div>
+  </div>
+
+  <div data-state-view="degraded">
+    <div class="degraded-banner">
+      <div class="icon">🔶</div>
+      <div>
+        <h3>已切换降级路径 · 简化匹配</h3>
+        <p>语义向量服务不可用，当前使用本地 BM25 关键词匹配，结果可能偏保守（界面已按规范标注「简化匹配」）。</p>
+      </div>
+    </div>
+    <div class="card">
+      <h3>关键词覆盖（简化匹配）</h3>
+      <div class="req-item"><span class="badge covered">命中</span><span class="txt">Go / MySQL / Redis / RabbitMQ / 订单 / 库存</span></div>
+      <div class="req-item"><span class="badge missing">未命中</span><span class="txt">Kubernetes / gRPC / 分布式事务</span></div>
+      <p style="font-size:13px;color:var(--c-text-2);margin-top:10px">语义匹配恢复后将自动重算并更新四态。</p>
+    </div>
+  </div>
+</div>
+
+<script src="../js/mock-data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (window.APP.getState() !== "success") return;
+  var m = window.MOCK.matchResult;
+  var order = { hard: 0, responsibility: 1, preferred: 2, terminology: 3 };
+  var reqs = m.requirements.slice().sort(function (a, b) { return order[a.type] - order[b.type]; });
+  var colors = { covered: "#16a34a", weak: "#d97706", missing: "#dc2626", unknown: "#6b7280" };
+  var total = reqs.length, counts = { covered: 0, weak: 0, missing: 0, unknown: 0 };
+  reqs.forEach(function (r) { counts[r.status]++; });
+  document.getElementById("coverTrack").innerHTML = Object.keys(counts).map(function (s) {
+    return counts[s] ? '<div style="width:' + (counts[s] / total * 100) + "%;background:" + colors[s] + '" title="' + s + " " + counts[s] + '"></div>' : "";
+  }).join("");
+  var labels = { covered: "covered", weak: "weak", missing: "missing", unknown: "unknown" };
+  document.getElementById("reqList").innerHTML = reqs.map(function (r) {
+    return '<div class="req-item"><span class="badge ' + r.status + '">' + labels[r.status] + '</span>' +
+      '<span class="txt"><b>[' + r.typeLabel + "]</b> " + r.text + '<br><span style="font-size:12px;color:var(--c-text-2)">证据：' + r.evidence + "</span></span></div>";
+  }).join("");
+  document.getElementById("gapList").innerHTML = m.gaps.map(function (g) {
+    return '<div class="req-item"><span class="badge ' + g.level.toLowerCase() + '">' + g.level + '</span>' +
+      '<span class="txt">' + g.text + '<br><span style="font-size:12px;color:var(--c-text-2)">建议：' + g.action + "</span></span></div>";
+  }).join("");
+});
+</script>
+</body>
+</html>
