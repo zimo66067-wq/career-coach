@@ -552,13 +552,6 @@ class InterviewEngine:
 
         return None
 
-    def _generate_question(self, session, gap=None):
-        """动态生成问题（通过 model_router）。
-
-        当前为降级实现，直接返回 None 触发 _fallback_question_bank。
-        """
-        return None
-
     def _fallback_question_bank(self, session, gap=None):
         """降级: 岗位题库（基于 gap 生成模板问题）。"""
         if not gap:

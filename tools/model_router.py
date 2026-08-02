@@ -23,6 +23,8 @@ import string
 import time
 import random
 from typing import Optional
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 # ------------------------------------------------------------------ #
 # 任务到提示词的映射（冻结）
@@ -300,14 +302,78 @@ class QianfanModelRouter(ModelRouter):
     def __init__(self, primary_model=None, fallback_model=None, enable_log=True):
         super().__init__(primary_model, fallback_model, enable_log)
         self.api_key = os.environ.get("QIANFAN_API_KEY")
+        self.base_url = os.environ.get(
+            "QIANFAN_BASE_URL", "https://qianfan.baidubce.com/v2"
+        ).rstrip("/")
         if not self.api_key:
-            raise NotImplementedError(
+            raise ValueError(
                 "QianfanModelRouter: QIANFAN_API_KEY not set; "
                 "configure it to enable Qianfan model calls"
             )
 
     def _try_call(self, model, prompt, user_input, params, context):
-        raise NotImplementedError(
-            "QianfanModelRouter._try_call: API call not implemented yet. "
-            "Wire up Qianfan SDK here."
+        """Call Qianfan V2's OpenAI-compatible chat endpoint.
+
+        Uses only the Python standard library so DuMate's restricted runtime does
+        not need an additional SDK.  Network/auth/HTTP failures are raised to the
+        base router, which then tries the configured fallback model and finally
+        the explicit rule-degraded path.
+        """
+        messages = []
+        if prompt:
+            messages.append({"role": "system", "content": prompt})
+
+        content = user_input or ""
+        if context:
+            content += "\n\ncontext_json:\n" + json.dumps(
+                context, ensure_ascii=False, separators=(",", ":")
+            )
+        messages.append({"role": "user", "content": content})
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": params["temperature"],
+            "max_tokens": params["max_tokens"],
+            "stream": False,
+        }
+        request = Request(
+            self.base_url + "/chat/completions",
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={
+                "Authorization": "Bearer " + self.api_key,
+                "Content-Type": "application/json",
+            },
+            method="POST",
         )
+        try:
+            with urlopen(request, timeout=params["timeout"]) as response:
+                body = json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            raise RuntimeError("qianfan_http_%s" % exc.code) from exc
+        except URLError as exc:
+            raise RuntimeError("qianfan_network_error") from exc
+
+        try:
+            output = body["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ValueError("qianfan_invalid_response") from exc
+        return self._parse_output(output)
+
+    @staticmethod
+    def _parse_output(output):
+        """Return JSON objects as dict/list; retain ordinary model text."""
+        if not isinstance(output, str):
+            return output
+        text = output.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+        try:
+            return json.loads(text)
+        except (TypeError, ValueError):
+            return text

@@ -12,6 +12,7 @@ import json
 import os
 import re
 import tempfile
+from unittest.mock import patch
 
 import pytest
 
@@ -21,7 +22,7 @@ from interview_engine import (
     MAX_FOLLOWUPS_PER_QUESTION,
 )
 from model_router import (
-    ModelRouter, TASK_PROMPTS, MODEL_PARAMS, DEGRADED_OUTPUTS,
+    ModelRouter, QianfanModelRouter, TASK_PROMPTS, MODEL_PARAMS, DEGRADED_OUTPUTS,
 )
 from voice_handler import VoiceHandler
 from privacy_lifecycle import ConsentManager, DataLifecycle, PIIScanner
@@ -237,6 +238,51 @@ class TestModelRouterRouting:
         """降级输出含 note 说明"""
         for task, output in DEGRADED_OUTPUTS.items():
             assert "note" in output, "%s 降级输出缺少 note" % task
+
+    def test_qianfan_v2_call_and_json_parse(self, monkeypatch):
+        """V2 请求使用 Bearer 鉴权，并将 JSON 模型输出解析为对象。"""
+        monkeypatch.setenv("QIANFAN_API_KEY", "test-key")
+        router = QianfanModelRouter(primary_model="test-model", enable_log=False)
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                return json.dumps({
+                    "choices": [{"message": {"content": '{"question":"请举例","targets":["R1"]}'}}]
+                }).encode("utf-8")
+
+        with patch("model_router.urlopen", return_value=FakeResponse()) as mocked:
+            result = router.call(
+                "interview_question", "gap: Go", context={"turn_id": 1}
+            )
+
+        request = mocked.call_args.args[0]
+        assert request.full_url == "https://qianfan.baidubce.com/v2/chat/completions"
+        assert request.get_header("Authorization") == "Bearer test-key"
+        assert result["status"] == "success"
+        assert result["output"]["question"] == "请举例"
+
+    def test_dynamic_interview_uses_router_output(self):
+        """动态成功时不得错误标记为题库降级。"""
+        class SuccessRouter:
+            def call(self, task_type, user_input, context=None):
+                return {
+                    "status": "success",
+                    "output": {"question": "请说明你如何优化 Go 服务？", "targets": ["R1"]},
+                }
+
+        engine = InterviewEngine(model_router=SuccessRouter())
+        session = engine.start(
+            {"title": "后端工程师", "requirements": []}, {},
+            [{"id": "R1", "type": "hard", "text": "Go", "status": "weak"}],
+        )
+        result = engine.next_question(session)
+        assert result["question"] == "请说明你如何优化 Go 服务？"
+        assert result["targets"] == ["R1"]
+        assert session["degraded"] is False
 
     def test_unknown_task_fails(self):
         """未知任务返回 failed"""

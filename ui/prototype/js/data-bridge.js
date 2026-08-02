@@ -25,6 +25,32 @@
   // ── 内存缓存（SessionStorage 持久化） ─────────────────
   var CACHE_PREFIX = 'cb_cache_';
 
+  var SUBSCORE_LABELS = {
+    structure: '结构完整度',
+    clarity: '表达清晰度',
+    achievement_evidence: '成果证据',
+    skill_evidence: '技能证据',
+    ats_readability: 'ATS可读性'
+  };
+
+  // 后端合同使用 source_spans[]；原型视图历史上读取 quote/label。
+  // 此适配器只生成视图副本，绝不改写后端合同对象或伪造证据。
+  function normalizeResumeProfile(profile) {
+    if (!profile || !profile.subscores) return profile;
+    var view = JSON.parse(JSON.stringify(profile));
+    Object.keys(view.subscores).forEach(function (key) {
+      var item = view.subscores[key] || {};
+      var spans = Array.isArray(item.source_spans) ? item.source_spans : [];
+      if (!item.quote && spans.length) item.quote = spans[0].quote || '';
+      if (!item.label) item.label = SUBSCORE_LABELS[key] || key;
+    });
+    (view.suggestions || []).forEach(function (item) {
+      var spans = Array.isArray(item.source_spans) ? item.source_spans : [];
+      if (!item.quote && spans.length) item.quote = spans[0].quote || '';
+    });
+    return view;
+  }
+
   function setCache(key, data) {
     try {
       sessionStorage.setItem(CACHE_PREFIX + key, JSON.stringify({
@@ -183,10 +209,12 @@
     });
 
     if (!res.error) {
-      setCache('resumeProfile', res.resumeProfile);
-      setCache('diagnoseResult', res);
+      var normalized = normalizeResumeProfile(res.resumeProfile);
+      var normalizedResult = Object.assign({}, res, { resumeProfile: normalized });
+      setCache('resumeProfile', normalized);
+      setCache('diagnoseResult', normalizedResult);
       return {
-        resumeProfile: res.resumeProfile,
+        resumeProfile: normalized,
         score_R: res.score_R !== undefined ? res.score_R : (res.resumeProfile ? res.resumeProfile.score_R : null),
         suggestions: res.suggestions || (res.resumeProfile ? res.resumeProfile.suggestions : []),
         trace_id: res.trace_id || traceId
@@ -208,7 +236,7 @@
     }
 
     // MOCK
-    var profile = window.MOCK.resumeProfile;
+    var profile = normalizeResumeProfile(window.MOCK.resumeProfile);
     return {
       resumeProfile: profile,
       score_R: profile.score_R,
@@ -531,6 +559,9 @@
 
     // 缓存工具
     _cache: { get: getCache, set: setCache },
+
+    // 契约适配器（供离线验收；不修改后端 source_spans 结构）
+    _normalizeResumeProfile: normalizeResumeProfile,
 
     // 端点配置（便于调试）
     _endpoints: ENDPOINTS
