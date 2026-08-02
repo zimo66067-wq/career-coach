@@ -104,10 +104,81 @@ class Bm25Matcher:
         return conf, idx
 
 
-# ---------------- Embedding（千帆 HTTP API） ----------------
+# ---------------- Embedding 后端 ----------------
 class EmbedderBase:
     def similarity(self, a, b):
         raise NotImplementedError
+
+
+class ZhipuEmbedder(EmbedderBase):
+    """智谱AI Embedding-2/3 封装（推荐，免费2000万Token）
+
+    用法:
+      from tools.match_requirements import ZhipuEmbedder
+      embedder = ZhipuEmbedder(api_key=os.environ.get("ZHIPU_API_KEY"))
+      vecs = embedder.embed(["文本1", "文本2"])
+    """
+
+    def __init__(self, api_key=None, model="embedding-2"):
+        self.api_key = api_key or os.environ.get("ZHIPU_API_KEY")
+        self.model = model
+        if not self.api_key:
+            raise NotImplementedError(
+                "智谱 embedding 未配置 ZHIPU_API_KEY；"
+                "请改用 --backend bm25（简化匹配）"
+            )
+        from zhipuai import ZhipuAI
+        self.client = ZhipuAI(api_key=self.api_key)
+        self.dim = 1024 if model == "embedding-2" else 2048
+
+    def embed(self, texts):
+        """批量嵌入，返回 List[List[float]]。"""
+        all_embeddings = []
+        batch_size = 16  # 智谱API批量限制
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i + batch_size]
+            resp = self.client.embeddings.create(model=self.model, input=batch)
+            all_embeddings.extend([item.embedding for item in resp.data])
+        return all_embeddings
+
+    @staticmethod
+    def _cosine(va, vb):
+        """对两个向量算余弦相似度，返回 [0, 1]。"""
+        dot = sum(x * y for x, y in zip(va, vb))
+        na = math.sqrt(sum(x * x for x in va))
+        nb = math.sqrt(sum(x * x for x in vb))
+        return dot / (na * nb) if na * nb > 0 else 0.0
+
+    def similarity(self, a, b):
+        """对两段文本算余弦相似度（先 embed 再算）。"""
+        vecs = self.embed([a, b])
+        return self._cosine(vecs[0], vecs[1])
+
+    def batch_match(self, requirements_text, sentences):
+        """句子级批量匹配：预 embed 所有简历句子和 JD 要求，矩阵计算余弦相似度。
+
+        Args:
+            requirements_text: List[str]，JD 要求文本列表
+            sentences: List[str]，简历切分后的句子列表
+
+        Returns:
+            List of (best_conf, best_idx) 对，长度 == len(requirements_text)
+        """
+        # 一次性 embed 全部句子和全部要求
+        sent_vecs = self.embed(sentences)
+        req_vecs = self.embed(requirements_text)
+
+        results = []
+        for ri, rv in enumerate(req_vecs):
+            best_conf = 0.0
+            best_idx = -1
+            for si, sv in enumerate(sent_vecs):
+                conf = self._cosine(rv, sv)
+                if conf > best_conf:
+                    best_conf = conf
+                    best_idx = si
+            results.append((best_conf, best_idx))
+        return results
 
 
 class QianfanEmbedder(EmbedderBase):
@@ -213,11 +284,55 @@ def load_requirements(job_path):
     return reqs
 
 
+def _run_embedding_match(embedder, requirements, sentences, resume_tokens):
+    """通用 embedding 匹配流程。
+
+    优先用 batch_match（批量 embed + 矩阵计算）；
+    若 embedder 不支持 batch_match，逐条降级到 similarity。
+    """
+    req_texts = [r["text"] for r in requirements]
+
+    if hasattr(embedder, "batch_match"):
+        # 批量模式：只调 2 次 API（句子 + 要求），矩阵计算余弦
+        match_results = embedder.batch_match(req_texts, sentences)
+    else:
+        # 逐条模式
+        match_results = []
+        for req_text in req_texts:
+            best_conf = 0.0
+            best_idx = -1
+            for si, sent in enumerate(sentences):
+                try:
+                    conf = embedder.similarity(req_text, sent)
+                except Exception as exc:
+                    print("[match] embedding 调用失败: %s" % exc, file=sys.stderr)
+                    conf = 0.0
+                if conf > best_conf:
+                    best_conf = conf
+                    best_idx = si
+            match_results.append((best_conf, best_idx))
+
+    results = []
+    for i, req in enumerate(requirements):
+        best_conf, best_idx = match_results[i]
+        req_tokens = unigrams(req["text"])
+        has_partial = bool(req_tokens & resume_tokens)
+        status = judge(best_conf, has_partial)
+        results.append({
+            "id": req["id"], "type": req["type"], "text": req["text"],
+            "status": status, "confidence": round(best_conf, 3),
+            "evidence": sentences[best_idx] if best_idx >= 0 and best_conf >= WEAK_TH else "",
+        })
+    return results
+
+
 def main():
     ap = argparse.ArgumentParser(description="JD 要求级匹配（covered/weak/missing/unknown）")
     ap.add_argument("--resume", required=True)
     ap.add_argument("--job", required=True, help="JD 纯文本或 job expected.json")
     ap.add_argument("--backend", choices=["bm25", "embedding"], default="bm25")
+    ap.add_argument("--embedding-model", default=None,
+                    help="指定 embedding 模型：zhipu-embedding-2 / zhipu-embedding-3 / qianfan")
     ap.add_argument("--output", default=None)
     args = ap.parse_args()
 
@@ -230,37 +345,33 @@ def main():
 
     if args.backend == "embedding":
         embedder = None
-        try:
-            embedder = QianfanEmbedder()
-        except NotImplementedError as e:
-            print("[match] %s，降级到 BM25" % e, file=sys.stderr)
+        embedder_name = "none"
+
+        # 1) 优先尝试智谱 Embedding（免费2000万Token）
+        if args.embedding_model in (None, "zhipu-embedding-2", "zhipu-embedding-3"):
+            model = "embedding-3" if args.embedding_model == "zhipu-embedding-3" else "embedding-2"
+            try:
+                embedder = ZhipuEmbedder(model=model)
+                embedder_name = "zhipu-%s" % model
+                print("[match] 使用智谱 %s（句子级批量匹配）" % model, file=sys.stderr)
+            except NotImplementedError as e:
+                print("[match] 智谱不可用: %s" % e, file=sys.stderr)
+
+        # 2) 降级到千帆 Embedding
+        if embedder is None and args.embedding_model in (None, "qianfan"):
+            try:
+                embedder = QianfanEmbedder()
+                embedder_name = "qianfan-%s" % embedder.model
+                print("[match] 降级到千帆 %s" % embedder.model, file=sys.stderr)
+            except NotImplementedError as e:
+                print("[match] 千帆不可用: %s" % e, file=sys.stderr)
 
         if embedder is not None:
-            results = []
-            for req in requirements:
-                best_conf = 0.0
-                best_idx = -1
-                for si, sent in enumerate(sentences):
-                    try:
-                        conf = embedder.similarity(req["text"], sent)
-                    except Exception as exc:
-                        print("[match] embedding 调用失败: %s" % exc, file=sys.stderr)
-                        conf = 0.0
-                    if conf > best_conf:
-                        best_conf = conf
-                        best_idx = si
-                req_tokens = unigrams(req["text"])
-                has_partial = bool(req_tokens & resume_tokens)
-                status = judge(best_conf, has_partial)
-                results.append({
-                    "id": req["id"], "type": req["type"], "text": req["text"],
-                    "status": status, "confidence": round(best_conf, 3),
-                    "evidence": sentences[best_idx] if best_idx >= 0 and best_conf >= WEAK_TH else "",
-                })
+            results = _run_embedding_match(embedder, requirements, sentences, resume_tokens)
             output = {
                 "backend": "embedding", "degraded": False,
-                "model": embedder.model,
-                "note": "千帆 embedding 语义匹配",
+                "model": embedder_name,
+                "note": "句子级 embedding 语义匹配（%s）" % embedder_name,
                 "thresholds": {"covered": COVERED_TH, "weak": WEAK_TH, "unknown": UNKNOWN_TH},
                 "results": results,
             }
@@ -268,12 +379,12 @@ def main():
             if args.output:
                 with io.open(args.output, "w", encoding="utf-8") as f:
                     f.write(payload + "\n")
-                print("[match] OK -> %s（%d 条要求, embedding）" % (args.output, len(results)))
+                print("[match] OK -> %s（%d 条要求, %s）" % (args.output, len(results), embedder_name))
             else:
                 print(payload)
             return
         # embedding 初始化失败，降级到 BM25
-        print("[match] 降级到 BM25 简化匹配", file=sys.stderr)
+        print("[match] 所有 embedding 后端不可用，降级到 BM25 简化匹配", file=sys.stderr)
 
     matcher = Bm25Matcher()
     results = []

@@ -99,26 +99,14 @@ class ZhipuBackend(EmbeddingBackend):
         self.api_key = api_key or os.environ.get("ZHIPU_API_KEY", "")
         if not self.api_key:
             raise ValueError("请设置 ZHIPU_API_KEY 环境变量")
-        self.url = "https://open.bigmodel.cn/api/paas/v4/embeddings"
-        self.model = "embedding-3"
-        self.dim = 2048
+        self.model = "embedding-2"
+        self.dim = 1024
     
     def embed(self, texts: List[str]) -> List[List[float]]:
-        import requests
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": self.model,
-            "input": texts,
-        }
-        resp = requests.post(self.url, headers=headers, json=payload, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        if "error" in data:
-            raise RuntimeError(f"智谱API错误: {data['error']}")
-        return [item["embedding"] for item in data["data"]]
+        from zhipuai import ZhipuAI
+        client = ZhipuAI(api_key=self.api_key)
+        resp = client.embeddings.create(model=self.model, input=texts)
+        return [item.embedding for item in resp.data]
 
 
 class QianfanBackend(EmbeddingBackend):
