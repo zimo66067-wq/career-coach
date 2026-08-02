@@ -1,0 +1,632 @@
+{
+  "model": "zhipu-embedding-3",
+  "pairs": 10,
+  "total_requirements": 118,
+  "agree": 49,
+  "emb_better": 31,
+  "bm25_better": 0,
+  "elapsed_sec": 28.8,
+  "diffs": [
+    {
+      "pair": "01",
+      "id": "L1",
+      "bm25_status": "weak",
+      "bm25_conf": 0.514,
+      "emb_status": "covered",
+      "emb_conf": 0.667,
+      "emb_evidence": "主修课程：数据结构、操作系统、计算机网络、数据库原理"
+    },
+    {
+      "pair": "01",
+      "id": "L2",
+      "bm25_status": "weak",
+      "bm25_conf": 0.5,
+      "emb_status": "covered",
+      "emb_conf": 0.746,
+      "emb_evidence": "语言：Go（熟练）、Java（熟练）、Python（了解）"
+    },
+    {
+      "pair": "01",
+      "id": "L8",
+      "bm25_status": "weak",
+      "bm25_conf": 0.375,
+      "emb_status": "covered",
+      "emb_conf": 0.716,
+      "emb_evidence": "编写接口文档并推动联调，与前端约定统一的错误码规范"
+    },
+    {
+      "pair": "01",
+      "id": "L10",
+      "bm25_status": "weak",
+      "bm25_conf": 0.514,
+      "emb_status": "covered",
+      "emb_conf": 0.627,
+      "emb_evidence": "学习能力强，习惯阅读官方文档和源码，能够在指导下独立完成模块开发"
+    },
+    {
+      "pair": "01",
+      "id": "L11",
+      "bm25_status": "weak",
+      "bm25_conf": 0.42,
+      "emb_status": "covered",
+      "emb_conf": 0.606,
+      "emb_evidence": "学习能力强，习惯阅读官方文档和源码，能够在指导下独立完成模块开发"
+    },
+    {
+      "pair": "02",
+      "id": "L1",
+      "bm25_status": "weak",
+      "bm25_conf": 0.514,
+      "emb_status": "covered",
+      "emb_conf": 0.598,
+      "emb_evidence": "教育经历"
+    },
+    {
+      "pair": "02",
+      "id": "L2",
+      "bm25_status": "missing",
+      "bm25_conf": 0.286,
+      "emb_status": "covered",
+      "emb_conf": 0.693,
+      "emb_evidence": "语言：TypeScript、JavaScript、HTML/CSS"
+    },
+    {
+      "pair": "02",
+      "id": "L6",
+      "bm25_status": "missing",
+      "bm25_conf": 0.18,
+      "emb_status": "covered",
+      "emb_conf": 0.607,
+      "emb_evidence": "关注用户体验细节，对性能优化有实践经验"
+    },
+    {
+      "pair": "02",
+      "id": "L7",
+      "bm25_status": "weak",
+      "bm25_conf": 0.36,
+      "emb_status": "covered",
+      "emb_conf": 0.604,
+      "emb_evidence": "技能清单"
+    },
+    {
+      "pair": "03",
+      "id": "L4",
+      "bm25_status": "weak",
+      "bm25_conf": 0.514,
+      "emb_status": "covered",
+      "emb_conf": 0.687,
+      "emb_evidence": "了解 A/B 测试设计与显著性检验"
+    },
+    {
+      "pair": "03",
+      "id": "L5",
+      "bm25_status": "weak",
+      "bm25_conf": 0.386,
+      "emb_status": "covered",
+      "emb_conf": 0.746,
+      "emb_evidence": "SQL（熟练）、Python pandas（熟练）、Tableau、Excel 透视表"
+    },
+    {
+      "pair": "03",
+      "id": "L7",
+      "bm25_status": "weak",
+      "bm25_conf": 0.485,
+      "emb_status": "covered",
+      "emb_conf": 0.699,
+      "emb_evidence": "习惯用数据说话，能把分析结论翻译成业务动作"
+    },
+    {
+      "pair": "03",
+      "id": "L8",
+      "bm25_status": "weak",
+      "bm25_conf": 0.514,
+      "emb_status": "covered",
+      "emb_conf": 0.601,
+      "emb_evidence": "2024.03-2024.09 某零售公司 数据分析实习生"
+    },
+    {
+      "pair": "03",
+      "id": "L9",
+      "bm25_status": "weak",
+      "bm25_conf": 0.45,
+      "emb_status": "covered",
+      "emb_conf": 0.618,
+      "emb_evidence": "相关课程：概率论、回归分析、数据挖掘"
+    },
+    {
+      "pair": "04",
+      "id": "L2",
+      "bm25_status": "missing",
+      "bm25_conf": 0.113,
+      "emb_status": "weak",
+      "emb_conf": 0.513,
+      "emb_evidence": "需求分析、PRD 撰写、原型设计（Figma）、SQL 基础、数据分析基础"
+    },
+    {
+      "pair": "04",
+      "id": "L5",
+      "bm25_status": "covered",
+      "bm25_conf": 0.554,
+      "emb_status": "weak",
+      "emb_conf": 0.517,
+      "emb_evidence": "需求分析、PRD 撰写、原型设计（Figma）、SQL 基础、数据分析基础"
+    },
+    {
+      "pair": "04",
+      "id": "L6",
+      "bm25_status": "weak",
+      "bm25_conf": 0.45,
+      "emb_status": "covered",
+      "emb_conf": 0.583,
+      "emb_evidence": "技能清单"
+    },
+    {
+      "pair": "04",
+      "id": "L7",
+      "bm25_status": "weak",
+      "bm25_conf": 0.45,
+      "emb_status": "covered",
+      "emb_conf": 0.701,
+      "emb_evidence": "项目经历"
+    },
+    {
+      "pair": "04",
+      "id": "L8",
+      "bm25_status": "unknown",
+      "bm25_conf": 0.0,
+      "emb_status": "covered",
+      "emb_conf": 0.6,
+      "emb_evidence": "需求分析、PRD 撰写、原型设计（Figma）、SQL 基础、数据分析基础"
+    },
+    {
+      "pair": "05",
+      "id": "L1",
+      "bm25_status": "weak",
+      "bm25_conf": 0.45,
+      "emb_status": "covered",
+      "emb_conf": 0.616,
+      "emb_evidence": "主修课程：Java 程序设计、数据结构、数据库系统"
+    },
+    {
+      "pair": "05",
+      "id": "L2",
+      "bm25_status": "missing",
+      "bm25_conf": 0.2,
+      "emb_status": "covered",
+      "emb_conf": 0.659,
+      "emb_evidence": "Java（熟悉）、MySQL（熟悉）、Spring Boot（入门）、Git（基本操作）"
+    },
+    {
+      "pair": "05",
+      "id": "L3",
+      "bm25_status": "weak",
+      "bm25_conf": 0.45,
+      "emb_status": "covered",
+      "emb_conf": 0.601,
+      "emb_evidence": "Java（熟悉）、MySQL（熟悉）、Spring Boot（入门）、Git（基本操作）"
+    },
+    {
+      "pair": "05",
+      "id": "L4",
+      "bm25_status": "weak",
+      "bm25_conf": 0.333,
+      "emb_status": "covered",
+      "emb_conf": 0.568,
+      "emb_evidence": "Java（熟悉）、MySQL（熟悉）、Spring Boot（入门）、Git（基本操作）"
+    },
+    {
+      "pair": "05",
+      "id": "L5",
+      "bm25_status": "missing",
+      "bm25_conf": 0.27,
+      "emb_status": "weak",
+      "emb_conf": 0.525,
+      "emb_evidence": "Java（熟悉）、MySQL（熟悉）、Spring Boot（入门）、Git（基本操作）"
+    },
+    {
+      "pair": "05",
+      "id": "L6",
+      "bm25_status": "missing",
+      "bm25_conf": 0.129,
+      "emb_status": "covered",
+      "emb_conf": 0.568,
+      "emb_evidence": "实现了文章管理和评论功能"
+    },
+    {
+      "pair": "05",
+      "id": "L8",
+      "bm25_status": "missing",
+      "bm25_conf": 0.138,
+      "emb_status": "weak",
+      "emb_conf": 0.539,
+      "emb_evidence": "实现了文章管理和评论功能"
+    },
+    {
+      "pair": "05",
+      "id": "L9",
+      "bm25_status": "missing",
+      "bm25_conf": 0.164,
+      "emb_status": "weak",
+      "emb_conf": 0.52,
+      "emb_evidence": "技能清单"
+    },
+    {
+      "pair": "05",
+      "id": "L10",
+      "bm25_status": "weak",
+      "bm25_conf": 0.54,
+      "emb_status": "covered",
+      "emb_conf": 0.605,
+      "emb_evidence": "数据库设计包含 8 张表，写了基本的单元测试"
+    },
+    {
+      "pair": "05",
+      "id": "L11",
+      "bm25_status": "weak",
+      "bm25_conf": 0.3,
+      "emb_status": "covered",
+      "emb_conf": 0.631,
+      "emb_evidence": "项目经历"
+    },
+    {
+      "pair": "05",
+      "id": "L13",
+      "bm25_status": "unknown",
+      "bm25_conf": 0.0,
+      "emb_status": "covered",
+      "emb_conf": 0.572,
+      "emb_evidence": "Java（熟悉）、MySQL（熟悉）、Spring Boot（入门）、Git（基本操作）"
+    },
+    {
+      "pair": "06",
+      "id": "L5",
+      "bm25_status": "weak",
+      "bm25_conf": 0.36,
+      "emb_status": "covered",
+      "emb_conf": 0.568,
+      "emb_evidence": "语言：JavaScript（熟练）、TypeScript（熟练）、HTML/CSS（熟练）"
+    },
+    {
+      "pair": "06",
+      "id": "L6",
+      "bm25_status": "weak",
+      "bm25_conf": 0.415,
+      "emb_status": "covered",
+      "emb_conf": 0.555,
+      "emb_evidence": "电话：[REDACTED_PHONE]"
+    },
+    {
+      "pair": "06",
+      "id": "L7",
+      "bm25_status": "covered",
+      "bm25_conf": 0.554,
+      "emb_status": "weak",
+      "emb_conf": 0.524,
+      "emb_evidence": "技能清单"
+    },
+    {
+      "pair": "06",
+      "id": "L8",
+      "bm25_status": "missing",
+      "bm25_conf": 0.245,
+      "emb_status": "weak",
+      "emb_conf": 0.496,
+      "emb_evidence": "技能清单"
+    },
+    {
+      "pair": "06",
+      "id": "L9",
+      "bm25_status": "missing",
+      "bm25_conf": 0.1,
+      "emb_status": "weak",
+      "emb_conf": 0.472,
+      "emb_evidence": "技能清单"
+    },
+    {
+      "pair": "06",
+      "id": "L12",
+      "bm25_status": "weak",
+      "bm25_conf": 0.4,
+      "emb_status": "covered",
+      "emb_conf": 0.555,
+      "emb_evidence": "语言：JavaScript（熟练）、TypeScript（熟练）、HTML/CSS（熟练）"
+    },
+    {
+      "pair": "06",
+      "id": "L13",
+      "bm25_status": "unknown",
+      "bm25_conf": 0.0,
+      "emb_status": "covered",
+      "emb_conf": 0.575,
+      "emb_evidence": "工具：Webpack、Vite、Git、Figma"
+    },
+    {
+      "pair": "07",
+      "id": "L1",
+      "bm25_status": "weak",
+      "bm25_conf": 0.327,
+      "emb_status": "covered",
+      "emb_conf": 0.586,
+      "emb_evidence": "2019.09-2023.06 某某大学 统计学 本科"
+    },
+    {
+      "pair": "07",
+      "id": "L2",
+      "bm25_status": "missing",
+      "bm25_conf": 0.193,
+      "emb_status": "weak",
+      "emb_conf": 0.53,
+      "emb_evidence": "项目经历"
+    },
+    {
+      "pair": "07",
+      "id": "L5",
+      "bm25_status": "missing",
+      "bm25_conf": 0.208,
+      "emb_status": "weak",
+      "emb_conf": 0.507,
+      "emb_evidence": "语言：Python（熟练）、SQL（熟练）、R（了解）"
+    },
+    {
+      "pair": "07",
+      "id": "L6",
+      "bm25_status": "missing",
+      "bm25_conf": 0.2,
+      "emb_status": "covered",
+      "emb_conf": 0.624,
+      "emb_evidence": "项目经历"
+    },
+    {
+      "pair": "07",
+      "id": "L7",
+      "bm25_status": "missing",
+      "bm25_conf": 0.225,
+      "emb_status": "weak",
+      "emb_conf": 0.475,
+      "emb_evidence": "项目经历"
+    },
+    {
+      "pair": "07",
+      "id": "L8",
+      "bm25_status": "missing",
+      "bm25_conf": 0.18,
+      "emb_status": "weak",
+      "emb_conf": 0.492,
+      "emb_evidence": "技能清单"
+    },
+    {
+      "pair": "07",
+      "id": "L9",
+      "bm25_status": "missing",
+      "bm25_conf": 0.225,
+      "emb_status": "weak",
+      "emb_conf": 0.503,
+      "emb_evidence": "项目经历"
+    },
+    {
+      "pair": "07",
+      "id": "L10",
+      "bm25_status": "missing",
+      "bm25_conf": 0.265,
+      "emb_status": "weak",
+      "emb_conf": 0.541,
+      "emb_evidence": "通过漏斗分析定位支付转化率下降原因，提出优化方案后转化率从 62% 提升至 78%"
+    },
+    {
+      "pair": "07",
+      "id": "L12",
+      "bm25_status": "missing",
+      "bm25_conf": 0.15,
+      "emb_status": "covered",
+      "emb_conf": 0.573,
+      "emb_evidence": "项目经历"
+    },
+    {
+      "pair": "07",
+      "id": "L13",
+      "bm25_status": "weak",
+      "bm25_conf": 0.386,
+      "emb_status": "covered",
+      "emb_conf": 0.699,
+      "emb_evidence": "工具：Pandas、NumPy、Matplotlib、Tableau、Excel"
+    },
+    {
+      "pair": "08",
+      "id": "L1",
+      "bm25_status": "weak",
+      "bm25_conf": 0.386,
+      "emb_status": "covered",
+      "emb_conf": 0.602,
+      "emb_evidence": "2018.09-2022.06 某某大学 信息管理与信息系统 本科"
+    },
+    {
+      "pair": "08",
+      "id": "L4",
+      "bm25_status": "missing",
+      "bm25_conf": 0.225,
+      "emb_status": "covered",
+      "emb_conf": 0.566,
+      "emb_evidence": "能力：需求分析、用户研究、数据分析、项目管理"
+    },
+    {
+      "pair": "08",
+      "id": "L6",
+      "bm25_status": "missing",
+      "bm25_conf": 0.277,
+      "emb_status": "weak",
+      "emb_conf": 0.5,
+      "emb_evidence": "协调跨部门 8 人团队（开发/设计/测试），项目按时交付率达 95%"
+    },
+    {
+      "pair": "08",
+      "id": "L8",
+      "bm25_status": "weak",
+      "bm25_conf": 0.491,
+      "emb_status": "covered",
+      "emb_conf": 0.563,
+      "emb_evidence": "能力：需求分析、用户研究、数据分析、项目管理"
+    },
+    {
+      "pair": "08",
+      "id": "L10",
+      "bm25_status": "missing",
+      "bm25_conf": 0.277,
+      "emb_status": "weak",
+      "emb_conf": 0.493,
+      "emb_evidence": "输出 PRD 文档 12 份，推动 A/B 测试 6 轮"
+    },
+    {
+      "pair": "08",
+      "id": "L11",
+      "bm25_status": "weak",
+      "bm25_conf": 0.42,
+      "emb_status": "covered",
+      "emb_conf": 0.551,
+      "emb_evidence": "协调跨部门 8 人团队（开发/设计/测试），项目按时交付率达 95%"
+    },
+    {
+      "pair": "08",
+      "id": "L12",
+      "bm25_status": "weak",
+      "bm25_conf": 0.36,
+      "emb_status": "covered",
+      "emb_conf": 0.59,
+      "emb_evidence": "项目经历"
+    },
+    {
+      "pair": "08",
+      "id": "L13",
+      "bm25_status": "missing",
+      "bm25_conf": 0.125,
+      "emb_status": "covered",
+      "emb_conf": 0.67,
+      "emb_evidence": "工具：Axure、Figma、Jira、Tableau、Excel"
+    },
+    {
+      "pair": "09",
+      "id": "L1",
+      "bm25_status": "weak",
+      "bm25_conf": 0.338,
+      "emb_status": "covered",
+      "emb_conf": 0.624,
+      "emb_evidence": "主修课程：软件测试、软件质量保证、数据结构、操作系统"
+    },
+    {
+      "pair": "09",
+      "id": "L2",
+      "bm25_status": "weak",
+      "bm25_conf": 0.36,
+      "emb_status": "covered",
+      "emb_conf": 0.652,
+      "emb_evidence": "语言：Python（熟悉）、Java（了解）"
+    },
+    {
+      "pair": "09",
+      "id": "L3",
+      "bm25_status": "weak",
+      "bm25_conf": 0.3,
+      "emb_status": "covered",
+      "emb_conf": 0.569,
+      "emb_evidence": "语言：Python（熟悉）、Java（了解）"
+    },
+    {
+      "pair": "09",
+      "id": "L11",
+      "bm25_status": "missing",
+      "bm25_conf": 0.15,
+      "emb_status": "covered",
+      "emb_conf": 0.552,
+      "emb_evidence": "实习经历"
+    },
+    {
+      "pair": "09",
+      "id": "L12",
+      "bm25_status": "missing",
+      "bm25_conf": 0.182,
+      "emb_status": "weak",
+      "emb_conf": 0.54,
+      "emb_evidence": "项目经历"
+    },
+    {
+      "pair": "09",
+      "id": "L13",
+      "bm25_status": "missing",
+      "bm25_conf": 0.143,
+      "emb_status": "covered",
+      "emb_conf": 0.594,
+      "emb_evidence": "语言：Python（熟悉）、Java（了解）"
+    },
+    {
+      "pair": "10",
+      "id": "L1",
+      "bm25_status": "weak",
+      "bm25_conf": 0.514,
+      "emb_status": "covered",
+      "emb_conf": 0.659,
+      "emb_evidence": "2019.09-2023.06 某某大学 计算机科学与技术 本科"
+    },
+    {
+      "pair": "10",
+      "id": "L2",
+      "bm25_status": "weak",
+      "bm25_conf": 0.5,
+      "emb_status": "covered",
+      "emb_conf": 0.646,
+      "emb_evidence": "语言：Python（熟悉）、Go（了解）"
+    },
+    {
+      "pair": "10",
+      "id": "L3",
+      "bm25_status": "weak",
+      "bm25_conf": 0.3,
+      "emb_status": "covered",
+      "emb_conf": 0.599,
+      "emb_evidence": "系统：Linux（熟练）、Shell（熟练）"
+    },
+    {
+      "pair": "10",
+      "id": "L6",
+      "bm25_status": "weak",
+      "bm25_conf": 0.491,
+      "emb_status": "covered",
+      "emb_conf": 0.633,
+      "emb_evidence": "系统：Linux（熟练）、Shell（熟练）"
+    },
+    {
+      "pair": "10",
+      "id": "L10",
+      "bm25_status": "weak",
+      "bm25_conf": 0.491,
+      "emb_status": "covered",
+      "emb_conf": 0.568,
+      "emb_evidence": "负责 200+ 台服务器的日常监控与维护，使用 Prometheus+Grafana 搭建监控告警体系"
+    },
+    {
+      "pair": "10",
+      "id": "L11",
+      "bm25_status": "missing",
+      "bm25_conf": 0.245,
+      "emb_status": "covered",
+      "emb_conf": 0.579,
+      "emb_evidence": "系统：Linux（熟练）、Shell（熟练）"
+    },
+    {
+      "pair": "10",
+      "id": "L12",
+      "bm25_status": "missing",
+      "bm25_conf": 0.225,
+      "emb_status": "covered",
+      "emb_conf": 0.583,
+      "emb_evidence": "系统：Linux（熟练）、Shell（熟练）"
+    },
+    {
+      "pair": "10",
+      "id": "L13",
+      "bm25_status": "missing",
+      "bm25_conf": 0.111,
+      "emb_status": "covered",
+      "emb_conf": 0.681,
+      "emb_evidence": "工具：Docker、Kubernetes（了解）、Prometheus、Grafana、Ansible、Nginx"
+    }
+  ]
+}

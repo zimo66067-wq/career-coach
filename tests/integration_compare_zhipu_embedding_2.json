@@ -1,0 +1,587 @@
+{
+  "model": "zhipu-embedding-2",
+  "pairs": 10,
+  "total_requirements": 118,
+  "agree": 54,
+  "emb_better": 31,
+  "bm25_better": 0,
+  "elapsed_sec": 28.6,
+  "diffs": [
+    {
+      "pair": "01",
+      "id": "L1",
+      "bm25_status": "weak",
+      "bm25_conf": 0.514,
+      "emb_status": "covered",
+      "emb_conf": 0.6,
+      "emb_evidence": "2019.09-2023.06 某某大学 计算机科学与技术 本科"
+    },
+    {
+      "pair": "01",
+      "id": "L2",
+      "bm25_status": "weak",
+      "bm25_conf": 0.5,
+      "emb_status": "covered",
+      "emb_conf": 0.711,
+      "emb_evidence": "语言：Go（熟练）、Java（熟练）、Python（了解）"
+    },
+    {
+      "pair": "01",
+      "id": "L8",
+      "bm25_status": "weak",
+      "bm25_conf": 0.375,
+      "emb_status": "covered",
+      "emb_conf": 0.57,
+      "emb_evidence": "学习能力强，习惯阅读官方文档和源码，能够在指导下独立完成模块开发"
+    },
+    {
+      "pair": "01",
+      "id": "L9",
+      "bm25_status": "covered",
+      "bm25_conf": 0.72,
+      "emb_status": "weak",
+      "emb_conf": 0.455,
+      "emb_evidence": "学习能力强，习惯阅读官方文档和源码，能够在指导下独立完成模块开发"
+    },
+    {
+      "pair": "01",
+      "id": "L11",
+      "bm25_status": "weak",
+      "bm25_conf": 0.42,
+      "emb_status": "covered",
+      "emb_conf": 0.597,
+      "emb_evidence": "学习能力强，习惯阅读官方文档和源码，能够在指导下独立完成模块开发"
+    },
+    {
+      "pair": "02",
+      "id": "L2",
+      "bm25_status": "missing",
+      "bm25_conf": 0.286,
+      "emb_status": "covered",
+      "emb_conf": 0.693,
+      "emb_evidence": "框架：React、Next.js、Vue3（了解）"
+    },
+    {
+      "pair": "02",
+      "id": "L6",
+      "bm25_status": "missing",
+      "bm25_conf": 0.18,
+      "emb_status": "weak",
+      "emb_conf": 0.529,
+      "emb_evidence": "关注用户体验细节，对性能优化有实践经验"
+    },
+    {
+      "pair": "02",
+      "id": "L9",
+      "bm25_status": "covered",
+      "bm25_conf": 0.573,
+      "emb_status": "weak",
+      "emb_conf": 0.481,
+      "emb_evidence": "关注用户体验细节，对性能优化有实践经验"
+    },
+    {
+      "pair": "03",
+      "id": "L1",
+      "bm25_status": "covered",
+      "bm25_conf": 0.55,
+      "emb_status": "weak",
+      "emb_conf": 0.51,
+      "emb_evidence": "相关课程：概率论、回归分析、数据挖掘"
+    },
+    {
+      "pair": "03",
+      "id": "L2",
+      "bm25_status": "covered",
+      "bm25_conf": 0.573,
+      "emb_status": "weak",
+      "emb_conf": 0.548,
+      "emb_evidence": "SQL（熟练）、Python pandas（熟练）、Tableau、Excel 透视表"
+    },
+    {
+      "pair": "03",
+      "id": "L5",
+      "bm25_status": "weak",
+      "bm25_conf": 0.386,
+      "emb_status": "covered",
+      "emb_conf": 0.592,
+      "emb_evidence": "SQL（熟练）、Python pandas（熟练）、Tableau、Excel 透视表"
+    },
+    {
+      "pair": "03",
+      "id": "L6",
+      "bm25_status": "covered",
+      "bm25_conf": 0.6,
+      "emb_status": "weak",
+      "emb_conf": 0.54,
+      "emb_evidence": "用 SQL 搭建每日销售看板，覆盖 300 家门店的核心指标"
+    },
+    {
+      "pair": "03",
+      "id": "L8",
+      "bm25_status": "weak",
+      "bm25_conf": 0.514,
+      "emb_status": "covered",
+      "emb_conf": 0.555,
+      "emb_evidence": "2024.03-2024.09 某零售公司 数据分析实习生"
+    },
+    {
+      "pair": "04",
+      "id": "L1",
+      "bm25_status": "covered",
+      "bm25_conf": 0.643,
+      "emb_status": "weak",
+      "emb_conf": 0.508,
+      "emb_evidence": "2020.09-2024.06 某综合大学 信息管理与信息系统 本科"
+    },
+    {
+      "pair": "04",
+      "id": "L2",
+      "bm25_status": "missing",
+      "bm25_conf": 0.113,
+      "emb_status": "weak",
+      "emb_conf": 0.429,
+      "emb_evidence": "主导产品设计，冷启动 3 周获取 2000 名用户"
+    },
+    {
+      "pair": "04",
+      "id": "L7",
+      "bm25_status": "weak",
+      "bm25_conf": 0.45,
+      "emb_status": "covered",
+      "emb_conf": 0.628,
+      "emb_evidence": "项目经历"
+    },
+    {
+      "pair": "04",
+      "id": "L8",
+      "bm25_status": "unknown",
+      "bm25_conf": 0.0,
+      "emb_status": "covered",
+      "emb_conf": 0.564,
+      "emb_evidence": "需求分析、PRD 撰写、原型设计（Figma）、SQL 基础、数据分析基础"
+    },
+    {
+      "pair": "05",
+      "id": "L2",
+      "bm25_status": "missing",
+      "bm25_conf": 0.2,
+      "emb_status": "covered",
+      "emb_conf": 0.604,
+      "emb_evidence": "Java（熟悉）、MySQL（熟悉）、Spring Boot（入门）、Git（基本操作）"
+    },
+    {
+      "pair": "05",
+      "id": "L5",
+      "bm25_status": "missing",
+      "bm25_conf": 0.27,
+      "emb_status": "covered",
+      "emb_conf": 0.566,
+      "emb_evidence": "使用 Spring Boot + Thymeleaf，部署在学校服务器上"
+    },
+    {
+      "pair": "05",
+      "id": "L6",
+      "bm25_status": "missing",
+      "bm25_conf": 0.129,
+      "emb_status": "weak",
+      "emb_conf": 0.52,
+      "emb_evidence": "踏实认真，愿意从基础工作做起，希望在实际项目中快速成长"
+    },
+    {
+      "pair": "05",
+      "id": "L8",
+      "bm25_status": "missing",
+      "bm25_conf": 0.138,
+      "emb_status": "weak",
+      "emb_conf": 0.466,
+      "emb_evidence": "实现了文章管理和评论功能"
+    },
+    {
+      "pair": "05",
+      "id": "L9",
+      "bm25_status": "missing",
+      "bm25_conf": 0.164,
+      "emb_status": "weak",
+      "emb_conf": 0.443,
+      "emb_evidence": "实现了文章管理和评论功能"
+    },
+    {
+      "pair": "05",
+      "id": "L10",
+      "bm25_status": "weak",
+      "bm25_conf": 0.54,
+      "emb_status": "covered",
+      "emb_conf": 0.559,
+      "emb_evidence": "数据库设计包含 8 张表，写了基本的单元测试"
+    },
+    {
+      "pair": "05",
+      "id": "L11",
+      "bm25_status": "weak",
+      "bm25_conf": 0.3,
+      "emb_status": "covered",
+      "emb_conf": 0.579,
+      "emb_evidence": "踏实认真，愿意从基础工作做起，希望在实际项目中快速成长"
+    },
+    {
+      "pair": "05",
+      "id": "L13",
+      "bm25_status": "unknown",
+      "bm25_conf": 0.0,
+      "emb_status": "weak",
+      "emb_conf": 0.537,
+      "emb_evidence": "Java（熟悉）、MySQL（熟悉）、Spring Boot（入门）、Git（基本操作）"
+    },
+    {
+      "pair": "06",
+      "id": "L1",
+      "bm25_status": "covered",
+      "bm25_conf": 0.619,
+      "emb_status": "weak",
+      "emb_conf": 0.49,
+      "emb_evidence": "2020.09-2024.06 某某大学 软件工程 本科"
+    },
+    {
+      "pair": "06",
+      "id": "L2",
+      "bm25_status": "weak",
+      "bm25_conf": 0.514,
+      "emb_status": "covered",
+      "emb_conf": 0.554,
+      "emb_evidence": "语言：JavaScript（熟练）、TypeScript（熟练）、HTML/CSS（熟练）"
+    },
+    {
+      "pair": "06",
+      "id": "L3",
+      "bm25_status": "weak",
+      "bm25_conf": 0.415,
+      "emb_status": "covered",
+      "emb_conf": 0.599,
+      "emb_evidence": "语言：JavaScript（熟练）、TypeScript（熟练）、HTML/CSS（熟练）"
+    },
+    {
+      "pair": "06",
+      "id": "L5",
+      "bm25_status": "weak",
+      "bm25_conf": 0.36,
+      "emb_status": "covered",
+      "emb_conf": 0.592,
+      "emb_evidence": "语言：JavaScript（熟练）、TypeScript（熟练）、HTML/CSS（熟练）"
+    },
+    {
+      "pair": "06",
+      "id": "L7",
+      "bm25_status": "covered",
+      "bm25_conf": 0.554,
+      "emb_status": "weak",
+      "emb_conf": 0.461,
+      "emb_evidence": "参与电商平台商品中心 React 组件库开发，使用 TypeScript + Ant Design 搭建 30+ 业务组件"
+    },
+    {
+      "pair": "06",
+      "id": "L8",
+      "bm25_status": "missing",
+      "bm25_conf": 0.245,
+      "emb_status": "weak",
+      "emb_conf": 0.431,
+      "emb_evidence": "推动团队引入 ESLint + Prettier 统一代码规范，代码审查通过率提升 40%"
+    },
+    {
+      "pair": "06",
+      "id": "L9",
+      "bm25_status": "missing",
+      "bm25_conf": 0.1,
+      "emb_status": "weak",
+      "emb_conf": 0.427,
+      "emb_evidence": "推动团队引入 ESLint + Prettier 统一代码规范，代码审查通过率提升 40%"
+    },
+    {
+      "pair": "06",
+      "id": "L13",
+      "bm25_status": "unknown",
+      "bm25_conf": 0.0,
+      "emb_status": "weak",
+      "emb_conf": 0.524,
+      "emb_evidence": "语言：JavaScript（熟练）、TypeScript（熟练）、HTML/CSS（熟练）"
+    },
+    {
+      "pair": "07",
+      "id": "L2",
+      "bm25_status": "missing",
+      "bm25_conf": 0.193,
+      "emb_status": "weak",
+      "emb_conf": 0.492,
+      "emb_evidence": "语言：Python（熟练）、SQL（熟练）、R（了解）"
+    },
+    {
+      "pair": "07",
+      "id": "L5",
+      "bm25_status": "missing",
+      "bm25_conf": 0.208,
+      "emb_status": "weak",
+      "emb_conf": 0.526,
+      "emb_evidence": "工作经历"
+    },
+    {
+      "pair": "07",
+      "id": "L6",
+      "bm25_status": "missing",
+      "bm25_conf": 0.2,
+      "emb_status": "weak",
+      "emb_conf": 0.526,
+      "emb_evidence": "工作经历"
+    },
+    {
+      "pair": "07",
+      "id": "L7",
+      "bm25_status": "missing",
+      "bm25_conf": 0.225,
+      "emb_status": "weak",
+      "emb_conf": 0.489,
+      "emb_evidence": "求职意向：数据分析师"
+    },
+    {
+      "pair": "07",
+      "id": "L8",
+      "bm25_status": "missing",
+      "bm25_conf": 0.18,
+      "emb_status": "weak",
+      "emb_conf": 0.444,
+      "emb_evidence": "项目报告获得课程最高分 95 分（满分 100）"
+    },
+    {
+      "pair": "07",
+      "id": "L9",
+      "bm25_status": "missing",
+      "bm25_conf": 0.225,
+      "emb_status": "weak",
+      "emb_conf": 0.429,
+      "emb_evidence": "项目经历"
+    },
+    {
+      "pair": "07",
+      "id": "L10",
+      "bm25_status": "missing",
+      "bm25_conf": 0.265,
+      "emb_status": "covered",
+      "emb_conf": 0.576,
+      "emb_evidence": "使用 SQL 从数仓提取用户行为数据，建立每日活跃用户留存看板，覆盖 50 万用户"
+    },
+    {
+      "pair": "07",
+      "id": "L12",
+      "bm25_status": "missing",
+      "bm25_conf": 0.15,
+      "emb_status": "weak",
+      "emb_conf": 0.511,
+      "emb_evidence": "求职意向：数据分析师"
+    },
+    {
+      "pair": "07",
+      "id": "L13",
+      "bm25_status": "weak",
+      "bm25_conf": 0.386,
+      "emb_status": "covered",
+      "emb_conf": 0.688,
+      "emb_evidence": "工具：Pandas、NumPy、Matplotlib、Tableau、Excel"
+    },
+    {
+      "pair": "08",
+      "id": "L2",
+      "bm25_status": "weak",
+      "bm25_conf": 0.332,
+      "emb_status": "covered",
+      "emb_conf": 0.597,
+      "emb_evidence": "能力：需求分析、用户研究、数据分析、项目管理"
+    },
+    {
+      "pair": "08",
+      "id": "L4",
+      "bm25_status": "missing",
+      "bm25_conf": 0.225,
+      "emb_status": "weak",
+      "emb_conf": 0.518,
+      "emb_evidence": "能力：需求分析、用户研究、数据分析、项目管理"
+    },
+    {
+      "pair": "08",
+      "id": "L5",
+      "bm25_status": "weak",
+      "bm25_conf": 0.3,
+      "emb_status": "covered",
+      "emb_conf": 0.551,
+      "emb_evidence": "工具：Axure、Figma、Jira、Tableau、Excel"
+    },
+    {
+      "pair": "08",
+      "id": "L6",
+      "bm25_status": "missing",
+      "bm25_conf": 0.277,
+      "emb_status": "weak",
+      "emb_conf": 0.528,
+      "emb_evidence": "能力：需求分析、用户研究、数据分析、项目管理"
+    },
+    {
+      "pair": "08",
+      "id": "L8",
+      "bm25_status": "weak",
+      "bm25_conf": 0.491,
+      "emb_status": "covered",
+      "emb_conf": 0.563,
+      "emb_evidence": "能力：需求分析、用户研究、数据分析、项目管理"
+    },
+    {
+      "pair": "08",
+      "id": "L9",
+      "bm25_status": "covered",
+      "bm25_conf": 0.6,
+      "emb_status": "weak",
+      "emb_conf": 0.491,
+      "emb_evidence": "能力：需求分析、用户研究、数据分析、项目管理"
+    },
+    {
+      "pair": "08",
+      "id": "L10",
+      "bm25_status": "missing",
+      "bm25_conf": 0.277,
+      "emb_status": "weak",
+      "emb_conf": 0.454,
+      "emb_evidence": "通过用户访谈收集 200+ 条反馈，迭代核心功能 5 轮，次月留存率从 28% 提升至 45%"
+    },
+    {
+      "pair": "08",
+      "id": "L13",
+      "bm25_status": "missing",
+      "bm25_conf": 0.125,
+      "emb_status": "covered",
+      "emb_conf": 0.699,
+      "emb_evidence": "工具：Axure、Figma、Jira、Tableau、Excel"
+    },
+    {
+      "pair": "09",
+      "id": "L2",
+      "bm25_status": "weak",
+      "bm25_conf": 0.36,
+      "emb_status": "covered",
+      "emb_conf": 0.721,
+      "emb_evidence": "语言：Python（熟悉）、Java（了解）"
+    },
+    {
+      "pair": "09",
+      "id": "L3",
+      "bm25_status": "weak",
+      "bm25_conf": 0.3,
+      "emb_status": "covered",
+      "emb_conf": 0.651,
+      "emb_evidence": "语言：Python（熟悉）、Java（了解）"
+    },
+    {
+      "pair": "09",
+      "id": "L7",
+      "bm25_status": "weak",
+      "bm25_conf": 0.327,
+      "emb_status": "covered",
+      "emb_conf": 0.624,
+      "emb_evidence": "负责移动端 App 的功能测试与接口测试，编写测试用例 300+ 条，覆盖核心业务场景"
+    },
+    {
+      "pair": "09",
+      "id": "L9",
+      "bm25_status": "weak",
+      "bm25_conf": 0.485,
+      "emb_status": "covered",
+      "emb_conf": 0.589,
+      "emb_evidence": "负责移动端 App 的功能测试与接口测试，编写测试用例 300+ 条，覆盖核心业务场景"
+    },
+    {
+      "pair": "09",
+      "id": "L11",
+      "bm25_status": "missing",
+      "bm25_conf": 0.15,
+      "emb_status": "weak",
+      "emb_conf": 0.41,
+      "emb_evidence": "项目经历"
+    },
+    {
+      "pair": "09",
+      "id": "L12",
+      "bm25_status": "missing",
+      "bm25_conf": 0.182,
+      "emb_status": "weak",
+      "emb_conf": 0.425,
+      "emb_evidence": "负责移动端 App 的功能测试与接口测试，编写测试用例 300+ 条，覆盖核心业务场景"
+    },
+    {
+      "pair": "09",
+      "id": "L13",
+      "bm25_status": "missing",
+      "bm25_conf": 0.143,
+      "emb_status": "covered",
+      "emb_conf": 0.625,
+      "emb_evidence": "语言：Python（熟悉）、Java（了解）"
+    },
+    {
+      "pair": "10",
+      "id": "L1",
+      "bm25_status": "weak",
+      "bm25_conf": 0.514,
+      "emb_status": "covered",
+      "emb_conf": 0.6,
+      "emb_evidence": "2019.09-2023.06 某某大学 计算机科学与技术 本科"
+    },
+    {
+      "pair": "10",
+      "id": "L2",
+      "bm25_status": "weak",
+      "bm25_conf": 0.5,
+      "emb_status": "covered",
+      "emb_conf": 0.581,
+      "emb_evidence": "语言：Python（熟悉）、Go（了解）"
+    },
+    {
+      "pair": "10",
+      "id": "L4",
+      "bm25_status": "weak",
+      "bm25_conf": 0.327,
+      "emb_status": "covered",
+      "emb_conf": 0.62,
+      "emb_evidence": "工具：Docker、Kubernetes（了解）、Prometheus、Grafana、Ansible、Nginx"
+    },
+    {
+      "pair": "10",
+      "id": "L10",
+      "bm25_status": "weak",
+      "bm25_conf": 0.491,
+      "emb_status": "covered",
+      "emb_conf": 0.612,
+      "emb_evidence": "负责 200+ 台服务器的日常监控与维护，使用 Prometheus+Grafana 搭建监控告警体系"
+    },
+    {
+      "pair": "10",
+      "id": "L11",
+      "bm25_status": "missing",
+      "bm25_conf": 0.245,
+      "emb_status": "covered",
+      "emb_conf": 0.569,
+      "emb_evidence": "工具：Docker、Kubernetes（了解）、Prometheus、Grafana、Ansible、Nginx"
+    },
+    {
+      "pair": "10",
+      "id": "L12",
+      "bm25_status": "missing",
+      "bm25_conf": 0.225,
+      "emb_status": "weak",
+      "emb_conf": 0.45,
+      "emb_evidence": "工作经历"
+    },
+    {
+      "pair": "10",
+      "id": "L13",
+      "bm25_status": "missing",
+      "bm25_conf": 0.111,
+      "emb_status": "covered",
+      "emb_conf": 0.746,
+      "emb_evidence": "工具：Docker、Kubernetes（了解）、Prometheus、Grafana、Ansible、Nginx"
+    }
+  ]
+}
