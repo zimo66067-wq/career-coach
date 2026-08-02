@@ -1,0 +1,49 @@
+{
+  "total": 7,
+  "passed": 7,
+  "failed": 0,
+  "tests": [
+    {
+      "name": "normal_flow",
+      "passed": true,
+      "detail": "confidence=0.92, accepted=True, no confirmation needed",
+      "latency_ms": 0
+    },
+    {
+      "name": "mic_denied",
+      "passed": true,
+      "detail": "error=mic_denied, fallback=text_input, retry=False",
+      "latency_ms": 0
+    },
+    {
+      "name": "network_error",
+      "passed": true,
+      "detail": "error=network_error, fallback=text_input, retry=False",
+      "latency_ms": 0
+    },
+    {
+      "name": "low_confidence",
+      "passed": true,
+      "detail": "confidence=0.55, accepted=False, needs_confirmation=True",
+      "latency_ms": 0
+    },
+    {
+      "name": "tts_error_non_blocking",
+      "passed": true,
+      "detail": "error=tts_error, fallback=None, retry=False (non-blocking)",
+      "latency_ms": 0
+    },
+    {
+      "name": "fallback_timer",
+      "passed": true,
+      "detail": "timeout=2s, fallback triggered with draft text",
+      "latency_ms": 2502
+    },
+    {
+      "name": "cancel_operation",
+      "passed": true,
+      "detail": "cancelled=True, timers cleared",
+      "latency_ms": 0
+    }
+  ]
+}

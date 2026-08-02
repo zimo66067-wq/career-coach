@@ -1,0 +1,150 @@
+{
+  "timestamp": "2026-08-02 22:12:50",
+  "total_steps": 17,
+  "passed_steps": 17,
+  "total_latency_ms": 25,
+  "suites": [
+    {
+      "name": "full_pipeline",
+      "trace_id": "e2e_1785679970560",
+      "success": true,
+      "steps_passed": 7,
+      "steps_total": 7,
+      "total_latency_ms": 14,
+      "steps": [
+        {
+          "step": "WF-01: extract_text",
+          "passed": true,
+          "detail": "raw_text_len=715",
+          "latency_ms": 0
+        },
+        {
+          "step": "WF-01: deidentify",
+          "passed": true,
+          "detail": "cleaned_len=724, pii_count=4",
+          "latency_ms": 0
+        },
+        {
+          "step": "WF-02: diagnose (degraded)",
+          "passed": true,
+          "detail": "status=degraded, model=rule_degraded",
+          "latency_ms": 0
+        },
+        {
+          "step": "WF-03: jd_match (BM25)",
+          "passed": true,
+          "detail": "total=9, covered=6, weak=3, missing=0, unknown=0",
+          "latency_ms": 6
+        },
+        {
+          "step": "WF-04: interview",
+          "passed": true,
+          "detail": "turns=2, score_I=55.6",
+          "latency_ms": 4
+        },
+        {
+          "step": "WF-05: rescore",
+          "passed": true,
+          "detail": "C0=68.3, C7_low=77.8, C7_high=90.5",
+          "latency_ms": 4
+        },
+        {
+          "step": "WF-05: seven_day_plan (degraded)",
+          "passed": true,
+          "detail": "status=degraded, plan_days=7",
+          "latency_ms": 0
+        }
+      ]
+    },
+    {
+      "name": "degraded_loop",
+      "trace_id": "e2e_1785679970578",
+      "success": true,
+      "steps_passed": 7,
+      "steps_total": 7,
+      "total_latency_ms": 0,
+      "steps": [
+        {
+          "step": "degrade: resume_diagnosis",
+          "passed": true,
+          "detail": "status=degraded, model=rule_degraded",
+          "latency_ms": 0
+        },
+        {
+          "step": "degrade: resume_report",
+          "passed": true,
+          "detail": "status=degraded, model=rule_degraded",
+          "latency_ms": 0
+        },
+        {
+          "step": "degrade: jd_extract",
+          "passed": true,
+          "detail": "status=degraded, model=rule_degraded",
+          "latency_ms": 0
+        },
+        {
+          "step": "degrade: jd_match_explain",
+          "passed": true,
+          "detail": "status=degraded, model=rule_degraded",
+          "latency_ms": 0
+        },
+        {
+          "step": "degrade: interview_question",
+          "passed": true,
+          "detail": "status=degraded, model=rule_degraded",
+          "latency_ms": 0
+        },
+        {
+          "step": "degrade: interview_review",
+          "passed": true,
+          "detail": "status=degraded, model=rule_degraded",
+          "latency_ms": 0
+        },
+        {
+          "step": "degrade: seven_day_plan",
+          "passed": true,
+          "detail": "status=degraded, model=rule_degraded",
+          "latency_ms": 0
+        }
+      ]
+    },
+    {
+      "name": "data_bridge",
+      "trace_id": "e2e_1785679970581",
+      "success": true,
+      "steps_passed": 2,
+      "steps_total": 2,
+      "total_latency_ms": 0,
+      "steps": [
+        {
+          "step": "DataBridge: API->Cache->MOCK",
+          "passed": true,
+          "detail": "final_source=mock_degraded, degraded=True",
+          "latency_ms": 0
+        },
+        {
+          "step": "DataBridge: normalizeResumeProfile",
+          "passed": true,
+          "detail": "source_spans -> quote mapping verified",
+          "latency_ms": 0
+        }
+      ]
+    },
+    {
+      "name": "privacy_loop",
+      "trace_id": "e2e_1785679970581",
+      "success": true,
+      "steps_passed": 1,
+      "steps_total": 1,
+      "total_latency_ms": 11,
+      "steps": [
+        {
+          "step": "Privacy: full lifecycle",
+          "passed": true,
+          "detail": "activate -> use -> delete -> block -> revoke_consent",
+          "latency_ms": 11
+        }
+      ]
+    }
+  ]
+}
