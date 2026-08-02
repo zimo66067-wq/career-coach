@@ -111,7 +111,7 @@ class EmbedderBase:
 
 
 class ZhipuEmbedder(EmbedderBase):
-    """智谱AI Embedding-2/3 封装（推荐，免费2000万Token）
+    """智谱AI Embedding-2/3 封装（推荐 embedding-3，召回率 91%，免费2000万Token）
 
     用法:
       from tools.match_requirements import ZhipuEmbedder
@@ -119,7 +119,7 @@ class ZhipuEmbedder(EmbedderBase):
       vecs = embedder.embed(["文本1", "文本2"])
     """
 
-    def __init__(self, api_key=None, model="embedding-2"):
+    def __init__(self, api_key=None, model="embedding-3"):
         self.api_key = api_key or os.environ.get("ZHIPU_API_KEY")
         self.model = model
         if not self.api_key:
@@ -349,7 +349,7 @@ def main():
 
         # 1) 优先尝试智谱 Embedding（免费2000万Token）
         if args.embedding_model in (None, "zhipu-embedding-2", "zhipu-embedding-3"):
-            model = "embedding-3" if args.embedding_model == "zhipu-embedding-3" else "embedding-2"
+            model = "embedding-3" if args.embedding_model in (None, "zhipu-embedding-3") else "embedding-2"
             try:
                 embedder = ZhipuEmbedder(model=model)
                 embedder_name = "zhipu-%s" % model
