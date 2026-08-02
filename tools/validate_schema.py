@@ -89,9 +89,14 @@ def main():
         sys.exit(2)
 
     validator = Draft202012Validator(schema)
-    for e in sorted(validator.iter_errors(instance), key=str):
-        path = "/".join(str(p) for p in e.absolute_path) or "(root)"
-        errors.append("schema: %s: %s" % (path, e.message))
+
+    # 如果 instance 是数组，逐元素校验（如 interview-turn 序列）
+    instances = instance if isinstance(instance, list) else [instance]
+    for idx, inst in enumerate(instances):
+        prefix = "[%d] " % idx if isinstance(instance, list) else ""
+        for e in sorted(validator.iter_errors(inst), key=str):
+            path = "/".join(str(p) for p in e.absolute_path) or "(root)"
+            errors.append("schema: %s%s: %s" % (prefix, path, e.message))
 
     business_rules(instance, errors)
 
