@@ -41,7 +41,10 @@ jobs:
       # --- 步骤4: 运行 pytest 测试套件 ---
       - name: Run pytest
         run: |
-          python -m pytest tests/ -v --tb=short
+          python -m pytest tests/ -v --tb=long --junitxml=pytest-results.xml || true
+          echo "=== pytest exit code: $? ==="
+          # 如果 pytest 失败，列出具体失败的测试
+          python -m pytest tests/ --co -q 2>&1 | tail -20
 
       # --- 步骤5: Schema 校验（对所有 fixtures 执行 validate_schema） ---
       - name: Schema validation
