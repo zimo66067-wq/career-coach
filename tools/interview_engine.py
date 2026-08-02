@@ -553,18 +553,56 @@ class InterviewEngine:
         return None
 
     def _fallback_question_bank(self, session, gap=None):
-        """降级: 岗位题库（基于 gap 生成模板问题）。"""
+        """降级: 基于 gap 类型/状态生成规则化面试问题。
+
+        当无 model_router 时，根据 gap 的 status（missing/covered/weak）
+        和 type（hard/responsibility/preferred/terminology）选择追问策略，
+        使问题比单一模板更精准。
+        """
         if not gap:
             return self._fallback_generic_by_index(session["current_main"])
 
-        qtype = QUESTION_TYPES[
-            session["question_type_index"] % len(QUESTION_TYPES)
-        ]
-        session["question_type_index"] += 1
+        status = gap.get("status", "missing")
+        gtype = gap.get("type", "generic")
+        gtext = gap.get("text", "该要求")
+        gid = gap.get("id", "unknown")
 
-        template = QUESTION_TEMPLATES.get(qtype, QUESTION_TEMPLATES["achievement_evidence"])
-        question = template.format(gap=gap.get("text", "the requirement"))
-        targets = [gap.get("id", "unknown")]
+        # status × type 二维模板表
+        templates = {
+            "missing": {
+                "hard": "你在简历中未提及「{gap}」，能否分享你在该领域的实际经验或学习经历？",
+                "responsibility": "简历中没有看到「{gap}」相关的职责描述，能否举一个你承担过类似工作的例子？",
+                "preferred": "这是一个加分项——「{gap}」。如果你有相关经验，请举一个具体例子；如果没有，请说明你的学习计划。",
+                "terminology": "能否解释一下你对「{gap}」的理解，以及在实际项目中如何应用？",
+                "generic": "能否补充说明一下你在「{gap}」方面的经验和能力？",
+            },
+            "weak": {
+                "hard": "你在简历中提到了「{gap}」，但证据不够充分。能否补充更多细节或量化结果？",
+                "responsibility": "关于「{gap}」的职责描述比较简单，能否展开说明你具体做了什么、用了什么方法？",
+                "preferred": "「{gap}」在简历中有提及但不够深入。能否举一个更能体现深度的例子？",
+                "terminology": "能否用更具体的场景说明你对「{gap}」的理解和应用？",
+                "generic": "能否更详细地说明你在「{gap}」方面的具体做法和成果？",
+            },
+            "covered": {
+                "hard": "你在简历中展示了「{gap}」的能力。能否举一个最具代表性的例子，说明你在其中的关键贡献？",
+                "responsibility": "关于「{gap}」的职责，能否深入讲一个最能体现你解决问题能力的具体事例？",
+                "preferred": "「{gap}」是你简历中的亮点。能否分享一个更复杂的应用场景？",
+                "terminology": "能否深入解释一下「{gap}」在大型项目中的最佳实践和踩坑经验？",
+                "generic": "能否深入讲讲你在「{gap}」方面最自豪的一个成果？",
+            },
+            "unknown": {
+                "hard": "简历中关于「{gap}」的信息不够明确。能否确认一下你是否有相关经验？",
+                "responsibility": "「{gap}」相关的职责在简历中不够清晰，能否补充说明？",
+                "preferred": "简历中未明确「{gap}」相关经验。如有，请举一个例子。",
+                "terminology": "能否简单说明你对「{gap}」的熟悉程度？",
+                "generic": "能否补充关于「{gap}」的更多信息？",
+            },
+        }
+
+        type_map = templates.get(status, templates["missing"])
+        template = type_map.get(gtype, type_map["generic"])
+        question = template.format(gap=gtext)
+        targets = [gid] if gid != "unknown" else [gtype or "generic"]
         return question, targets
 
     def _fallback_generic_by_index(self, index):

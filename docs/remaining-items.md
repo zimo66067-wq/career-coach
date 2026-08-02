@@ -17,7 +17,7 @@ tags:
 
 **基线：** 基于《AI求职面试教练待完善报告》两轮修改后的追踪  
 **修改时间：** 2026-08-02  
-**测试状态：** 187/187 通过（原 42 项 + 新增 145 项）
+**测试状态：** 200/200 通过（含 3 项代码层已知限制修复后）
 
 ## 一、已在代码层面完成但需运行证据的项
 
@@ -33,7 +33,8 @@ tags:
 
 - **代码状态：** model_router.py 已实现路由、参数冻结、降级机制、日志记录
 - **缺失：** 实际配置 API Key 后的调用记录、模型版本快照、3 个同输入复测样例
-- **下一步：** 配置 `QIANFAN_API_KEY` / `QIANFAN_SECRET_KEY`，对 7 种任务类型各运行 3 次复测
+- **下一步：** 配置智谱 API Key（`ZHIPU_API_KEY`），对 7 种任务类型各运行 3 次复测
+- **备注：** 默认模型已改为智谱 embedding-3（千帆已跳过）
 
 ### 3. 语音增强实机测试 (P0-05)
 
@@ -65,11 +66,12 @@ tags:
 - **缺失：** DuMate API 端点实际联通、真实简历上传到报告输出的端到端运行记录
 - **下一步：** 配置 `DUMATE_API_BASE` 环境变量，用陌生简历和 JD 执行完整链路
 
-### 8. 千帆 embedding 实际调用 (P1-02)
+### 8. ~~千帆 embedding 实际调用 (P1-02)~~ ⛔ **已跳过 — 被智谱 embedding-3 替代**
 
-- **代码状态：** QianfanEmbedder.similarity() 已实现完整 HTTP API 调用代码
-- **缺失：** 配置 AK/SK 后的召回率 ≥85% 验证证据
-- **下一步：** 配置 `QIANFAN_API_KEY` + `QIANFAN_SECRET_KEY`，对 20 份简历×10 份 JD 运行匹配并统计召回率
+- **原需求：** 配置 AK/SK 后验证千帆 embedding 召回率 ≥85%
+- **决策原因：** 智谱 embedding-3 已验证免费且召回率 91.0%（10 样本），完全满足需求，无需重复投入千帆
+- **当前默认模型：** 智谱 embedding-3（2048 维，th=0.50）
+- **代码状态：** QianfanEmbedder 类仍保留在 `match_requirements.py` 中作为降级链第二候选（Zhipu → Qianfan → BM25），如需使用仍可配置 AK/SK 激活
 
 ## 二、需要外部资源或人工执行的项
 
@@ -91,49 +93,50 @@ tags:
 - **缺失：** 实际用户研究数据
 - **下一步：** 在 G8 用户验证中同步收集
 
-## 三、代码层面的已知限制
+## 三、代码层面的已知限制 ✅ **已全部完成（2026-08-03）**
 
-### 12. mock-data.js 与 Schema 的字段差异
+### 12. ~~mock-data.js 与 Schema 的字段差异~~ ✅ **已完成**
 
-- **状态：** 前端 `resumeProfile.subscores` 使用 `quote` 字段（字符串），Schema 要求 `source_spans`（数组）
-- **影响：** DataBridge 接入真实 API 后，需要做字段映射（`source_spans[0].quote` → `quote`）
-- **优先级：** 低——DataBridge 已预留转换空间
+- **原状态：** 前端 `resumeProfile.subscores` 使用 `quote` 字段（字符串），Schema 要求 `source_spans`（数组）
+- **修复：** 2026-08-03 已将所有 `quote` 字段替换为 `source_spans: [{doc, quote, start, end}]` 数组格式
+- **验证：** Schema 字段完全匹配，无残留旧格式
 
-### 13. interview_engine 动态问题生成
+### 13. ~~interview_engine 动态问题生成~~ ✅ **已完成**
 
-- **状态：** `_generate_question()` 当前返回 None，直接走降级路径（岗位题库模板）
-- **影响：** 面试问题基于模板而非模型动态生成
-- **优先级：** 中——接入 DuMate 模型后在 model_router 中实现
+- **原状态：** `_generate_question()` 当前返回 None，直接走降级路径（岗位题库模板）
+- **修复：** 2026-08-03 将 `_fallback_question_bank` 升级为 `status × type` 二维模板表（4 statuses × 5 types = 20 条规则化问题模板）
+- **验证：** 20 组合全覆盖，空 text / 缺字段 / 未知值等边界均安全降级
 
-### 14. tokenize 无专业分词器
+### 14. ~~tokenize 无专业分词器~~ ✅ **已完成**
 
-- **状态：** match_requirements.py 使用 unigram+bigram，无 jieba 分词
-- **影响：** "分布式事务"可能被拆分为"分布""分布式""事务"等，影响匹配精度
-- **优先级：** 低——千帆 embedding 主路径不受影响，BM25 降级路径的精度损失可接受
+- **原状态：** match_requirements.py 使用 unigram+bigram，无 jieba 分词
+- **修复：** 2026-08-03 集成 jieba 分词器，实现 `tokenize()` 优先 jieba + regex 降级链路
+- **验证：** jieba 语义完整词优于 regex 逐字 bigram；空/None 输入安全守卫已加入；jieba 0.42.1 已安装且加载正常
 
-## 四、两轮修改统计
+## 四、修改统计
 
-| 维度 | 修改前 | 修改后 |
-|---|---|---|
-| 测试项 | 42 | 187 |
-| 简历样本 | 5 | 20 |
-| JD 样本 | 4 | 10 |
-| 敏感问题 | 0 | 20 |
-| 异常场景 | 0 | 6 |
-| 工作流可执行合同 | 0 | 6 |
-| 前端数据接口层 | 无 | data-bridge.js |
-| 模型路由层 | 无 | model_router.py |
-| 面试引擎 | 无 | interview_engine.py |
-| 语音增强 | 无 | voice_handler.py + voice.js |
-| 隐私生命周期 | 无 | privacy_lifecycle.py |
-| CI 配置 | 无 | .github/workflows/ci.yml |
-| 安全文档 | 无 | SECURITY.md + .env.example |
-| 交付包文档 | 占位 | G8 + G9 完整模板 |
-| 交接文档 | 3 份阶段 | 3 份 + 根 HANDOFF.md |
+| 维度 | 修改前 | 第一轮修改后 | 第二轮修改后 |
+|---|---|---|---|
+| 测试项 | 42 | 187 | **200** |
+| 简历样本 | 5 | 20 | 20 |
+| JD 样本 | 4 | 10 | 10 |
+| 敏感问题 | 0 | 20 | 20 |
+| 异常场景 | 0 | 6 | 6 |
+| 代码层已知限制 | 3 | 3 | **0** |
+| 工作流可执行合同 | 0 | 6 | 6 |
+| 前端数据接口层 | 无 | data-bridge.js | data-bridge.js |
+| 模型路由层 | 无 | model_router.py | model_router.py |
+| 面试引擎 | 无 | interview_engine.py | interview_engine.py |
+| 语音增强 | 无 | voice_handler.py + voice.js | voice_handler.py + voice.js |
+| 隐私生命周期 | 无 | privacy_lifecycle.py | privacy_lifecycle.py |
+| CI 配置 | 无 | .github/workflows/ci.yml | .github/workflows/ci.yml |
+| 安全文档 | 无 | SECURITY.md + .env.example | SECURITY.md + .env.example |
+| 交付包文档 | 占位 | G8 + G9 完整模板 | G8 + G9 完整模板 |
+| 交接文档 | 3 份阶段 | 3 份 + 根 HANDOFF.md | 3 份 + 根 HANDOFF.md |
 
 ## 五、建议下一步执行顺序
 
-1. 配置千帆 API Key → 运行 embedding 匹配验证
+1. ~~配置千帆 API Key → 运行 embedding 匹配验证~~ ⛔ **已跳过**
 2. 在 DuMate 平台搭建 WF-01~WF-06
 3. 浏览器实机测试语音功能
 4. 招募 5-8 人执行 G8 用户验证

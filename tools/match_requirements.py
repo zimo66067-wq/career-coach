@@ -28,12 +28,54 @@ COVERED_TH = 0.55
 WEAK_TH = 0.30
 UNKNOWN_TH = 0.12
 
-# ---------------- 文本切分（中英文混合，无需第三方分词） ----------------
+# ---------------- 文本切分（中英文混合，优先 jieba，降级到 unigram+bigram） ----------------
 RE_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9+#.\-]*|[\u4e00-\u9fa5]")
 STOP = set("的了和是有在与我你他她它们这那也不都就及或着吧呢啊嘛么很还被把对于等以及一个我们你们他们".split())
 
 
+_JIEBA_LOADED = False
+
+try:
+    import jieba
+    _JIEBA_LOADED = True
+except ImportError:
+    jieba = None
+
+
+def _jieba_tokenize(text):
+    """jieba 分词 + 英文 token 提取。"""
+    # 先提取英文词
+    en_toks = RE_TOKEN.findall(text.lower())
+    en_words = [t for t in en_toks if len(t) > 1 and t not in STOP
+                and re.match(r"^[^\u4e00-\u9fa5]", t)]
+    # jieba 分词（去除单字和停用词）
+    cn_words = []
+    if jieba:
+        for w in jieba.cut(text):
+            w = w.strip().lower()
+            if len(w) > 1 and w not in STOP and re.match(r"^[\u4e00-\u9fa5]", w):
+                cn_words.append(w)
+    # bigram（仅限相邻中文词）
+    bigrams = []
+    all_words = en_words + cn_words
+    for i in range(len(all_words) - 1):
+        a, b = all_words[i], all_words[i + 1]
+        if re.match(r"^[\u4e00-\u9fa5]", a) and re.match(r"^[\u4e00-\u9fa5]", b):
+            bigrams.append(a + b)
+    return all_words + bigrams
+
+
 def tokenize(text):
+    """分词：优先 jieba，失败后回退到 regex unigram+bigram。None/空安全。"""
+    if not text:
+        return []
+    global _JIEBA_LOADED
+    if _JIEBA_LOADED:
+        try:
+            return _jieba_tokenize(text)
+        except Exception:
+            _JIEBA_LOADED = False  # jieba 失败，永久降级到 regex
+    # 回退：regex 分词
     toks = RE_TOKEN.findall(text.lower())
     bigrams = ["".join(toks[i:i + 2]) for i in range(len(toks) - 1)
                if re.match(r"^[\u4e00-\u9fa5]", toks[i]) and re.match(r"^[\u4e00-\u9fa5]", toks[i + 1])]
