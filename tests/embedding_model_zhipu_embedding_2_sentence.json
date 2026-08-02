@@ -1,0 +1,8 @@
+{
+  "model": "zhipu-embedding-2",
+  "strategy": "sentence",
+  "total_comparisons": 500,
+  "best_threshold": 0.2,
+  "best_recall": 100.0,
+  "elapsed_ms": 21688
+}
