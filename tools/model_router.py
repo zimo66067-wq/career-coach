@@ -372,32 +372,43 @@ class ZhipuModelRouter(ModelRouter):
 
 
 class QianfanModelRouter(ModelRouter):
-    """千帆模型路由器。
+    """千帆模型路由器（使用 qianfan SDK 自动管理 Token）。
 
-    _try_call 通过千帆 API 调用模型；
-    需配置 QIANFAN_API_KEY 环境变量，未配置时 raise NotImplementedError。
+    _try_call 通过 qianfan SDK 调用千帆大模型 API；
+    需配置 QIANFAN_ACCESS_KEY + QIANFAN_SECRET_KEY 环境变量，
+    或 QIANFAN_API_KEY（旧版格式 bce-v3/AK/SK）。
+
+    环境变量:
+      - QIANFAN_ACCESS_KEY / QIANFAN_SECRET_KEY（推荐，V2 应用 Key）
+      - QIANFAN_API_KEY（兼容旧版 bce-v3/AK/SK 格式）
+      - QIANFAN_BASE_URL（可选）
     """
 
     def __init__(self, primary_model=None, fallback_model=None, enable_log=True):
         super().__init__(primary_model, fallback_model, enable_log)
-        self.api_key = os.environ.get("QIANFAN_API_KEY")
-        self.base_url = os.environ.get(
-            "QIANFAN_BASE_URL", "https://qianfan.baidubce.com/v2"
-        ).rstrip("/")
-        if not self.api_key:
+        self.ak = os.environ.get("QIANFAN_ACCESS_KEY")
+        self.sk = os.environ.get("QIANFAN_SECRET_KEY")
+
+        # 兼容旧版 QIANFAN_API_KEY 格式 bce-v3/AK/SK
+        if not self.ak or not self.sk:
+            legacy_key = os.environ.get("QIANFAN_API_KEY", "")
+            if legacy_key.startswith("bce-v3/"):
+                parts = legacy_key.split("/")
+                if len(parts) >= 4:
+                    self.ak = parts[2]
+                    self.sk = "/".join(parts[3:])
+
+        if not self.ak or not self.sk:
             raise ValueError(
-                "QianfanModelRouter: QIANFAN_API_KEY not set; "
-                "configure it to enable Qianfan model calls"
+                "QianfanModelRouter: QIANFAN_ACCESS_KEY + QIANFAN_SECRET_KEY "
+                "(or QIANFAN_API_KEY in bce-v3/AK/SK format) not set"
             )
 
-    def _try_call(self, model, prompt, user_input, params, context):
-        """Call Qianfan V2's OpenAI-compatible chat endpoint.
+        from qianfan import ChatCompletion
+        self.client = ChatCompletion(ak=self.ak, sk=self.sk)
 
-        Uses only the Python standard library so DuMate's restricted runtime does
-        not need an additional SDK.  Network/auth/HTTP failures are raised to the
-        base router, which then tries the configured fallback model and finally
-        the explicit rule-degraded path.
-        """
+    def _try_call(self, model, prompt, user_input, params, context):
+        """Call Qianfan chat endpoint via SDK (auto token management)."""
         messages = []
         if prompt:
             messages.append({"role": "system", "content": prompt})
@@ -409,50 +420,92 @@ class QianfanModelRouter(ModelRouter):
             )
         messages.append({"role": "user", "content": content})
 
-        payload = {
-            "model": model,
-            "messages": messages,
-            "temperature": params["temperature"],
-            "max_tokens": params["max_tokens"],
-            "stream": False,
-        }
-        request = Request(
-            self.base_url + "/chat/completions",
-            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers={
-                "Authorization": "Bearer " + self.api_key,
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
         try:
-            with urlopen(request, timeout=params["timeout"]) as response:
-                body = json.loads(response.read().decode("utf-8"))
-        except HTTPError as exc:
-            raise RuntimeError("qianfan_http_%s" % exc.code) from exc
-        except URLError as exc:
-            raise RuntimeError("qianfan_network_error") from exc
+            resp = self.client.do(
+                model=model,
+                messages=messages,
+                temperature=params["temperature"],
+                max_tokens=params["max_tokens"],
+                stream=False,
+            )
+        except Exception as exc:
+            raise RuntimeError("qianfan_chat_error: %s" % type(exc).__name__) from exc
 
         try:
-            output = body["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError) as exc:
+            output = resp.result
+        except AttributeError as exc:
             raise ValueError("qianfan_invalid_response") from exc
-        return self._parse_output(output)
+        return parse_model_output(output)
 
-    @staticmethod
-    def _parse_output(output):
-        """Return JSON objects as dict/list; retain ordinary model text."""
-        if not isinstance(output, str):
-            return output
-        text = output.strip()
-        if text.startswith("```"):
-            lines = text.splitlines()
-            if lines and lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            text = "\n".join(lines).strip()
+def parse_model_output(output):
+    """Return JSON objects as dict/list; retain ordinary model text."""
+    if not isinstance(output, str):
+        return output
+    text = output.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    try:
+        return json.loads(text)
+    except (TypeError, ValueError):
+        return text
+
+
+class ZhipuChatRouter(ModelRouter):
+    """智谱 Chat 模型路由器（替代千帆，用于 7 种生成任务）。
+
+    同时负责 Embedding（通过 ZhipuEmbedder）和 Chat（通过 zhipuai SDK）。
+    千帆 AK/SK 无法换取模型调用所需的 access_token，因此智谱同时承担两者。
+
+    环境变量:
+      - ZHIPU_API_KEY（必填）
+      - ZHIPU_BASE_URL（可选，默认 https://open.bigmodel.cn/api/paas/v4）
+    """
+
+    def __init__(self, primary_model=None, fallback_model=None, enable_log=True):
+        super().__init__(primary_model, fallback_model, enable_log)
+        self.api_key = os.environ.get("ZHIPU_API_KEY")
+        self.base_url = os.environ.get(
+            "ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4"
+        ).rstrip("/")
+        if not self.api_key:
+            raise ValueError(
+                "ZhipuChatRouter: ZHIPU_API_KEY not set; "
+                "configure it to enable Zhipu model calls"
+            )
+        from zhipuai import ZhipuAI
+        self.client = ZhipuAI(api_key=self.api_key)
+
+    def _try_call(self, model, prompt, user_input, params, context):
+        """Call Zhipu Chat API (OpenAI-compatible endpoint via SDK)."""
+        messages = []
+        if prompt:
+            messages.append({"role": "system", "content": prompt})
+
+        content = user_input or ""
+        if context:
+            content += "\n\ncontext_json:\n" + json.dumps(
+                context, ensure_ascii=False, separators=(",", ":")
+            )
+        messages.append({"role": "user", "content": content})
+
         try:
-            return json.loads(text)
-        except (TypeError, ValueError):
-            return text
+            resp = self.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=params["temperature"],
+                max_tokens=params["max_tokens"],
+                stream=False,
+            )
+        except Exception as exc:
+            raise RuntimeError("zhipu_chat_error: %s" % type(exc).__name__) from exc
+
+        try:
+            output = resp.choices[0].message.content
+        except (AttributeError, IndexError, KeyError) as exc:
+            raise ValueError("zhipu_invalid_response") from exc
+        return parse_model_output(output)

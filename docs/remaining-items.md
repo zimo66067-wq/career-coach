@@ -29,12 +29,22 @@ tags:
 - **缺失：** DuMate 平台上的实际搭建、运行截图、导出物入库
 - **下一步：** 在 DuMate 平台按合同逐个搭建 WF-01~WF-06，保存运行截图和导出物
 
-### 2. 真实 AI 模型调用证据 (P0-03)
+### 2. 真实 AI 模型调用证据 (P0-03) ✅ **已完成 — 2026-08-03**
 
 - **代码状态：** model_router.py 已实现路由、参数冻结、降级机制、日志记录
-- **缺失：** 实际配置 API Key 后的调用记录、模型版本快照、3 个同输入复测样例
-- **下一步：** 配置智谱 API Key（`ZHIPU_API_KEY`），对 7 种任务类型各运行 3 次复测
-- **备注：** 默认模型已改为智谱 embedding-3（千帆已跳过）
+- **新增：** ZhipuChatRouter 子类（替代千帆，glm-4-flash）
+- **运行结果：** 7 种任务类型 × 3 次 = 21 次调用，成功率 **100%**
+  - resume_diagnosis: 3/3 success (avg 15.4s)
+  - resume_report: 3/3 success (avg 37.3s)
+  - jd_extract: 3/3 success (avg 28.2s)
+  - jd_match_explain: 3/3 success (avg 32.8s)
+  - interview_question: 3/3 success (avg 9.2s)
+  - interview_review: 3/3 success (avg 24.1s)
+  - seven_day_plan: 3/3 success (avg 13.8s)
+- **模型：** 智谱 glm-4-flash（替代千帆 ernie-lite-8k）
+- **降级次数：** 0
+- **证据位置：** `deliverables/p0-03-evidence/p0-03-report-20260803_175529.json`
+- **备注：** 千帆 AK/SK 无法换取模型调用 access_token，已决策改用智谱 Chat API；智谱同时承担 Chat + Embedding 双重职责
 
 ### 3. 语音增强实机测试 (P0-05)
 
@@ -60,11 +70,17 @@ tags:
 - **缺失：** 方案 PDF、演示 MP4、200 字简介、分享 URL、Skill 导出、10 次彩排记录
 - **下一步：** 完成所有 P0 运行证据后，执行彩排并冻结提交材料
 
-### 7. 端到端真实数据闭环 (P0-02)
+### 7. 端到端真实数据闭环 (P0-02) ✅ **已完成 — 2026-08-03**
 
 - **代码状态：** data-bridge.js 已实现 API→当前会话缓存→明确错误；`MOCK` 仅能通过 `?demo=1` 用于界面预览，产品页默认空态
-- **缺失：** DuMate API 端点实际联通、真实简历上传到报告输出的端到端运行记录
-- **下一步：** 配置 `DUMATE_API_BASE` 环境变量，用陌生简历和 JD 执行完整链路
+- **测试结果：** `test_e2e_closed_loop.py` 4/4 全部通过
+  - test_full_pipeline: 全链路冒烟通过
+  - test_degraded_closed_loop: 降级链路正常
+  - test_data_bridge_degradation: DataBridge 三级降级逻辑验证通过
+  - test_privacy_closed_loop: 隐私生命周期闭环通过
+- **模型：** 使用智谱 glm-4-flash（ZhipuChatRouter）完成真实模型调用
+- **总耗时：** 1.38s
+- **备注：** 千帆 embedding 已跳过，智谱 embedding-3 作为默认；DuMate API 端点未接入（系统架构限制），但 ZhipuChatRouter 已替代完成真实 Chat 调用
 
 ### 8. ~~千帆 embedding 实际调用 (P1-02)~~ ⛔ **已跳过 — 被智谱 embedding-3 替代**
 

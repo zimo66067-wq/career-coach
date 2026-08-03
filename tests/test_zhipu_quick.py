@@ -11,7 +11,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 from zhipuai import ZhipuAI
 import match_requirements as mr
 
-API_KEY = "eb96db33a49942e39cca6ace6dff497b.1IjKi9E7D0Bv1c1x"
+API_KEY = os.environ.get("ZHIPU_API_KEY")
+if not API_KEY:
+    raise EnvironmentError(
+        "ZHIPU_API_KEY not set; please export ZHIPU_API_KEY=<your_key>"
+    )
 FIX = os.path.join(os.path.dirname(__file__), "fixtures-synthetic")
 
 def load_text(path):
