@@ -310,32 +310,32 @@ def test_degraded_closed_loop(verbose=False):
 # ────────────────────────────────────────────────────────────────── #
 
 def test_data_bridge_degradation(verbose=False):
-    """验证 data-bridge.js 的三级降级逻辑（后端模拟）"""
+    """验证生产路径 API -> 缓存 -> 明确错误，MOCK 只用于显式演示。"""
     result = ClosedLoopResult()
 
-    # 模拟 DataBridge 的三级降级: API -> 缓存 -> MOCK
+    # 模拟生产路径：API 不可用时只可使用当前会话缓存，不能伪造 MOCK 结果。
     t0 = time.time()
     try:
-        # 模拟 API 不可用 -> 缓存 -> MOCK
+        # 模拟 API 不可用、没有当前会话缓存、非演示模式
         api_available = False
         cache_available = False
-        mock_available = True
+        demo_mode = False
 
         # Level 1: API
         if api_available:
             data_source = "api"
         elif cache_available:
             data_source = "cache"
-        elif mock_available:
-            data_source = "mock_degraded"
+        elif demo_mode:
+            data_source = "demo_mock"
         else:
-            raise RuntimeError("all data sources unavailable")
+            data_source = "explicit_error"
 
-        assert data_source == "mock_degraded", "should fall back to mock"
+        assert data_source == "explicit_error", "production path must not fall back to mock"
 
         result.add_step(
-            "DataBridge: API->Cache->MOCK", True,
-            "final_source=%s, degraded=True" % data_source,
+            "DataBridge: API->Cache->ExplicitError", True,
+            "final_source=%s, no synthetic user result" % data_source,
             int((time.time() - t0) * 1000)
         )
     except Exception as e:

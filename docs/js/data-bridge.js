@@ -1,6 +1,6 @@
 /* data-bridge.js · 真实数据接口层
- * 三级降级: API -> 缓存 -> MOCK(标注)
- * 不破坏现有 MOCK 接口，MOCK 降级为演示缓存
+ * 生产路径：API -> 当前会话缓存 -> 明确错误；MOCK 仅限显式演示模式。
+ * 不将合成简历、面试或报告伪装成用户结果。
  */
 (function () {
   'use strict';
@@ -138,15 +138,32 @@
     });
   }
 
-  // ── 降级辅助：返回 MOCK 数据并标注 degraded ───────────
-  function degrade(mockKey, traceId, reason) {
-    console.warn('[DataBridge] 降级到 MOCK 数据: ' + mockKey + (reason ? ' (' + reason + ')' : ''));
+  function isDemoMode() {
+    if (window.APP && typeof window.APP.isDemoMode === 'function') return window.APP.isDemoMode();
+    return /[?&]demo=1(?:&|$)/.test(location.search);
+  }
+
+  function unavailable(traceId, reason) {
+    console.warn('[DataBridge] 服务不可用；不会显示合成数据' + (reason ? ' (' + reason + ')' : ''));
+    return {
+      error: 'service_unavailable',
+      message: '服务暂不可用，请稍后重试。未展示演示数据。',
+      trace_id: traceId,
+      degraded: true,
+      degraded_reason: reason || 'api_unavailable'
+    };
+  }
+
+  // ── 演示辅助：仅 ?demo=1 可返回合成数据 ───────────────
+  function demoData(mockKey, traceId, reason) {
+    if (!isDemoMode()) return unavailable(traceId, reason);
+    console.warn('[DataBridge] 使用演示数据: ' + mockKey + (reason ? ' (' + reason + ')' : ''));
     if (!window.MOCK || !window.MOCK[mockKey]) {
-      return { error: 'no_mock', message: 'MOCK 数据不存在: ' + mockKey, trace_id: traceId, degraded: true };
+      return { error: 'no_demo_data', message: '演示数据不存在: ' + mockKey, trace_id: traceId, degraded: true };
     }
     // 深拷贝避免污染原始 MOCK
     var data = JSON.parse(JSON.stringify(window.MOCK[mockKey]));
-    return { data: data, degraded: true, degraded_reason: reason || 'fallback_to_mock', trace_id: traceId };
+    return { data: data, degraded: true, degraded_reason: reason || 'demo_mock', demo_data: true, trace_id: traceId };
   }
 
   // ── 从降级结果中提取 data ──────────────────────────────
@@ -179,7 +196,7 @@
       return { resumeText: res.resumeText, resumeProfile: res.resumeProfile, trace_id: res.trace_id || traceId };
     }
 
-    // 降级: 缓存 -> MOCK
+    // 降级: 当前会话缓存 -> 显式错误；只有演示模式才可使用合成样本。
     var cached = getCache('resumeText');
     if (cached) {
       console.warn('[DataBridge] 使用缓存数据: resumeText');
@@ -191,11 +208,15 @@
         trace_id: traceId
       };
     }
+    var demoText = demoData('resumeText', traceId, res.error);
+    var demoProfile = demoData('resumeProfile', traceId, res.error);
+    if (demoText.error || demoProfile.error) return demoText.error ? demoText : demoProfile;
     return {
-      resumeText: window.MOCK.resumeText,
-      resumeProfile: window.MOCK.resumeProfile,
+      resumeText: demoText.data,
+      resumeProfile: demoProfile.data,
       degraded: true,
-      degraded_reason: 'fallback_to_mock',
+      degraded_reason: 'demo_mock',
+      demo_data: true,
       trace_id: traceId
     };
   }
@@ -235,14 +256,17 @@
       };
     }
 
-    // MOCK
-    var profile = normalizeResumeProfile(window.MOCK.resumeProfile);
+    // 演示模式才可显示合成诊断。
+    var demo = demoData('resumeProfile', traceId, res.error);
+    if (demo.error) return demo;
+    var profile = normalizeResumeProfile(demo.data);
     return {
       resumeProfile: profile,
       score_R: profile.score_R,
       suggestions: profile.suggestions,
       degraded: true,
-      degraded_reason: 'fallback_to_mock',
+      degraded_reason: 'demo_mock',
+      demo_data: true,
       trace_id: traceId
     };
   }
@@ -302,9 +326,15 @@
       return { matchResult: cached, degraded: true, degraded_reason: 'cached', trace_id: traceId };
     }
 
-    // MOCK
-    var result = degrade('matchResult', traceId, res.error);
-    return { matchResult: result.data, degraded: true, degraded_reason: 'fallback_to_mock', trace_id: traceId };
+    var demo = demoData('matchResult', traceId, res.error);
+    if (demo.error) return demo;
+    return {
+      matchResult: demo.data,
+      degraded: true,
+      degraded_reason: 'demo_mock',
+      demo_data: true,
+      trace_id: traceId
+    };
   }
 
   // ============================================================
@@ -325,6 +355,7 @@
 
     if (!res.error) {
       setCache('sessionId', res.session_id);
+      setCache('firstQuestion', res.firstQuestion);
       return {
         session_id: res.session_id,
         firstQuestion: res.firstQuestion,
@@ -334,24 +365,26 @@
 
     // 缓存
     var cachedSid = getCache('sessionId');
-    if (cachedSid) {
-      console.warn('[DataBridge] 使用缓存数据: sessionId');
+    var cachedQuestion = getCache('firstQuestion');
+    if (cachedSid && cachedQuestion) {
+      console.warn('[DataBridge] 使用缓存数据: sessionId / firstQuestion');
       return {
         session_id: cachedSid,
-        firstQuestion: window.MOCK.interviews[0].question,
+        firstQuestion: cachedQuestion,
         degraded: true,
         degraded_reason: 'cached',
         trace_id: traceId
       };
     }
 
-    // MOCK
-    console.warn('[DataBridge] 降级到 MOCK 面试数据');
+    var demo = demoData('interviews', traceId, res.error);
+    if (demo.error) return demo;
     return {
       session_id: 'mock_session_' + traceId,
-      firstQuestion: window.MOCK.interviews[0].question,
+      firstQuestion: demo.data[0].question,
       degraded: true,
-      degraded_reason: 'fallback_to_mock',
+      degraded_reason: 'demo_mock',
+      demo_data: true,
       trace_id: traceId
     };
   }
@@ -376,17 +409,19 @@
       };
     }
 
-    // 缓存: 无缓存策略（每次回答不同），直接 MOCK 轮次
-    console.warn('[DataBridge] 降级到 MOCK 面试轮次');
+    // 每次回答不同，没有可安全复用的缓存；生产态返回明确错误。
+    var demo = demoData('interviews', traceId, res.error);
+    if (demo.error) return demo;
     var turnCount = parseInt(sessionStorage.getItem('cb_mock_turn') || '0', 10);
-    var idx = turnCount % window.MOCK.interviews.length;
+    var idx = turnCount % demo.data.length;
     sessionStorage.setItem('cb_mock_turn', String(turnCount + 1));
-    var mockTurn = window.MOCK.interviews[idx];
+    var mockTurn = demo.data[idx];
     return {
       turn: mockTurn,
       followUp: mockTurn.follow_up,
       degraded: true,
-      degraded_reason: 'fallback_to_mock',
+      degraded_reason: 'demo_mock',
+      demo_data: true,
       trace_id: traceId
     };
   }
@@ -423,14 +458,16 @@
       };
     }
 
-    // MOCK
-    console.warn('[DataBridge] 降级到 MOCK 面试报告');
+    var demoInterviews = demoData('interviews', traceId, res.error);
+    var demoScore = demoData('score_I', traceId, res.error);
+    if (demoInterviews.error || demoScore.error) return demoInterviews.error ? demoInterviews : demoScore;
     return {
-      report: window.MOCK.interviews,
-      score_I: window.MOCK.score_I,
-      turns: window.MOCK.interviews.length,
+      report: demoInterviews.data,
+      score_I: demoScore.data,
+      turns: demoInterviews.data.length,
       degraded: true,
-      degraded_reason: 'fallback_to_mock',
+      degraded_reason: 'demo_mock',
+      demo_data: true,
       trace_id: traceId
     };
   }
@@ -459,9 +496,15 @@
       return { ability: cached, degraded: true, degraded_reason: 'cached', trace_id: traceId };
     }
 
-    // MOCK
-    var result = degrade('ability', traceId, res.error);
-    return { ability: result.data, degraded: true, degraded_reason: 'fallback_to_mock', trace_id: traceId };
+    var demo = demoData('ability', traceId, res.error);
+    if (demo.error) return demo;
+    return {
+      ability: demo.data,
+      degraded: true,
+      degraded_reason: 'demo_mock',
+      demo_data: true,
+      trace_id: traceId
+    };
   }
 
   // ============================================================
@@ -480,12 +523,14 @@
       return { consent_id: res.consent_id, status: res.status || 'ACCEPTED', trace_id: res.trace_id || traceId };
     }
 
-    console.warn('[DataBridge] 降级: consent');
+    if (!isDemoMode()) return unavailable(traceId, res.error);
+    console.warn('[DataBridge] 演示模式：使用合成 consent 结果');
     return {
-      consent_id: 'mock_consent_' + traceId,
+      consent_id: 'demo_consent_' + traceId,
       status: 'ACCEPTED',
       degraded: true,
-      degraded_reason: 'fallback_to_mock',
+      degraded_reason: 'demo_mock',
+      demo_data: true,
       trace_id: traceId
     };
   }
@@ -548,9 +593,13 @@
       return result && result.degraded === true;
     },
 
-    // 获取 MOCK 数据（明确标注为演示缓存）
+    // 获取演示数据（生产路径一律返回 null）
     getMockData: function (key) {
-      console.warn('[DataBridge] 使用 MOCK 数据作为演示缓存');
+      if (!isDemoMode()) {
+        console.warn('[DataBridge] 已阻止在生产路径读取演示数据');
+        return null;
+      }
+      console.warn('[DataBridge] 使用演示数据: ' + key);
       return window.MOCK ? window.MOCK[key] : null;
     },
 

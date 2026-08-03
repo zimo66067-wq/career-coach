@@ -16,13 +16,13 @@
 
 - 所有公开功能页默认 `empty`；未提交材料时不展示分数、建议或匹配结论。
 - 普通 `?state=...` 参数会被忽略，公开导航不展示状态墙或状态切换器。
-- 内部 QA 才可显式使用 `?demo=1&state=empty|processing|success|error|degraded`；`pages/states.html` 仅保留为未链接的 QA 矩阵。
+- 内部 QA 才可显式使用 `?demo=1&state=empty|processing|success|error|degraded`；状态切换器仅在演示模式显示，页面会标识合成样本。
 - degraded 态：F1 简化诊断清单 / F2 BM25 简化匹配 / F3 固定题库 / F4 雷达强制降级为表格。
 
 ## 数据来源与一致性
 
-- `js/mock-data.js` 仅用于显式 QA 演示，且全部为合成样本；不得作为公开用户的诊断输入或结果。
-- 真实结果必须来自用户提交、服务端处理和证据校验；当前静态页面尚未完成此链路。
+- 演示数据在 `js/mock-data.js`，与 `tests/fixtures-synthetic/` 同源，只能在 `demo=1` 下读取。
+- 生产路径为 API → 当前会话缓存 → 明确错误，绝不以 `window.MOCK` 代替用户上传、诊断、匹配、面试或能力报告
 
 ## ECharts 三级降级
 

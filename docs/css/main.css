@@ -365,6 +365,14 @@ a.card:hover, .card.hoverable:hover {
 .state-fab a.cur { background: var(--zy-grad-ai); color: #fff; }
 .state-fab a:hover:not(.cur) { background: rgba(22, 30, 52, .06); }
 
+/* ---- 演示模式标识（仅 ?demo=1 时由 app.js 挂载） ---- */
+.demo-notice {
+  position: fixed; top: 82px; left: 50%; transform: translateX(-50%); z-index: 98;
+  padding: 7px 12px; border: 1px solid rgba(180, 83, 9, .28); border-radius: var(--zy-r-pill);
+  background: rgba(255, 251, 235, .96); color: #92400e; box-shadow: var(--zy-shadow-1);
+  font-size: 12px; font-weight: 650; white-space: nowrap;
+}
+
 /* ---- 表格（雷达降级） ---- */
 table.dim { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 table.dim th, table.dim td { border: 1px solid var(--zy-line); padding: 9px 12px; text-align: left; }
@@ -398,6 +406,7 @@ table.dim th { background: var(--zy-bg-cool); font-weight: 650; }
   .score-ring { width: 116px; height: 116px; }
   .score-ring .inner { width: 90px; height: 90px; }
   .score-ring .num { font-size: 27px; }
+  .demo-notice { top: 72px; max-width: calc(100vw - 28px); white-space: normal; text-align: center; }
 }
 
 /* ---- 减少动态偏好（WCAG 2.3.3 / 规范要求） ---- */

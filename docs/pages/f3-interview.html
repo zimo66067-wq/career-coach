@@ -252,16 +252,17 @@
 <script src="../js/voice.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  if (window.APP.getState() !== "success") return;
-  // 主链路: 优先 DataBridge, MOCK 作为降级缓存
+  if (!window.APP.isDemoMode() || window.APP.getState() !== "success") return;
+  // 成功态的合成内容仅用于显式演示模式。
   var DB = window.DataBridge;
   function fetchSync(key) {
     if (DB && DB.getMockData) { var d = DB.getMockData(key); if (d) return d; }
-    return window.MOCK ? window.MOCK[key] : null;
+    return null;
   }
   var star = { situation: "情境S", task: "任务T", action: "行动A", result: "结果R", metric: "量化数据", reflection: "复盘" };
   var html = "";
   var interviews = fetchSync('interviews') || [];
+  if (!interviews.length) return;
   interviews.forEach(function (t) {
     html += '<div class="bubble q"><div class="who">面试官 · 第' + t.turn_id + "题（考察：" + t.targets.join(" / ") + "）</div>" + t.question + "</div>";
     html += '<div class="bubble a"><div class="who">你</div>' + t.answer + "</div>";

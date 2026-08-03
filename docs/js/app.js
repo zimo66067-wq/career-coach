@@ -1,26 +1,32 @@
-/* app.js · 公开入口默认空态；演示状态仅限显式 ?demo=1 */
+/* app.js · 公共逻辑：生产默认空态；演示需 ?demo=1&state= */
 (function () {
   var STATES = ["empty", "processing", "success", "error", "degraded"];
   var LABELS = { empty: "空态", processing: "处理中", success: "成功", error: "失败", degraded: "降级" };
 
-  function isDemo() {
-    return /[?&]demo=1(?:[&#]|$)/.test(location.search);
+  function isDemoMode() {
+    return /[?&]demo=1(?:&|$)/.test(location.search);
   }
 
   function getState() {
-    if (!isDemo()) return "empty";
+    // 生产访问绝不能仅靠 URL 参数进入含合成数据的成功态。
+    if (!isDemoMode()) return "empty";
     var m = /[?&]state=([a-z]+)/.exec(location.search);
     var s = m && STATES.indexOf(m[1]) >= 0 ? m[1] : "empty";
     return s;
   }
 
   function setState(s) {
+    if (STATES.indexOf(s) < 0) return;
+    if (!isDemoMode()) {
+      document.body.setAttribute("data-state", s);
+      return;
+    }
     var url = location.pathname + "?demo=1&state=" + s + location.hash;
     location.href = url;
   }
 
   function mountFab() {
-    if (!isDemo() || document.body.hasAttribute("data-no-fab")) return;
+    if (!isDemoMode() || document.body.hasAttribute("data-no-fab")) return;
     var cur = getState();
     var fab = document.createElement("div");
     fab.className = "state-fab";
@@ -39,6 +45,16 @@
     document.body.appendChild(fab);
   }
 
+  function mountDemoNotice() {
+    if (!isDemoMode()) return;
+    document.body.setAttribute("data-demo", "true");
+    var notice = document.createElement("div");
+    notice.className = "demo-notice";
+    notice.setAttribute("role", "status");
+    notice.textContent = "演示数据：合成样本，仅用于界面预览";
+    document.body.appendChild(notice);
+  }
+
   function mountNav(active) {
     var nav = document.querySelector(".topnav");
     if (!nav) return;
@@ -50,9 +66,16 @@
   document.addEventListener("DOMContentLoaded", function () {
     var s = getState();
     document.body.setAttribute("data-state", s);
+    mountDemoNotice();
     mountFab();
     mountNav(document.body.getAttribute("data-page"));
   });
 
-  window.APP = { getState: getState, isDemo: isDemo, STATES: STATES, LABELS: LABELS };
+  window.APP = {
+    getState: getState,
+    setState: setState,
+    isDemoMode: isDemoMode,
+    STATES: STATES,
+    LABELS: LABELS
+  };
 })();

@@ -118,13 +118,15 @@ function renderPlan(elId, plan) {
 }
 document.addEventListener("DOMContentLoaded", function () {
   var state = window.APP.getState();
-  // 主链路: 优先 DataBridge, MOCK 作为降级缓存
+  if (!window.APP.isDemoMode() || (state !== "success" && state !== "degraded")) return;
+  // 成功/降级态的合成内容仅用于显式演示模式。
   var DB = window.DataBridge;
   function fetchSync(key) {
     if (DB && DB.getMockData) { var d = DB.getMockData(key); if (d) return d; }
-    return window.MOCK ? window.MOCK[key] : null;
+    return null;
   }
   var a = fetchSync('ability');
+  if (!a) return;
   if (state === "success") {
     document.getElementById("assump").innerHTML = "<b>情景假设：</b>" + a.scenario_day7.assumptions.join("；");
     window.RADAR.mount("radar", a, false);

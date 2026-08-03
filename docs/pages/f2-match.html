@@ -103,14 +103,15 @@
 <script src="../js/data-bridge.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  if (window.APP.getState() !== "success") return;
-  // 主链路: 优先 DataBridge, MOCK 作为降级缓存
+  if (!window.APP.isDemoMode() || window.APP.getState() !== "success") return;
+  // 成功态的合成内容仅用于显式演示模式。
   var DB = window.DataBridge;
   function fetchSync(key) {
     if (DB && DB.getMockData) { var d = DB.getMockData(key); if (d) return d; }
-    return window.MOCK ? window.MOCK[key] : null;
+    return null;
   }
   var m = fetchSync('matchResult');
+  if (!m) return;
   var order = { hard: 0, responsibility: 1, preferred: 2, terminology: 3 };
   var reqs = m.requirements.slice().sort(function (a, b) { return order[a.type] - order[b.type]; });
   var colors = { covered: "#15803d", weak: "#b45309", missing: "#d32424", unknown: "#5b6472" };

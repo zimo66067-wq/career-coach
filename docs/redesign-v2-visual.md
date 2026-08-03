@@ -31,21 +31,21 @@
 | `pages/f4-report.html` | 改版 | C0 数字递增动画（终值=真实基线）；保留 DataBridge |
 | `pages/states.html` | 改版 | tokens.css + skip-link |
 | `js/radar.js` | 修改 | 雷达配色对齐设计系统；平滑路径动画；reduced-motion 关闭动画 |
-| `js/app.js` | 修改 | 状态悬浮器补 aria（逻辑零改动） |
+| `js/app.js` | 修改 | 生产默认空态；状态悬浮器与合成数据仅在 `?demo=1&state=` 下启用 |
 
 ### docs/（GitHub Pages 部署副本）
 全量同步上述前端文件（css×3 / js×6 含 data-bridge.js、voice.js / index.html / pages×5），
 消除此前部署副本缺少 voice.js、data-bridge.js 的滞后问题。
 
-未改动：`js/mock-data.js`、`js/evidence.js`、`js/voice.js`、`js/data-bridge.js`（逻辑）、`contracts/`、`tests/`、`workflows/`、`deliverables/`。
+未改动：`js/mock-data.js`、`js/evidence.js`、`js/voice.js`、`contracts/`、`workflows/`、`deliverables/`。
 
 ## 3. 契约保留核验
 
 - DOM ID 全量保留（含 DuMate 新增：`micBtn / ttsToggle / voice-state-indicator / voice-fallback-area / voiceTextFallback / voiceTextSubmit / voiceTextRetryVoice / draftHint`）
-- `data-state-view` ×5 态 ×4 页完整；`data-page`、`data-no-fab`、`data-quote`、`?state=` 契约不变
+- `data-state-view` ×5 态 ×4 页完整；`data-page`、`data-no-fab`、`data-quote` 契约保留；状态演示改为显式 `?demo=1&state=`
 - `window.APP / MOCK / EVIDENCE / RADAR / DataBridge / VoiceHandler` 接口签名不变
 - 四条业务流程、五类状态、语音增强链路、文字回退链路完整
-- 未伪造任何 AI 数据：评分、证据引用、source_spans、追问逻辑、推演区间与远程一致
+- 评分、证据引用、source_spans、追问逻辑、推演区间的合成样本仅用于显式演示；生产态不伪造用户结果
 
 ## 4. 验收记录
 
