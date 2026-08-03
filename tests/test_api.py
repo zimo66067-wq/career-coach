@@ -45,8 +45,10 @@ class FakeRouter:
         self.output = output
         self.status = status
         self.degraded = degraded
+        self.call_count = 0
 
     def call(self, *_args, **_kwargs):
+        self.call_count += 1
         return {
             "status": self.status,
             "output": self.output,
@@ -141,6 +143,10 @@ def test_zhipu_router_calls_chat_completions_and_parses_json(monkeypatch):
     assert result["output"] == {"ok": True}
 
 
+def test_zhipu_router_extracts_json_after_a_model_preface():
+    assert ZhipuModelRouter._parse_output('分析结果如下：\n{"ok": true}') == {"ok": True}
+
+
 def test_diagnosis_returns_only_valid_grounded_profile(monkeypatch):
     response = client(monkeypatch, FakeRouter(valid_profile())).post(
         "/api/wf02/diagnose", json={"resumeText": RESUME}
@@ -164,3 +170,16 @@ def test_degraded_or_ungrounded_model_output_is_not_shown(monkeypatch):
     assert degraded.json["error"] == "model_unavailable"
     assert invalid.status_code == 502
     assert invalid.json["error"] == "model_output_invalid"
+
+
+def test_invalid_model_result_is_not_retried_in_the_same_request(monkeypatch):
+    invalid_profile = valid_profile()
+    invalid_profile["subscores"]["structure"]["source_spans"][0]["quote"] = "不存在的证据"
+    router = FakeRouter(invalid_profile)
+
+    response = client(monkeypatch, router).post(
+        "/api/wf02/diagnose", json={"resumeText": RESUME}
+    )
+
+    assert response.status_code == 502
+    assert router.call_count == 1

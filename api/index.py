@@ -284,24 +284,19 @@ def redflag_errors(profile, resume_text):
 def diagnose_resume(resume_text):
     cleaned_text, _mapping = deidentify(resume_text)
     router = build_model_router()
-    last_status = "model_unavailable"
-    for _attempt in range(2):
-        result = router.call("resume_diagnosis", cleaned_text)
-        if result.get("status") != "success" or result.get("degraded") or not isinstance(result.get("output"), dict):
-            last_status = "model_unavailable"
-            continue
-        profile = result["output"]
-        validation_errors = profile_validation_errors(profile, cleaned_text)
-        if not validation_errors:
-            score_r = round2(calc_R({
-                key: value["score"] for key, value in profile["subscores"].items()
-            }))
-            return profile, score_r, result.get("trace_id") or trace_id()
-        last_status = "model_output_invalid"
+    result = router.call("resume_diagnosis", cleaned_text)
+    if result.get("status") != "success" or result.get("degraded") or not isinstance(result.get("output"), dict):
+        raise ApiError("model_unavailable", "诊断模型暂时不可用，请稍后重试。", 503)
 
-    if last_status == "model_output_invalid":
+    profile = result["output"]
+    validation_errors = profile_validation_errors(profile, cleaned_text)
+    if validation_errors:
         raise ApiError("model_output_invalid", "诊断结果未通过证据校验，请稍后重试。", 502)
-    raise ApiError("model_unavailable", "诊断模型暂时不可用，请稍后重试。", 503)
+
+    score_r = round2(calc_R({
+        key: value["score"] for key, value in profile["subscores"].items()
+    }))
+    return profile, score_r, result.get("trace_id") or trace_id()
 
 
 def route_api():

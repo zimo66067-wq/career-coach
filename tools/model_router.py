@@ -43,7 +43,7 @@ TASK_PROMPTS = {
 # 冻结参数（temperature / max_tokens / timeout）
 # ------------------------------------------------------------------ #
 MODEL_PARAMS = {
-    "resume_diagnosis":     {"temperature": 0.1, "max_tokens": 4096, "timeout": 30},
+    "resume_diagnosis":     {"temperature": 0.1, "max_tokens": 2048, "timeout": 25},
     "resume_report":        {"temperature": 0.3, "max_tokens": 4096, "timeout": 30},
     "jd_extract":           {"temperature": 0.1, "max_tokens": 2048, "timeout": 20},
     "jd_match_explain":     {"temperature": 0.3, "max_tokens": 2048, "timeout": 20},
@@ -356,7 +356,7 @@ class ZhipuModelRouter(ModelRouter):
 
     @staticmethod
     def _parse_output(output):
-        """Decode plain text or a fenced JSON object returned by the model."""
+        """Decode JSON returned directly, fenced, or after a short model preface."""
         if not isinstance(output, str):
             return output
         text = output.strip()
@@ -368,7 +368,17 @@ class ZhipuModelRouter(ModelRouter):
         try:
             return json.loads(text)
         except json.JSONDecodeError:
-            return text
+            # Some compliant-enough providers prepend a sentence before the
+            # object. Extract that object locally instead of issuing a second
+            # provider request for the same user action.
+            object_start = text.find("{")
+            if object_start < 0:
+                return text
+            try:
+                parsed, _end = json.JSONDecoder().raw_decode(text[object_start:])
+            except json.JSONDecodeError:
+                return text
+            return parsed if isinstance(parsed, dict) else text
 
 
 class QianfanModelRouter(ModelRouter):
