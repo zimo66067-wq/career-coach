@@ -21,8 +21,12 @@ import time
 AK = os.environ.get("QIANFAN_AK", "")
 SK = os.environ.get("QIANFAN_SK", "")
 if not AK or not SK:
-    print("错误: 请设置环境变量 QIANFAN_AK 和 QIANFAN_SK")
-    sys.exit(2)
+    try:
+        import pytest
+        pytest.skip("未设置 QIANFAN_AK/QIANFAN_SK，跳过千帆在线测试", allow_module_level=True)
+    except ImportError:
+        print("错误: 请设置环境变量 QIANFAN_AK 和 QIANFAN_SK")
+        sys.exit(2)
 
 COVERED_TH = 0.55
 WEAK_TH = 0.30

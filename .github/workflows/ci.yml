@@ -39,12 +39,11 @@ jobs:
           pip install jsonschema pypdf python-docx pytest
 
       # --- 步骤4: 运行 pytest 测试套件 ---
+      # 说明：凭证依赖测试在缺少环境变量时会 pytest.skip（见各测试文件守卫），
+      #       因此此处不再使用 `|| true` 吞掉失败；测试失败应使 CI 变红。
       - name: Run pytest
         run: |
-          python -m pytest tests/ -v --tb=long --junitxml=pytest-results.xml || true
-          echo "=== pytest exit code: $? ==="
-          # 如果 pytest 失败，列出具体失败的测试
-          python -m pytest tests/ --co -q 2>&1 | tail -20
+          python -m pytest tests/ -v --tb=long --junitxml=pytest-results.xml
 
       # --- 步骤5: Schema 校验（对所有 fixtures 执行 validate_schema） ---
       - name: Schema validation

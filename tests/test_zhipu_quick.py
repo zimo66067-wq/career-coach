@@ -8,10 +8,17 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 
-from zhipuai import ZhipuAI
+try:
+    from zhipuai import ZhipuAI
+except ImportError:
+    import pytest
+    pytest.skip("zhipuai 包未安装，跳过智谱在线测试", allow_module_level=True)
 import match_requirements as mr
 
-API_KEY = "REMOVED-LEAKED-KEY"
+API_KEY = os.environ.get("ZHIPUAI_API_KEY", "")
+if not API_KEY:
+    import pytest
+    pytest.skip("未设置 ZHIPUAI_API_KEY，跳过智谱在线测试", allow_module_level=True)
 FIX = os.path.join(os.path.dirname(__file__), "fixtures-synthetic")
 
 def load_text(path):
