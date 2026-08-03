@@ -5,11 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>F4 能力报告 · 职跃AI</title>
 <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../css/tokens.css">
 <link rel="stylesheet" href="../css/main.css">
 <link rel="stylesheet" href="../css/states.css">
 </head>
 <body data-page="f4">
-<nav class="topnav">
+<a class="skip-link" href="#main">跳到主要内容</a>
+<nav class="topnav" aria-label="主导航">
   <span class="brand">职跃AI</span>
   <a class="nav" data-page="home" href="../index.html">首页</a>
   <a class="nav" data-page="f1" href="f1-resume.html">F1 简历诊断</a>
@@ -18,7 +20,7 @@
   <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
   <a class="nav" data-page="states" href="states.html">状态墙</a>
 </nav>
-<div class="wrap">
+<div class="wrap" id="main">
   <h1 class="page-title">F4 · 能力报告 + 七天竞争力情景推演</h1>
   <p class="page-sub">C0 = 0.25R + 0.35M + 0.40I ｜ 七天结果为公开假设下的情景区间，不是预测</p>
 
@@ -33,28 +35,34 @@
 
   <div data-state-view="processing">
     <div class="card">
-      <div class="spin-row"><span class="spinner"></span>正在聚合 R / M / I 并复算对齐…（报告 P95 ≤ 30 秒）</div>
-      <div class="skel h-lg" style="margin:14px 0"></div>
+      <div class="ai-status"><span class="ai-orb" aria-hidden="true"></span>AI 正在聚合 · 复算 R / M / I 对齐…（报告 P95 ≤ 30 秒）</div>
+      <div class="flow-line" aria-hidden="true"></div>
+      <div class="ai-stages" aria-label="AI 分析阶段">
+        <span class="ai-stage done">R/M/I 归集</span>
+        <span class="ai-stage on">六维聚合</span>
+        <span class="ai-stage">情景推演</span>
+      </div>
+      <div class="skel h-lg" style="margin:16px 0"></div>
       <div class="skel h-sm" style="width:70%"></div>
       <div class="skel h-sm" style="width:55%"></div>
     </div>
   </div>
 
   <div data-state-view="success">
-    <div class="card" style="display:flex;gap:28px;align-items:center;flex-wrap:wrap">
+    <div class="card" style="display:flex;gap:32px;align-items:center;flex-wrap:wrap">
       <div>
-        <div class="big-num">68.27</div>
-        <div style="color:var(--c-text-2);font-size:13px">C0 综合基线（证据覆盖指数，非录用概率）</div>
-        <div style="font-size:13px;margin-top:6px">R 73.00 × 0.25 ＋ M 60.00 × 0.35 ＋ I 72.55 × 0.40</div>
+        <div class="big-num" id="c0num">68.27</div>
+        <div style="color:var(--zy-ink-2);font-size:13px">C0 综合基线（证据覆盖指数，非录用概率）</div>
+        <div style="font-size:13px;margin-top:8px;color:var(--zy-ink-2)">R 73.00 × 0.25 ＋ M 60.00 × 0.35 ＋ I 72.55 × 0.40</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <h3 style="margin-bottom:8px">七天竞争力情景推演</h3>
+        <h3 style="margin-bottom:10px">七天竞争力情景推演</h3>
         <div class="range-band">
-          <span style="font-size:13px">77.79</span>
+          <span>77.79</span>
           <div class="bar"><div class="seg" style="left:68.27%;width:22.21%"></div></div>
-          <span style="font-size:13px">90.48</span>
+          <span>90.48</span>
         </div>
-        <div class="assump" style="margin-top:10px" id="assump"></div>
+        <div class="assump" style="margin-top:12px" id="assump"></div>
       </div>
     </div>
 
@@ -102,6 +110,7 @@
 <script src="../js/mock-data.js"></script>
 <script src="../js/app.js"></script>
 <script src="../js/radar.js"></script>
+<script src="../js/data-bridge.js"></script>
 <script>
 function renderPlan(elId, plan) {
   document.getElementById(elId).innerHTML = plan.map(function (p) {
@@ -110,11 +119,33 @@ function renderPlan(elId, plan) {
 }
 document.addEventListener("DOMContentLoaded", function () {
   var state = window.APP.getState();
-  var a = window.MOCK.ability;
+  // 主链路: 优先 DataBridge, MOCK 作为降级缓存
+  var DB = window.DataBridge;
+  function fetchSync(key) {
+    if (DB && DB.getMockData) { var d = DB.getMockData(key); if (d) return d; }
+    return window.MOCK ? window.MOCK[key] : null;
+  }
+  var a = fetchSync('ability');
   if (state === "success") {
     document.getElementById("assump").innerHTML = "<b>情景假设：</b>" + a.scenario_day7.assumptions.join("；");
     window.RADAR.mount("radar", a, false);
     renderPlan("planGrid", a.plan);
+    // C0 数字递增（真实基线值，减少动态时直接呈现终值）
+    var el = document.getElementById("c0num");
+    var target = a.baseline;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      el.textContent = target.toFixed(2);
+    } else {
+      var t0 = null, DUR = 900;
+      function step(ts) {
+        if (!t0) t0 = ts;
+        var k = Math.min(1, (ts - t0) / DUR);
+        var e = 1 - Math.pow(1 - k, 3); // easeOutCubic，与 token 曲线一致
+        el.textContent = (target * e).toFixed(2);
+        if (k < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
   } else if (state === "degraded") {
     window.RADAR.mount("radarFallback", a, true); // 强制表格降级演示
     renderPlan("planGridDegraded", a.plan);

@@ -5,17 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>F3 模拟面试 · 职跃AI</title>
 <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../css/tokens.css">
 <link rel="stylesheet" href="../css/main.css">
 <link rel="stylesheet" href="../css/states.css">
 <style>
-  /* 语音增强组件样式 */
+  /* 语音增强组件样式（配色已对齐职跃AI设计系统 v2） */
   .voice-bar {
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 14px 18px;
-    background: var(--c-bg-2, #f8f9fb);
-    border-radius: 12px;
+    background: var(--zy-surface-2, #fafbfc);
+    border: 1px solid var(--zy-line, rgba(22,30,52,.10));
+    border-radius: var(--zy-r-md, 12px);
     margin-top: 16px;
     flex-wrap: wrap;
   }
@@ -24,36 +26,37 @@
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    border: 2px solid var(--c-accent, #2563eb);
+    border: 2px solid var(--zy-primary, #2f5fe8);
     background: #fff;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all .2s;
+    transition: all var(--zy-d-fast, 160ms) var(--zy-ease, ease);
     flex-shrink: 0;
   }
-  .voice-bar .mic-btn:hover { background: var(--c-accent, #2563eb); }
+  .voice-bar .mic-btn:hover { background: var(--zy-primary, #2f5fe8); box-shadow: 0 6px 16px -6px rgba(47,107,255,.5); }
   .voice-bar .mic-btn:hover svg { stroke: #fff; }
+  .voice-bar .mic-btn:focus-visible { outline: none; box-shadow: var(--zy-shadow-focus, 0 0 0 3px rgba(47,107,255,.32)); }
   .voice-bar .mic-btn.recording {
-    background: #dc2626;
-    border-color: #dc2626;
+    background: var(--zy-missing, #d32424);
+    border-color: var(--zy-missing, #d32424);
     animation: mic-pulse 1.5s ease-in-out infinite;
   }
   .voice-bar .mic-btn.recording svg { stroke: #fff; }
   .voice-bar .mic-btn.disabled {
     opacity: .4;
     cursor: not-allowed;
-    border-color: var(--c-text-2, #6b7280);
+    border-color: var(--zy-ink-3, #68707e);
   }
   @keyframes mic-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,.4); }
-    50% { box-shadow: 0 0 0 10px rgba(220,38,38,0); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(211,36,36,.35); }
+    50% { box-shadow: 0 0 0 10px rgba(211,36,36,0); }
   }
   .voice-bar .mic-btn svg {
     width: 24px;
     height: 24px;
-    stroke: var(--c-accent, #2563eb);
+    stroke: var(--zy-primary, #2f5fe8);
     transition: stroke .2s;
   }
   .voice-bar .tts-toggle {
@@ -62,22 +65,22 @@
     gap: 6px;
     cursor: pointer;
     font-size: 14px;
-    color: var(--c-text-1, #374151);
+    color: var(--zy-ink, #1b1e26);
     user-select: none;
   }
-  .voice-bar .tts-toggle input { cursor: pointer; }
+  .voice-bar .tts-toggle input { cursor: pointer; accent-color: var(--zy-primary, #2f5fe8); }
   .voice-indicator {
     font-size: 13px;
-    color: var(--c-text-2, #6b7280);
+    color: var(--zy-ink-3, #68707e);
     padding: 4px 10px;
     border-radius: 6px;
     background: transparent;
     transition: all .2s;
   }
-  .voice-indicator.listening { color: #dc2626; background: rgba(220,38,38,.08); }
-  .voice-indicator.speaking { color: #2563eb; background: rgba(37,99,235,.08); }
-  .voice-indicator.fallback { color: #d97706; background: rgba(217,119,6,.08); }
-  .voice-indicator.error { color: #dc2626; background: rgba(220,38,38,.08); }
+  .voice-indicator.listening { color: var(--zy-missing, #d32424); background: rgba(211,36,36,.08); }
+  .voice-indicator.speaking { color: var(--zy-primary, #2f5fe8); background: rgba(47,107,255,.08); }
+  .voice-indicator.fallback { color: var(--zy-weak, #b45309); background: rgba(180,83,9,.08); }
+  .voice-indicator.error { color: var(--zy-missing, #d32424); background: rgba(211,36,36,.08); }
   .voice-bar .spacer { flex: 1; }
 
   /* 文字回退输入区 */
@@ -85,14 +88,14 @@
     display: none;
     margin-top: 12px;
     padding: 16px;
-    background: #fffbeb;
-    border: 1px solid #fcd34d;
-    border-radius: 12px;
+    background: var(--zy-weak-bg, #fdf3e0);
+    border: 1px solid rgba(180,83,9,.28);
+    border-radius: var(--zy-r-md, 12px);
   }
   .voice-fallback-area label {
     display: block;
     font-size: 13px;
-    color: #92400e;
+    color: var(--zy-weak, #b45309);
     margin-bottom: 8px;
     font-weight: 600;
   }
@@ -100,18 +103,19 @@
     width: 100%;
     min-height: 100px;
     padding: 10px 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
+    border: 1px solid var(--zy-line-2, rgba(22,30,52,.16));
+    border-radius: var(--zy-r-sm, 8px);
     font-size: 14px;
     line-height: 1.6;
     resize: vertical;
     font-family: inherit;
     box-sizing: border-box;
+    background: #fff;
   }
   .voice-fallback-area textarea:focus {
     outline: none;
-    border-color: var(--c-accent, #2563eb);
-    box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    border-color: var(--zy-primary, #2f5fe8);
+    box-shadow: var(--zy-shadow-focus, 0 0 0 3px rgba(47,107,255,.32));
   }
   .voice-fallback-area .actions {
     margin-top: 10px;
@@ -120,13 +124,17 @@
   }
   .voice-fallback-area .draft-hint {
     font-size: 12px;
-    color: #92400e;
+    color: var(--zy-weak, #b45309);
     margin-top: 6px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .voice-bar .mic-btn.recording { animation: none; }
   }
 </style>
 </head>
 <body data-page="f3">
-<nav class="topnav">
+<a class="skip-link" href="#main">跳到主要内容</a>
+<nav class="topnav" aria-label="主导航">
   <span class="brand">职跃AI</span>
   <a class="nav" data-page="home" href="../index.html">首页</a>
   <a class="nav" data-page="f1" href="f1-resume.html">F1 简历诊断</a>
@@ -135,7 +143,7 @@
   <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
   <a class="nav" data-page="states" href="states.html">状态墙</a>
 </nav>
-<div class="wrap">
+<div class="wrap" id="main">
   <h1 class="page-title">F3 · AI 模拟面试（文字主链路）</h1>
   <p class="page-sub">最多 5 个主问题，每题最多 1 次追问 ｜ 追问必须引用你的上轮回答或指出 STAR 缺失项</p>
 
@@ -144,29 +152,44 @@
       <div class="art"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
       <h3>准备开始模拟面试</h3>
       <p>基于你的简历与目标 JD 出题；语音为增强链路（按键说话），文字是等价稳定主链路</p>
+      <div class="ai-status" style="justify-content:center;margin-bottom:18px" aria-hidden="true">
+        <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span style="font-size:12px;color:var(--zy-ink-3)">语音链路待命</span>
+      </div>
       <span class="btn">开始面试</span> <span class="btn ghost">启用语音（增强）</span>
     </div>
   </div>
 
   <div data-state-view="processing">
     <div class="card">
-      <div class="spin-row"><span class="spinner"></span>面试官正在基于你的上轮回答生成追问…（首响应 P95 ≤ 8 秒）</div>
-      <div class="skel h-md" style="margin:12px 0;width:70%"></div>
-      <div class="skel h-md" style="margin:12px 0;width:55%;margin-left:auto"></div>
+      <div class="ai-status"><span class="ai-orb" aria-hidden="true"></span>面试官正在思考 · 基于你的上轮回答生成追问…（首响应 P95 ≤ 8 秒）</div>
+      <div class="flow-line" aria-hidden="true"></div>
+      <div class="ai-stages" aria-label="AI 分析阶段">
+        <span class="ai-stage done">回答解析</span>
+        <span class="ai-stage on">STAR 要素核对</span>
+        <span class="ai-stage">追问生成</span>
+      </div>
+      <div class="skel h-md" style="margin:14px 0;width:70%"></div>
+      <div class="skel h-md" style="margin:14px 0;width:55%;margin-left:auto"></div>
     </div>
   </div>
 
   <div data-state-view="success">
     <div class="card">
+      <div class="ai-status" style="margin-bottom:16px" aria-label="面试官在线">
+        <span class="ai-orb" aria-hidden="true"></span>
+        <span style="font-weight:600;color:var(--zy-ink)">面试官在线</span>
+        <span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      </div>
       <h3>面试记录（3 轮节选）与即时评估</h3>
       <div id="turns"></div>
-      <div style="text-align:center;margin-top:8px"><span class="btn ghost">继续第 4 题</span></div>
+      <div style="text-align:center;margin-top:10px"><span class="btn ghost">继续第 4 题</span></div>
     </div>
 
     <!-- 语音增强工具栏 -->
     <div class="card">
       <h3>语音增强（可选）</h3>
-      <p style="font-size:13px;color:var(--c-text-2);margin-bottom:10px">语音为增强链路，文字是等价稳定主链路。语音故障时自动切文字输入。</p>
+      <p style="font-size:13px;color:var(--zy-ink-2);margin-bottom:10px">语音为增强链路，文字是等价稳定主链路。语音故障时自动切文字输入。</p>
       <div class="voice-bar">
         <button class="mic-btn" id="micBtn" title="按住说话（松开提交）">
           <svg fill="none" stroke-width="2" viewBox="0 0 24 24">
@@ -243,18 +266,18 @@ document.addEventListener("DOMContentLoaded", function () {
   interviews.forEach(function (t) {
     html += '<div class="bubble q"><div class="who">面试官 · 第' + t.turn_id + "题（考察：" + t.targets.join(" / ") + "）</div>" + t.question + "</div>";
     html += '<div class="bubble a"><div class="who">你</div>' + t.answer + "</div>";
-    html += '<div class="card" style="margin:4px 0 18px;background:#fbfcfe"><div style="font-size:13px">';
-    html += '<b>评估依据（引用原文）：</b><div class="quote-block">"' + t.answer_quote + '"</div>';
+    html += '<div class="card" style="margin:4px 0 20px;background:var(--zy-surface-2)"><div style="font-size:13px">';
+    html += '<b>评估依据（引用原文）：</b><div class="quote-block">“' + t.answer_quote + '”</div>';
     if (t.missing_elements.length) {
       html += "<b>STAR 缺口：</b>" + t.missing_elements.map(function (m) { return '<span class="chip">' + (star[m] || m) + "</span>"; }).join("") + "<br>";
     } else {
       html += "<b>STAR 缺口：</b><span class=\"chip\">无</span><br>";
     }
     if (t.follow_up) {
-      html += '<div class="followup"><b>追问：</b>' + t.follow_up.question + '<br><span style="color:var(--c-text-2)">追问理由：' + t.follow_up.reason + "</span></div>";
+      html += '<div class="followup"><b>追问：</b>' + t.follow_up.question + '<br><span style="color:var(--zy-ink-2)">追问理由：' + t.follow_up.reason + "</span></div>";
     }
     var ss = t.subscores;
-    html += '<div style="margin-top:8px;color:var(--c-text-2)">结构 ' + ss.structure + " | 相关 " + ss.relevance + " | 具体 " + ss.specificity + " | 追问适应 " + ss.followup_adaptation + " | 清晰 " + ss.clarity + "</div>";
+    html += '<div style="margin-top:10px;color:var(--zy-ink-2)">结构 ' + ss.structure + " ｜ 相关 " + ss.relevance + " ｜ 具体 " + ss.specificity + " ｜ 追问适应 " + ss.followup_adaptation + " ｜ 清晰 " + ss.clarity + "</div>";
     html += "</div></div>";
   });
   document.getElementById("turns").innerHTML = html;

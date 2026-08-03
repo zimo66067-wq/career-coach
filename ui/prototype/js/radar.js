@@ -21,22 +21,32 @@
   }
 
   function renderChart(container, dims, baseline, low, high) {
+    var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     var option = {
+      animation: !reduced,
+      animationDuration: 900,
+      animationEasing: "cubicOut",
       tooltip: {},
-      legend: { bottom: 0, data: ["C0 基线", "七天推演 low", "七天推演 high"] },
+      legend: { bottom: 0, data: ["C0 基线", "七天推演 low", "七天推演 high"],
+        textStyle: { color: "#4d5566", fontSize: 12 } },
       radar: {
         indicator: dims.map(function (d) { return { name: d.name, max: 100 }; }),
-        radius: "62%"
+        radius: "62%",
+        axisName: { color: "#4d5566", fontSize: 12.5 },
+        splitLine: { lineStyle: { color: "rgba(22,30,52,.10)" } },
+        splitArea: { areaStyle: { color: ["#ffffff", "#fafbfc"] } },
+        axisLine: { lineStyle: { color: "rgba(22,30,52,.12)" } }
       },
       series: [{
         type: "radar",
         data: [
           { value: dims.map(function (d) { return d.score; }), name: "C0 基线",
-            areaStyle: { opacity: 0.25 }, lineStyle: { color: "#2563eb" }, itemStyle: { color: "#2563eb" } },
+            areaStyle: { color: "rgba(47,107,255,.16)" },
+            lineStyle: { color: "#2f5fe8", width: 2 }, itemStyle: { color: "#2f5fe8" } },
           { value: dims.map(function (d) { return Math.min(100, d.score * (low / baseline)); }), name: "七天推演 low",
-            lineStyle: { color: "#93c5fd", type: "dashed" }, itemStyle: { color: "#93c5fd" } },
+            lineStyle: { color: "#8fabf5", type: "dashed" }, itemStyle: { color: "#8fabf5" } },
           { value: dims.map(function (d) { return Math.min(100, d.score * (high / baseline)); }), name: "七天推演 high",
-            lineStyle: { color: "#16a34a", type: "dashed" }, itemStyle: { color: "#16a34a" } }
+            lineStyle: { color: "#15803d", type: "dashed" }, itemStyle: { color: "#15803d" } }
         ]
       }]
     };

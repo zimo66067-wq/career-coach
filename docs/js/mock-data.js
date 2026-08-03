@@ -40,29 +40,29 @@ pii_removed:true`,
     score_R: 73.0,
     subscores: {
       structure: { score: 80, label: "结构完整度", rationale: "教育/实习/项目/技能版块齐全，结构完整",
-        quote: "实习经历" },
+        source_spans: [{doc:"resume", quote:"实习经历", start:304, end:308}] },
       clarity: { score: 75, label: "表达清晰度", rationale: "表达具体，含协作与规范意识",
-        quote: "编写接口文档并推动联调，与前端约定统一的错误码规范" },
+        source_spans: [{doc:"resume", quote:"编写接口文档并推动联调，与前端约定统一的错误码规范", start:405, end:434}] },
       achievement_evidence: { score: 60, label: "成果证据", rationale: "有量化成果但数量偏少",
-        quote: "将订单列表接口的平均响应时间从 800ms 优化到 220ms，通过给 MySQL 加复合索引和引入 Redis 缓存实现" },
+        source_spans: [{doc:"resume", quote:"将订单列表接口的平均响应时间从 800ms 优化到 220ms，通过给 MySQL 加复合索引和引入 Redis 缓存实现", start:332, end:403}] },
       skill_evidence: { score: 70, label: "技能证据", rationale: "技能与岗位匹配但中间件深度待证",
-        quote: "语言：Go（熟练）、Java（熟练）、Python（了解）" },
+        source_spans: [{doc:"resume", quote:"语言：Go（熟练）、Java（熟练）、Python（了解）", start:508, end:532}] },
       ats_readability: { score: 85, label: "ATS可读性", rationale: "纯文本结构清晰，ATS 可解析",
-        quote: "技能清单" }
+        source_spans: [{doc:"resume", quote:"技能清单", start:496, end:500}] }
     },
     suggestions: [
       { id: "S1", severity: "P1", issue: "自我评价偏主观，缺少事实支撑",
         suggestion: "将自我评价改写为可验证陈述，补充源码阅读或文档实践的具体例子",
         rewrite_draft: "独立完成订单查询接口开发并推动联调，习惯以官方文档为准排查问题",
-        quote: "学习能力强，习惯阅读官方文档和源码，能够在指导下独立完成模块开发。" },
+        source_spans: [{doc:"resume", quote:"学习能力强，习惯阅读官方文档和源码，能够在指导下独立完成模块开发。", start:534, end:570}] },
       { id: "S2", severity: "P0", issue: "成果证据仅一处量化，其余经历缺少数字",
         suggestion: "为分布式锁项目补充量化结果口径，无法确认的数字用占位格式",
         rewrite_draft: "库存扣减方案支撑秒杀场景，峰值 QPS 待用户核实：约X",
-        quote: "参与设计库存扣减的分布式锁方案，使用 Redisson 解决了超卖问题，上线后超卖投诉降为 0" },
+        source_spans: [{doc:"resume", quote:"参与设计库存扣减的分布式锁方案，使用 Redisson 解决了超卖问题，上线后超卖投诉降为 0", start:370, end:404}] },
       { id: "S3", severity: "P2", issue: "课程项目缺少团队规模与本人分工说明",
         suggestion: "标注独立开发或团队角色，避免面试追问时表述含糊",
         rewrite_draft: "独立完成后端全部开发（1 人），设计 12 张数据表",
-        quote: "独立完成后端全部开发，使用 Spring Boot + MyBatis，设计了 12 张数据表" }
+        source_spans: [{doc:"resume", quote:"独立完成后端全部开发，使用 Spring Boot + MyBatis，设计了 12 张数据表", start:445, end:490}] }
     ]
   },
 

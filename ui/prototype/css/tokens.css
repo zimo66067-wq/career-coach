@@ -1,0 +1,71 @@
+/* ============================================================
+   tokens.css · 职跃AI 全局设计变量（Design Tokens v2）
+   视觉语言：温润近白 + 深石墨 + 低饱和冷灰 + 电光蓝→靛青 AI 强调色
+   原则：克制留白 / 精密排版 / 发丝线 / 柔和漫反射 / 自然物理动效
+   说明：本文件只做"新增"，main.css / states.css 中的旧变量继续生效，
+        所有 DOM ID / class / data-* 契约保持不变。
+   ============================================================ */
+:root {
+  /* ---- 色彩 · 基底 ---- */
+  --zy-bg: #f7f6f4;                 /* 温润近白 */
+  --zy-bg-cool: #f4f6f9;            /* 冷灰层次（次级区块） */
+  --zy-surface: #ffffff;
+  --zy-surface-2: #fafbfc;
+  --zy-ink: #1b1e26;                /* 深石墨正文 */
+  --zy-ink-2: #4d5566;              /* 次级文字（白底对比度 ≈7.0:1，AA） */
+  --zy-ink-3: #68707e;              /* 说明文字（白底对比度 ≈4.8:1，AA） */
+  --zy-line: rgba(22, 30, 52, .10); /* 发丝线 */
+  --zy-line-2: rgba(22, 30, 52, .16);
+
+  /* ---- 色彩 · AI 强调 ---- */
+  --zy-primary: #2f5fe8;            /* 电光蓝（白字对比度 ≈6.2:1，AA） */
+  --zy-primary-deep: #2549c2;
+  --zy-indigo: #4f46e5;             /* 靛青 */
+  --zy-grad-ai: linear-gradient(135deg, #2f6bff 0%, #4f46e5 100%);
+  --zy-grad-ai-soft: linear-gradient(135deg, rgba(47,107,255,.10), rgba(79,70,229,.10));
+  --zy-primary-soft: #eef2ff;
+  --zy-glow: rgba(47, 107, 255, .28);
+
+  /* ---- 色彩 · 语义（四态判定 / 优先级，白底均 ≥4.5:1） ---- */
+  --zy-covered: #15803d;  --zy-covered-bg: #e8f6ee;
+  --zy-weak: #b45309;     --zy-weak-bg: #fdf3e0;
+  --zy-missing: #d32424;  --zy-missing-bg: #fdecec;
+  --zy-unknown: #5b6472;  --zy-unknown-bg: #eef0f3;
+  --zy-info: #0369a1;     --zy-info-bg: #e3f2fc;
+  --zy-degraded: #92580a; --zy-degraded-bg: #fdf6e3;
+  --zy-error-bg: #fdecec;
+
+  /* ---- 字体与排版 ---- */
+  --zy-font: -apple-system, BlinkMacSystemFont, "SF Pro SC", "PingFang SC",
+             "Microsoft YaHei", "Segoe UI", "Helvetica Neue", sans-serif;
+  --zy-font-num: "SF Pro Display", -apple-system, "Helvetica Neue", "Segoe UI",
+                 "PingFang SC", "Microsoft YaHei", sans-serif;
+  --zy-fs-display: clamp(30px, 4.6vw, 44px);
+  --zy-fs-h1: 24px;
+  --zy-fs-h3: 16px;
+  --zy-fs-body: 14px;
+  --zy-fs-cap: 12.5px;
+  --zy-lh: 1.65;
+  --zy-ls-title: -0.012em;          /* 标题收紧 */
+  --zy-ls-body: .012em;             /* 中文正文微呼吸 */
+
+  /* ---- 间距（4pt 基准） ---- */
+  --zy-s1: 4px;  --zy-s2: 8px;  --zy-s3: 12px; --zy-s4: 16px;
+  --zy-s5: 24px; --zy-s6: 32px; --zy-s7: 48px; --zy-s8: 64px;
+
+  /* ---- 圆角（克制曲线） ---- */
+  --zy-r-sm: 8px; --zy-r-md: 12px; --zy-r-lg: 16px; --zy-r-xl: 22px; --zy-r-pill: 999px;
+
+  /* ---- 阴影（柔和漫反射） ---- */
+  --zy-shadow-1: 0 1px 2px rgba(16, 24, 40, .05);
+  --zy-shadow-2: 0 6px 24px -8px rgba(16, 24, 40, .10);
+  --zy-shadow-3: 0 14px 36px -10px rgba(31, 56, 140, .16);
+  --zy-shadow-focus: 0 0 0 3px rgba(47, 107, 255, .32);
+
+  /* ---- 动效（自然物理感） ---- */
+  --zy-ease: cubic-bezier(.22, .61, .36, 1);
+  --zy-ease-spring: cubic-bezier(.34, 1.38, .44, 1);
+  --zy-d-fast: 160ms;
+  --zy-d-mid: 260ms;
+  --zy-d-slow: 480ms;
+}

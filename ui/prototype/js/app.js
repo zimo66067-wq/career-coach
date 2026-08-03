@@ -19,9 +19,12 @@
     var cur = getState();
     var fab = document.createElement("div");
     fab.className = "state-fab";
+    fab.setAttribute("role", "group");
+    fab.setAttribute("aria-label", "界面状态演示切换器");
     var html = '<div class="t">界面状态演示</div>';
     STATES.forEach(function (s) {
-      html += '<a href="javascript:void(0)" data-s="' + s + '"' + (s === cur ? ' class="cur"' : "") + ">" + LABELS[s] + "</a>";
+      html += '<a href="javascript:void(0)" data-s="' + s + '" aria-label="切换到' + LABELS[s] + '状态"' +
+        (s === cur ? ' class="cur" aria-current="true"' : "") + ">" + LABELS[s] + "</a>";
     });
     fab.innerHTML = html;
     fab.addEventListener("click", function (e) {
