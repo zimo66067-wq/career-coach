@@ -1,0 +1,84 @@
+{
+  "backend": "bm25",
+  "degraded": false,
+  "note": "简化匹配（本地 BM25）",
+  "thresholds": {
+    "covered": 0.55,
+    "weak": 0.3,
+    "unknown": 0.12
+  },
+  "results": [
+    {
+      "id": "J1",
+      "type": "hard",
+      "text": "本科及以上学历，计算机相关专业",
+      "status": "weak",
+      "confidence": 0.514,
+      "evidence": "2019.09-2023.06 某某大学 计算机科学与技术 本科"
+    },
+    {
+      "id": "J2",
+      "type": "hard",
+      "text": "熟悉 Go 或 Java 至少一门语言并有项目经验",
+      "status": "weak",
+      "confidence": 0.529,
+      "evidence": "语言：Go（熟练）、Java（熟练）、Python（了解）"
+    },
+    {
+      "id": "J3",
+      "type": "hard",
+      "text": "熟悉 MySQL 索引优化与慢查询分析",
+      "status": "covered",
+      "confidence": 0.692,
+      "evidence": "将订单列表接口的平均响应时间从 800ms 优化到 220ms，通过给 MySQL 加复合索引和引入 Redis 缓存实现"
+    },
+    {
+      "id": "J4",
+      "type": "hard",
+      "text": "了解 Redis 缓存使用场景",
+      "status": "covered",
+      "confidence": 0.7,
+      "evidence": "中间件：MySQL、Redis、RabbitMQ、Kafka（了解）"
+    },
+    {
+      "id": "R1",
+      "type": "responsibility",
+      "text": "参与订单、库存核心链路接口开发",
+      "status": "covered",
+      "confidence": 0.707,
+      "evidence": "负责订单中心微服务开发，使用 Go 语言和 Gin 框架实现订单查询接口"
+    },
+    {
+      "id": "R2",
+      "type": "responsibility",
+      "text": "编写单元测试保证代码质量",
+      "status": "weak",
+      "confidence": 0.375,
+      "evidence": "编写接口文档并推动联调，与前端约定统一的错误码规范"
+    },
+    {
+      "id": "P1",
+      "type": "preferred",
+      "text": "分布式锁/分布式事务实践经验",
+      "status": "covered",
+      "confidence": 0.63,
+      "evidence": "参与设计库存扣减的分布式锁方案，使用 Redisson 解决了超卖问题，上线后超卖投诉降为 0"
+    },
+    {
+      "id": "T1",
+      "type": "terminology",
+      "text": "Go",
+      "status": "covered",
+      "confidence": 1.0,
+      "evidence": "语言：Go（熟练）、Java（熟练）、Python（了解）"
+    },
+    {
+      "id": "T2",
+      "type": "terminology",
+      "text": "消息队列 RabbitMQ/Kafka",
+      "status": "covered",
+      "confidence": 0.75,
+      "evidence": "中间件：MySQL、Redis、RabbitMQ、Kafka（了解）"
+    }
+  ]
+}

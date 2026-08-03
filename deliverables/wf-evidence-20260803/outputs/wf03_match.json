@@ -1,0 +1,108 @@
+{
+  "backend": "bm25",
+  "degraded": false,
+  "note": "简化匹配（本地 BM25）",
+  "thresholds": {
+    "covered": 0.55,
+    "weak": 0.3,
+    "unknown": 0.12
+  },
+  "results": [
+    {
+      "id": "L1",
+      "type": "hard",
+      "text": "本科及以上学历，计算机相关专业；",
+      "status": "weak",
+      "confidence": 0.514,
+      "evidence": "2019.09-2023.06 某某大学 计算机科学与技术 本科"
+    },
+    {
+      "id": "L2",
+      "type": "hard",
+      "text": "熟悉 Go 或 Java 至少一门语言，有实际项目经验；",
+      "status": "weak",
+      "confidence": 0.5,
+      "evidence": "语言：Go（熟练）、Java（熟练）、Python（了解）"
+    },
+    {
+      "id": "L3",
+      "type": "hard",
+      "text": "熟悉 MySQL，了解索引优化和慢查询分析；",
+      "status": "covered",
+      "confidence": 0.72,
+      "evidence": "中间件：MySQL、Redis、RabbitMQ、Kafka（了解）"
+    },
+    {
+      "id": "L4",
+      "type": "hard",
+      "text": "了解 Redis 等缓存中间件的使用场景；",
+      "status": "covered",
+      "confidence": 0.707,
+      "evidence": "中间件：MySQL、Redis、RabbitMQ、Kafka（了解）"
+    },
+    {
+      "id": "L5",
+      "type": "hard",
+      "text": "了解消息队列（RabbitMQ/Kafka）的基本原理；",
+      "status": "covered",
+      "confidence": 0.831,
+      "evidence": "中间件：MySQL、Redis、RabbitMQ、Kafka（了解）"
+    },
+    {
+      "id": "L6",
+      "type": "hard",
+      "text": "具备良好的沟通能力和文档习惯。",
+      "status": "covered",
+      "confidence": 0.643,
+      "evidence": "学习能力强，习惯阅读官方文档和源码，能够在指导下独立完成模块开发"
+    },
+    {
+      "id": "L7",
+      "type": "responsibility",
+      "text": "参与订单、库存等核心链路的接口开发；",
+      "status": "covered",
+      "confidence": 0.675,
+      "evidence": "负责订单中心微服务开发，使用 Go 语言和 Gin 框架实现订单查询接口"
+    },
+    {
+      "id": "L8",
+      "type": "responsibility",
+      "text": "编写单元测试，保证代码质量；",
+      "status": "weak",
+      "confidence": 0.375,
+      "evidence": "编写接口文档并推动联调，与前端约定统一的错误码规范"
+    },
+    {
+      "id": "L9",
+      "type": "responsibility",
+      "text": "参与线上问题排查与复盘。",
+      "status": "covered",
+      "confidence": 0.72,
+      "evidence": "参与设计库存扣减的分布式锁方案，使用 Redisson 解决了超卖问题，上线后超卖投诉降为 0"
+    },
+    {
+      "id": "L10",
+      "type": "preferred",
+      "text": "有分布式锁、分布式事务实践经验者优先；",
+      "status": "weak",
+      "confidence": 0.514,
+      "evidence": "参与设计库存扣减的分布式锁方案，使用 Redisson 解决了超卖问题，上线后超卖投诉降为 0"
+    },
+    {
+      "id": "L11",
+      "type": "preferred",
+      "text": "有开源项目贡献或技术博客者优先。",
+      "status": "weak",
+      "confidence": 0.42,
+      "evidence": "2019.09-2023.06 某某大学 计算机科学与技术 本科"
+    },
+    {
+      "id": "L12",
+      "type": "terminology",
+      "text": "Go、Java、MySQL、Redis、RabbitMQ、Docker、Kubernetes、gRPC",
+      "status": "covered",
+      "confidence": 0.675,
+      "evidence": "中间件：MySQL、Redis、RabbitMQ、Kafka（了解）"
+    }
+  ]
+}

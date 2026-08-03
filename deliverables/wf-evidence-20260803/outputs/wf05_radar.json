@@ -1,0 +1,103 @@
+{
+  "tooltip": {},
+  "legend": {
+    "bottom": 0,
+    "data": [
+      "C0 基线",
+      "七天推演 low",
+      "七天推演 high"
+    ]
+  },
+  "radar": {
+    "indicator": [
+      {
+        "name": "岗位契合",
+        "max": 100
+      },
+      {
+        "name": "成果证据",
+        "max": 100
+      },
+      {
+        "name": "专业表达",
+        "max": 100
+      },
+      {
+        "name": "结构化回答",
+        "max": 100
+      },
+      {
+        "name": "岗位深度",
+        "max": 100
+      },
+      {
+        "name": "追问适应",
+        "max": 100
+      }
+    ],
+    "radius": "62%"
+  },
+  "series": [
+    {
+      "type": "radar",
+      "data": [
+        {
+          "value": [
+            60.0,
+            60.0,
+            75.0,
+            70.0,
+            65.0,
+            75.0
+          ],
+          "name": "C0 基线",
+          "areaStyle": {
+            "opacity": 0.25
+          },
+          "lineStyle": {
+            "color": "#2563eb"
+          },
+          "itemStyle": {
+            "color": "#2563eb"
+          }
+        },
+        {
+          "value": [
+            68.37,
+            68.37,
+            85.46,
+            79.76,
+            74.06,
+            85.46
+          ],
+          "name": "七天推演 low",
+          "lineStyle": {
+            "color": "#93c5fd",
+            "type": "dashed"
+          },
+          "itemStyle": {
+            "color": "#93c5fd"
+          }
+        },
+        {
+          "value": [
+            79.52,
+            79.52,
+            99.4,
+            92.77,
+            86.15,
+            99.4
+          ],
+          "name": "七天推演 high",
+          "lineStyle": {
+            "color": "#16a34a",
+            "type": "dashed"
+          },
+          "itemStyle": {
+            "color": "#16a34a"
+          }
+        }
+      ]
+    }
+  ]
+}

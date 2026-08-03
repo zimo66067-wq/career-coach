@@ -1,0 +1,21 @@
+{
+  "R": 73.0,
+  "M": 60.0,
+  "I": 72.55,
+  "M_categories": {
+    "hard": 50.0,
+    "responsibility": 100.0,
+    "preferred": 0.0,
+    "terminology": 100.0
+  },
+  "C0": 68.27,
+  "C7_low": 77.79,
+  "C7_high": 90.48
+}
+[rescore] 对拍 R: 复算=73.00 期望=73.00 diff=0.00
+[rescore] 对拍 M: 复算=60.00 期望=60.00 diff=0.00
+[rescore] 对拍 I: 复算=72.55 期望=72.55 diff=0.00
+[rescore] 对拍 C0: 复算=68.27 期望=68.27 diff=0.00
+[rescore] 对拍 C7_low: 复算=77.79 期望=77.79 diff=0.00
+[rescore] 对拍 C7_high: 复算=90.48 期望=90.48 diff=0.00
+[rescore] PASS（tolerance=0.50）

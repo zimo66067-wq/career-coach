@@ -1,0 +1,122 @@
+{
+  "p0-05_link_check": {
+    "date": "2026-08-03T08:39:24.302852",
+    "summary": {
+      "total": 9,
+      "reachable": 6,
+      "needs_auth": 1,
+      "head_mismatch": 4,
+      "unreachable": 3
+    },
+    "results": [
+      {
+        "url": "https://qianfan.baidubce.com/v2",
+        "source": "model_router.py",
+        "note": "千帆 API Base URL",
+        "http_code": "404",
+        "reason": "Not Found",
+        "elapsed_s": 0.45,
+        "reachable": false,
+        "needs_auth": false,
+        "head_mismatch": true,
+        "method": "GET"
+      },
+      {
+        "url": "https://aip.baidubce.com/oauth/2.0/token",
+        "source": "match_requirements.py",
+        "note": "千帆 OAuth 鉴权",
+        "http_code": "400",
+        "reason": "Bad Request",
+        "elapsed_s": 0.22,
+        "reachable": false,
+        "needs_auth": false,
+        "head_mismatch": true,
+        "method": "GET"
+      },
+      {
+        "url": "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenniu/embedding_v1",
+        "source": "match_requirements.py",
+        "note": "旧版千帆 embedding",
+        "http_code": "200",
+        "reason": "OK",
+        "elapsed_s": 0.11,
+        "reachable": true,
+        "needs_auth": false,
+        "head_mismatch": false,
+        "method": "HEAD"
+      },
+      {
+        "url": "https://qianfan.baidubce.com/v2/embeddings",
+        "source": "test_qianfan_embedding.py",
+        "note": "新版千帆 embedding-v1",
+        "http_code": "404",
+        "reason": "Not Found",
+        "elapsed_s": 0.29,
+        "reachable": false,
+        "needs_auth": false,
+        "head_mismatch": true,
+        "method": "GET"
+      },
+      {
+        "url": "https://qianfan.baidubce.com/v2/chat/completions",
+        "source": "test_new_tools.py",
+        "note": "千帆 Chat Completions",
+        "http_code": "401",
+        "reason": "Unauthorized",
+        "elapsed_s": 0.33,
+        "reachable": true,
+        "needs_auth": true,
+        "head_mismatch": true,
+        "method": "GET"
+      },
+      {
+        "url": "https://api.jina.ai/v1/embeddings",
+        "source": "test_embedding_comprehensive.py",
+        "note": "Jina AI 备选 embedding",
+        "http_code": "403",
+        "reason": "Forbidden",
+        "elapsed_s": 1.66,
+        "reachable": true,
+        "needs_auth": false,
+        "head_mismatch": false,
+        "method": "HEAD"
+      },
+      {
+        "url": "https://dumate.baidu.com/asr",
+        "source": "voice_handler.py",
+        "note": "DuMate ASR 接口",
+        "http_code": "200",
+        "reason": "OK",
+        "elapsed_s": 0.89,
+        "reachable": true,
+        "needs_auth": false,
+        "head_mismatch": false,
+        "method": "HEAD"
+      },
+      {
+        "url": "https://open.bigmodel.cn/",
+        "source": "MEMORY.md",
+        "note": "智谱 AI 开放平台",
+        "http_code": "200",
+        "reason": "OK",
+        "elapsed_s": 0.2,
+        "reachable": true,
+        "needs_auth": false,
+        "head_mismatch": false,
+        "method": "HEAD"
+      },
+      {
+        "url": "https://jina.ai/embeddings/",
+        "source": "test_embedding_comprehensive.py",
+        "note": "Jina AI Embedding 文档",
+        "http_code": "403",
+        "reason": "Forbidden",
+        "elapsed_s": 2.26,
+        "reachable": true,
+        "needs_auth": false,
+        "head_mismatch": false,
+        "method": "HEAD"
+      }
+    ]
+  }
+}

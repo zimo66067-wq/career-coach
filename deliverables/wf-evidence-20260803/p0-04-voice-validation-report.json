@@ -1,0 +1,104 @@
+{
+  "p0-04_voice_validation": {
+    "date": "2026-08-03T08:42:38.628569",
+    "summary": {
+      "total": 18,
+      "passed": 18,
+      "failed": 0,
+      "pass_rate": "18/18 (100%)"
+    },
+    "results": [
+      {
+        "name": "voice_handler.py 可导入",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "VoiceHandler 实例化",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "start_asr 调用",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "10秒回退计时器启动",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "check_confidence(0.85) 通过",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "check_confidence(0.60) 拒绝",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "高置信度后计时器停止",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "文字回退方案",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "handle_error 降级",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "cancel 取消",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "TTS错误不阻断主链路",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "voice.js 存在",
+        "status": "PASS",
+        "detail": "(10937 bytes)"
+      },
+      {
+        "name": "voice.js UI集成",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "voice.js Web Speech API",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "voice.js speechSynthesis",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "voice.js ASR回调",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "voice.js TTS回调",
+        "status": "PASS",
+        "detail": ""
+      },
+      {
+        "name": "voice.js 降级路径",
+        "status": "PASS",
+        "detail": ""
+      }
+    ],
+    "note": "降级验证：无法实际调用麦克风(环境无音频设备)，验证代码契约 + UI集成"
+  }
+}

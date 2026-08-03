@@ -189,7 +189,7 @@ class VoiceHandler:
     # 计时器
     # ================================================================ #
 
-    def _start_timer(self, turn_id):
+    def _start_timer(self, turn_id, on_timeout=None):
         """10秒回退计时器。
 
         ASR 启动后开始计时，超时自动标记需要回退。
