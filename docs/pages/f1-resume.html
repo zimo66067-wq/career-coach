@@ -25,11 +25,18 @@
 
   <!-- 空态 -->
   <div data-state-view="empty">
-    <div class="card empty-state">
-      <div class="art"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></div>
-      <h3>上传或粘贴你的简历</h3>
-      <p>支持 PDF / DOCX / TXT；文件经过去标识化处理后才进入分析</p>
-      <span class="btn">选择文件</span> <span class="btn ghost">直接粘贴文本</span>
+    <div class="card empty-state resume-upload-card" id="resumeUploadCard">
+      <input class="visually-hidden" id="resumeFileInput" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain">
+      <div class="resume-dropzone" id="resumeDropzone" role="button" tabindex="0" aria-label="简历文件投放区域" aria-describedby="resumeUploadHint resumeUploadStatus">
+        <div class="art"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></div>
+        <h3>拖入或选择你的简历</h3>
+        <p id="resumeUploadHint">支持 PDF / DOCX / TXT；可直接将一个文件拖到此处</p>
+        <p class="resume-file-status" id="resumeUploadStatus" role="status" aria-live="polite">尚未选择文件</p>
+      </div>
+      <div class="resume-upload-actions">
+        <button class="btn" type="button" id="chooseResumeFile">选择文件</button>
+        <span class="btn ghost">直接粘贴文本</span>
+      </div>
     </div>
   </div>
 
@@ -101,6 +108,7 @@
 <script src="../js/app.js"></script>
 <script src="../js/evidence.js"></script>
 <script src="../js/data-bridge.js"></script>
+<script src="../js/resume-upload.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   if (!window.APP.isDemoMode() || window.APP.getState() !== "success") return;

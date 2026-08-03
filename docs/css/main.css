@@ -51,7 +51,8 @@ code { font-family: "SF Mono", Consolas, monospace; font-size: .92em;
 
 /* ---- 全局焦点（WCAG 2.4.7） ---- */
 a:focus-visible, button:focus-visible, .btn:focus-visible,
-.reason-item:focus-visible, .feat:focus-visible, .state-fab a:focus-visible {
+.reason-item:focus-visible, .feat:focus-visible, .state-fab a:focus-visible,
+.resume-dropzone:focus-visible {
   outline: none; box-shadow: var(--zy-shadow-focus); border-radius: var(--zy-r-sm);
 }
 
@@ -147,6 +148,36 @@ a.card:hover, .card.hoverable:hover {
   border: 1px solid rgba(47, 107, 255, .45); box-shadow: none;
 }
 .btn.ghost:hover { background: var(--zy-primary-soft); box-shadow: none; }
+
+/* ---- 简历文件接收：点击选择与拖放使用同一入口 ---- */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.resume-upload-card { text-align: center; padding: clamp(28px, 5vw, 64px) clamp(20px, 4vw, 52px); }
+.resume-dropzone {
+  border: 1px dashed transparent; border-radius: var(--zy-r-md); padding: 16px;
+  cursor: pointer; transition: background var(--zy-d-fast) var(--zy-ease),
+    border-color var(--zy-d-fast) var(--zy-ease), transform var(--zy-d-fast) var(--zy-ease);
+}
+.resume-dropzone:hover { background: var(--zy-primary-soft); border-color: rgba(47, 107, 255, .34); }
+.resume-dropzone.is-dragging {
+  background: rgba(47, 107, 255, .10); border-color: var(--zy-primary);
+  transform: scale(1.01);
+}
+.resume-upload-card.has-file .resume-dropzone { background: rgba(21, 128, 61, .055); border-color: rgba(21, 128, 61, .34); }
+.resume-upload-card .art {
+  width: 76px; height: 76px; display: grid; place-items: center; margin: 0 auto 18px;
+  color: var(--zy-primary); background: var(--zy-primary-soft); border: 1px solid rgba(47, 107, 255, .14);
+  border-radius: 28px; box-shadow: 0 12px 30px -20px rgba(47, 107, 255, .75);
+}
+.resume-upload-card .art svg { width: 42px; height: 42px; stroke: currentColor; }
+.resume-upload-card h3 { margin-bottom: 8px; }
+.resume-upload-card p { color: var(--zy-ink-2); max-width: 430px; margin: 0 auto; }
+.resume-file-status { min-height: 22px; margin-top: 10px !important; font-size: 13px; color: var(--zy-ink-3) !important; }
+.resume-file-status.is-selected { color: var(--zy-covered) !important; }
+.resume-file-status.is-error { color: var(--zy-missing) !important; }
+.resume-upload-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 
 /* ---- 状态徽章 ---- */
 .badge {
@@ -406,6 +437,8 @@ table.dim th { background: var(--zy-bg-cool); font-weight: 650; }
   .score-ring { width: 116px; height: 116px; }
   .score-ring .inner { width: 90px; height: 90px; }
   .score-ring .num { font-size: 27px; }
+  .resume-upload-card { padding: 30px 18px; }
+  .resume-upload-actions .btn { flex: 1 1 160px; justify-content: center; }
   .demo-notice { top: 72px; max-width: calc(100vw - 28px); white-space: normal; text-align: center; }
 }
 
