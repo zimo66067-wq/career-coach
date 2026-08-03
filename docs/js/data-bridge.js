@@ -6,7 +6,9 @@
   'use strict';
 
   // ── API 端点配置 ──────────────────────────────────────
-  var API_BASE = window.DUMATE_API_BASE || '';
+  // 生产环境由 pages-api-config.js 注入独立后端的 HTTPS 地址；
+  // 不配置时保持空值，让页面明确显示未接入，而不是尝试调用 Pages 自身。
+  var API_BASE = String(window.DUMATE_API_BASE || '').replace(/\/+$/, '');
   var ENDPOINTS = {
     uploadResume:    '/api/wf01/upload',
     diagnoseResume:  '/api/wf02/diagnose',
@@ -119,8 +121,13 @@
           clearTimeout(timer);
           if (!res.ok) {
             console.warn('[DataBridge] HTTP ' + res.status + ': ' + endpoint);
-            return res.text().then(function () {
-              resolve({ error: 'http_' + res.status, message: '服务器返回 ' + res.status, trace_id: traceId, degraded: true });
+            return res.json().catch(function () { return {}; }).then(function (json) {
+              resolve({
+                error: json.error || 'http_' + res.status,
+                message: json.message || ('服务器返回 ' + res.status),
+                trace_id: json.trace_id || traceId,
+                degraded: true
+              });
             });
           }
           return res.json().then(function (json) {

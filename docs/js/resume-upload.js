@@ -67,7 +67,11 @@
     var code = result && result.error;
     if (code === "api_not_configured") return "诊断服务尚未接入此页面，暂时无法处理简历。";
     if (code === "timeout") return "服务响应超时，请稍后重试。";
-    if (code === "http_413") return "文件或文本超过服务允许的大小，请精简后重试。";
+    if (code === "http_413" || code === "payload_too_large") return "文件或文本超过服务允许的大小，请精简后重试。";
+    if (code === "model_not_configured") return "诊断服务尚未完成模型配置，请联系服务管理员。";
+    if (code === "model_unavailable") return "诊断模型暂时不可用，请稍后重试。";
+    if (code === "model_output_invalid") return "诊断结果未通过证据校验，请稍后重试。";
+    if (code === "unreadable_file") return "未能读取该文件，请改为可复制文字的 PDF、DOCX、TXT 或直接粘贴正文。";
     if (code === "service_unavailable" || code === "network") return "诊断服务暂不可用，请稍后重试。";
     return (result && result.message) || fallback || "诊断未完成，请稍后重试。";
   }

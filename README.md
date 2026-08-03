@@ -56,6 +56,20 @@ career-coach/
 
 要让公开页完成真实上传与诊断，部署方必须在加载 `data-bridge.js` 前配置 `window.DUMATE_API_BASE`，并提供可从 Pages 域名访问的 `POST /api/wf01/upload` 与 `POST /api/wf02/diagnose` 服务。未接入时页面会明确显示失败状态，不会使用旧缓存或合成诊断代替用户结果。
 
+### 生产 API 部署（Vercel）
+
+仓库已包含 `api/index.py` 和 `vercel.json`，用于在 Vercel 部署真实上传与诊断服务。Vercel 项目需配置以下环境变量，所有密钥只能保存在 Vercel，不能写入 GitHub Pages 或仓库：
+
+```text
+QIANFAN_API_KEY=...
+DUMATE_MODEL=...
+# 可选：QIANFAN_MODEL=...（备用模型）
+DUMATE_ALLOWED_ORIGINS=https://zimo66067-wq.github.io
+APP_ENV=production
+```
+
+部署完成后，将 Vercel 的 HTTPS 生产地址写入 `docs/js/pages-api-config.js` 的 `window.DUMATE_API_BASE`，并确保该脚本在 `data-bridge.js` 之前加载。API 会仅对 `DUMATE_ALLOWED_ORIGINS` 白名单来源返回 CORS 响应；文件原件只写入请求临时目录并在响应前删除。
+
 **跑测试**（Windows）：
 
 ```bat
