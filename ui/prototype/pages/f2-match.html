@@ -22,7 +22,7 @@
 </nav>
 <div class="wrap" id="main">
   <h1 class="page-title">F2 · 简历-JD 匹配</h1>
-  <p class="page-sub">M = 硬性50% + 职责25% + 加分15% + 术语10% ｜ covered=1 / weak=0.5 / missing=0 / unknown 不进分母</p>
+  <p class="page-sub">M = 硬性50% + 职责25% + 加分15% + 术语10% ｜ covered=1 / weak=0.5 / missing=0 / unknown 不进分母 ｜ 判定 <span class="src-badge ai">AI 语义匹配</span> 计分 <span class="src-badge rule">规则计算</span></p>
 
   <div data-state-view="empty">
     <div class="card empty-state">
@@ -122,12 +122,13 @@ document.addEventListener("DOMContentLoaded", function () {
   }).join("");
   var labels = { covered: "covered", weak: "weak", missing: "missing", unknown: "unknown" };
   document.getElementById("reqList").innerHTML = reqs.map(function (r) {
+    var unsure = r.status === "unknown" ? ' <span class="src-badge uncertain">待用户确认</span>' : "";
     return '<div class="req-item"><span class="badge ' + r.status + '">' + labels[r.status] + '</span>' +
-      '<span class="txt"><b>[' + r.typeLabel + "]</b> " + r.text + '<br><span style="font-size:12px;color:var(--zy-ink-3)">证据：' + r.evidence + "</span></span></div>";
+      '<span class="txt"><b>[' + r.typeLabel + "]</b> " + r.text + unsure + '<br><span style="font-size:12px;color:var(--zy-ink-3)">证据：' + r.evidence + "</span></span></div>";
   }).join("");
   document.getElementById("gapList").innerHTML = m.gaps.map(function (g) {
     return '<div class="req-item"><span class="badge ' + g.level.toLowerCase() + '">' + g.level + '</span>' +
-      '<span class="txt">' + g.text + '<br><span style="font-size:12px;color:var(--zy-ink-3)">建议：' + g.action + "</span></span></div>";
+      '<span class="txt">' + g.text + ' <span class="src-badge ai">AI 生成</span><br><span style="font-size:12px;color:var(--zy-ink-3)">建议：' + g.action + "（基于你已确认的经历，不虚构）</span></span></div>";
   }).join("");
 });
 </script>

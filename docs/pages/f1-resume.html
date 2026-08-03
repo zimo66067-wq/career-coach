@@ -22,7 +22,7 @@
 </nav>
 <div class="wrap" id="main">
   <h1 class="page-title">F1 · 简历 AI 诊断</h1>
-  <p class="page-sub">R = 结构15% + 清晰20% + 成果25% + 技能20% + ATS20% ｜ 分数由规则引擎计算</p>
+  <p class="page-sub">R = 结构15% + 清晰20% + 成果25% + 技能20% + ATS20% ｜ 分数由规则引擎计算 <span class="src-badge rule">规则计算</span> ｜ 建议由模型生成 <span class="src-badge ai">AI 生成</span></p>
 
   <!-- 空态 -->
   <div data-state-view="empty">
@@ -126,12 +126,14 @@ document.addEventListener("DOMContentLoaded", function () {
   var list = "";
   Object.keys(p.subscores).forEach(function (k) {
     var s = p.subscores[k];
-    list += '<div class="reason-item" data-quote="' + encodeURIComponent(s.quote) + '"><b>' + s.label + " · " + s.score + '分</b><br>' +
+    list += '<div class="reason-item" data-quote="' + encodeURIComponent(s.quote) + '"><span class="src-badge rule">规则计算</span> <b>' + s.label + " · " + s.score + '分</b><br>' +
       s.rationale + '<div class="tag">证据：' + (s.quote.length > 24 ? s.quote.slice(0, 24) + "…" : s.quote) + "</div></div>";
   });
   p.suggestions.forEach(function (s) {
-    list += '<div class="reason-item" data-quote="' + encodeURIComponent(s.quote) + '"><span class="badge ' + s.severity.toLowerCase() + '">' + s.severity + "</span> <b>" + s.issue + "</b><br>" +
-      "建议：" + s.suggestion + '<br><span class="tag">改写草案：' + s.rewrite_draft + "</span></div>";
+    list += '<div class="reason-item" data-quote="' + encodeURIComponent(s.quote) + '"><span class="badge ' + s.severity.toLowerCase() + '">' + s.severity + "</span> <span class=\"src-badge ai\">AI 生成</span> <b>" + s.issue + "</b><br>" +
+      "建议：" + s.suggestion +
+      '<div class="diff-compare"><div class="dc before"><span class="dc-tag">修改前 · 原文</span>“' + s.quote + '”</div>' +
+      '<div class="dc after"><span class="dc-tag">修改后 · 改写草案</span>' + s.rewrite_draft + "</div></div></div>";
   });
   document.getElementById("reasonList").innerHTML = list;
   window.EVIDENCE.bindReasons(".reason-item", highlight, function (item) {

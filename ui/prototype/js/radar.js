@@ -27,6 +27,7 @@
       animationDuration: 900,
       animationEasing: "cubicOut",
       tooltip: {},
+      aria: { enabled: true, decal: { show: true } }, // 不只靠颜色 + 屏幕阅读器替代描述
       legend: { bottom: 0, data: ["C0 基线", "七天推演 low", "七天推演 high"],
         textStyle: { color: "#4d5566", fontSize: 12 } },
       radar: {

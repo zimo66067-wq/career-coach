@@ -42,12 +42,49 @@
     });
   }
 
+  /* 导航滚动平滑压缩（表现层增强，不改动导航 DOM 契约） */
+  function mountNavCompress() {
+    var nav = document.querySelector(".topnav");
+    if (!nav) return;
+    var ticking = false;
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        nav.classList.toggle("scrolled", window.scrollY > 24);
+        ticking = false;
+      });
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  }
+
+  /* Toast 轻量反馈（表现层工具；type: info|success|error） */
+  function toast(msg, type) {
+    var wrap = document.querySelector(".toast-wrap");
+    if (!wrap) {
+      wrap = document.createElement("div");
+      wrap.className = "toast-wrap";
+      wrap.setAttribute("aria-live", "polite");
+      document.body.appendChild(wrap);
+    }
+    var el = document.createElement("div");
+    el.className = "toast " + (type || "info");
+    el.textContent = msg;
+    wrap.appendChild(el);
+    setTimeout(function () {
+      el.classList.add("out");
+      setTimeout(function () { el.remove(); }, 320);
+    }, 2600);
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     var s = getState();
     document.body.setAttribute("data-state", s);
     mountFab();
     mountNav(document.body.getAttribute("data-page"));
+    mountNavCompress();
   });
 
-  window.APP = { getState: getState, STATES: STATES, LABELS: LABELS };
+  window.APP = { getState: getState, STATES: STATES, LABELS: LABELS, toast: toast };
 })();

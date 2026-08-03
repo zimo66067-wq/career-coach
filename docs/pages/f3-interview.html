@@ -264,17 +264,17 @@ document.addEventListener("DOMContentLoaded", function () {
   var html = "";
   var interviews = fetchSync('interviews') || [];
   interviews.forEach(function (t) {
-    html += '<div class="bubble q"><div class="who">面试官 · 第' + t.turn_id + "题（考察：" + t.targets.join(" / ") + "）</div>" + t.question + "</div>";
-    html += '<div class="bubble a"><div class="who">你</div>' + t.answer + "</div>";
+    html += '<div class="bubble q"><div class="who"><span class="src-badge ai">AI 生成</span> 面试官 · 第' + t.turn_id + "题（考察：" + t.targets.join(" / ") + "）</div>" + t.question + "</div>";
+    html += '<div class="bubble a"><div class="who"><span class="src-badge user">用户输入</span> 你</div>' + t.answer + "</div>";
     html += '<div class="card" style="margin:4px 0 20px;background:var(--zy-surface-2)"><div style="font-size:13px">';
-    html += '<b>评估依据（引用原文）：</b><div class="quote-block">“' + t.answer_quote + '”</div>';
+    html += '<b>评估依据（引用原文）：</b><span class="src-badge rule">规则计算</span><div class="quote-block">“' + t.answer_quote + '”</div>';
     if (t.missing_elements.length) {
       html += "<b>STAR 缺口：</b>" + t.missing_elements.map(function (m) { return '<span class="chip">' + (star[m] || m) + "</span>"; }).join("") + "<br>";
     } else {
       html += "<b>STAR 缺口：</b><span class=\"chip\">无</span><br>";
     }
     if (t.follow_up) {
-      html += '<div class="followup"><b>追问：</b>' + t.follow_up.question + '<br><span style="color:var(--zy-ink-2)">追问理由：' + t.follow_up.reason + "</span></div>";
+      html += '<div class="followup"><b>追问：</b><span class="src-badge ai">AI 生成 · 追问</span> ' + t.follow_up.question + '<br><span style="color:var(--zy-ink-2)">追问依据：' + t.follow_up.reason + "</span></div>";
     }
     var ss = t.subscores;
     html += '<div style="margin-top:10px;color:var(--zy-ink-2)">结构 ' + ss.structure + " ｜ 相关 " + ss.relevance + " ｜ 具体 " + ss.specificity + " ｜ 追问适应 " + ss.followup_adaptation + " ｜ 清晰 " + ss.clarity + "</div>";
