@@ -198,12 +198,25 @@ def test_degraded_or_ungrounded_model_output_uses_grounded_fallback(monkeypatch)
     invalid = client(monkeypatch, FakeRouter(invalid_profile)).post(
         "/api/wf02/diagnose", json={"resumeText": RESUME}
     )
-    assert degraded.status_code == 503
-    assert degraded.json["error"] == "model_unavailable"
+    assert degraded.status_code == 200
+    assert degraded.json["diagnosis_mode"] == "fallback_model"
+    assert "备用模型" in degraded.json["diagnosis_notice"]
     assert invalid.status_code == 200
     repaired = invalid.json["resumeProfile"]["subscores"]["structure"]
     assert repaired["source_spans"][0]["quote"] == RESUME
     assert "不存在的证据" not in json.dumps(invalid.json, ensure_ascii=False)
+
+
+def test_unavailable_model_returns_labeled_rule_fallback(monkeypatch):
+    response = client(monkeypatch, FakeRouter({}, status="degraded", degraded=True)).post(
+        "/api/wf02/diagnose", json={"resumeText": RESUME}
+    )
+
+    assert response.status_code == 200
+    assert response.json["diagnosis_mode"] == "rule_fallback"
+    assert "基础规则诊断" in response.json["diagnosis_notice"]
+    assert response.json["resumeProfile"]["subscores"]["structure"]["source_spans"][0]["quote"] == RESUME
+    assert 0 <= response.json["score_R"] <= 100
 
 
 def test_invalid_provider_citation_is_repaired_without_retry(monkeypatch):

@@ -89,6 +89,23 @@ async function run() {
   assert.strictEqual(unavailable.ok, false);
   assert.strictEqual(unavailable.error, 'service_unavailable');
 
+  const fallbackFlow = upload.createSubmissionFlow({
+    bridge: {
+      async diagnoseResume() {
+        return {
+          resumeProfile: { subscores: {}, suggestions: [] },
+          score_R: 60,
+          diagnosis_mode: 'rule_fallback',
+          diagnosis_notice: '诊断模型暂时不可用，本次展示基础规则诊断。'
+        };
+      }
+    }
+  });
+  const fallback = await fallbackFlow.submitText('赵六\n有足够长度的简历正文，用于验证模型故障时仍能返回已标注的规则诊断。');
+  assert.strictEqual(fallback.ok, true);
+  assert.strictEqual(fallback.diagnosis.diagnosis_mode, 'rule_fallback');
+  assert.match(fallback.diagnosis.diagnosis_notice, /基础规则诊断/);
+
   context.window.location = { hostname: 'zimo66067-wq.github.io' };
   const staticFlow = upload.createSubmissionFlow({
     bridge: {

@@ -455,12 +455,113 @@ def redflag_errors(profile, resume_text):
     return ["unsupported_number:%s" % number for number in sorted(unsupported)]
 
 
+def rule_score(value, minimum=0, maximum=100):
+    """Clamp deterministic fallback scores to the public contract range."""
+    return max(minimum, min(maximum, int(value)))
+
+
+def count_present_terms(text, terms):
+    lowered = text.lower()
+    return sum(1 for term in terms if term in lowered)
+
+
+def build_rule_based_resume_profile(resume_text):
+    """Produce a transparent, evidence-bound fallback when models are unavailable.
+
+    This is deliberately not presented as an AI semantic diagnosis.  It only
+    checks visible resume structure and text signals, and every displayed
+    reason cites an exact excerpt from the submitted resume.
+    """
+    span = fallback_source_span(resume_text)
+    section_count = count_present_terms(resume_text, (
+        "教育", "经历", "项目", "技能", "实习", "工作", "奖项", "证书",
+    ))
+    action_count = count_present_terms(resume_text, (
+        "负责", "完成", "优化", "开发", "设计", "推动", "协作", "上线", "分析", "管理",
+    ))
+    skill_count = count_present_terms(resume_text, (
+        "python", "java", "javascript", "sql", "excel", "figma", "linux", "git", "ai", "数据",
+    ))
+    number_count = len(RE_NUMBER.findall(resume_text))
+    line_count = len([line for line in resume_text.splitlines() if line.strip()])
+
+    scores = {
+        "structure": rule_score(38 + section_count * 7 + min(line_count, 10) * 2),
+        "clarity": rule_score(45 + min(line_count, 12) * 2 + min(action_count, 5) * 3),
+        "achievement_evidence": rule_score(35 + min(action_count, 7) * 5 + min(number_count, 5) * 6),
+        "skill_evidence": rule_score(38 + min(skill_count, 8) * 6),
+        "ats_readability": rule_score(50 + min(section_count, 6) * 5 + min(line_count, 10)),
+    }
+    rationales = {
+        "structure": "依据简历原文中的标题和段落组织进行基础规则检查。",
+        "clarity": "依据简历原文的分行和行动表达进行基础规则检查。",
+        "achievement_evidence": "依据简历原文中可见的行动词和量化文本进行基础规则检查。",
+        "skill_evidence": "依据简历原文中可见的技能关键词进行基础规则检查。",
+        "ats_readability": "依据简历原文的常见栏目和文本可读性进行基础规则检查。",
+    }
+    suggestions = [
+        {
+            "id": "rule-evidence",
+            "severity": "P1",
+            "issue": "请复核已引用段落中的职责与成果表达。",
+            "suggestion": "为关键项目补充可公开核验的职责、动作和结果，并确保新增数字与原始材料一致。",
+            "source_spans": [span],
+        },
+        {
+            "id": "rule-structure",
+            "severity": "P2",
+            "issue": "请复核已引用段落中的栏目组织和技能呈现。",
+            "suggestion": "使用清晰栏目和统一格式呈现经历与技能，方便招聘系统和人工阅读。",
+            "source_spans": [span],
+        },
+    ]
+    return {
+        "version": "1.0",
+        "pii_removed": True,
+        "subscores": {
+            key: {"score": scores[key], "rationale": rationales[key], "source_spans": [span]}
+            for key in SUBSCORE_DEFAULTS
+        },
+        "suggestions": suggestions,
+    }
+
+
+def rule_fallback_diagnosis(resume_text, reason, trace=None):
+    """Return a usable, explicitly labeled result rather than an opaque 503."""
+    fallback_profile = build_rule_based_resume_profile(resume_text)
+    fallback_trace = trace or trace_id()
+    print(json.dumps({
+        "event": "resume_rule_fallback",
+        "trace_id": fallback_trace,
+        "reason": reason,
+    }, ensure_ascii=False), flush=True)
+    score_r = round2(calc_R({
+        key: value["score"] for key, value in fallback_profile["subscores"].items()
+    }))
+    return (
+        fallback_profile,
+        score_r,
+        fallback_trace,
+        "rule_fallback",
+        "诊断模型暂时不可用，本次展示基于简历原文的基础规则诊断；恢复后可再次诊断以获取模型解释。",
+    )
+
+
 def diagnose_resume(resume_text):
     cleaned_text, _mapping = deidentify(resume_text)
-    router = build_model_router()
-    result = router.call("resume_diagnosis", cleaned_text)
-    if result.get("status") != "success" or result.get("degraded") or not isinstance(result.get("output"), dict):
-        raise ApiError("model_unavailable", "诊断模型暂时不可用，请稍后重试。", 503)
+    try:
+        router = build_model_router()
+        result = router.call("resume_diagnosis", cleaned_text)
+    except ApiError as error:
+        if error.code == "model_not_configured":
+            return rule_fallback_diagnosis(cleaned_text, error.code)
+        raise
+    except Exception as error:
+        return rule_fallback_diagnosis(cleaned_text, "router_exception:%s" % type(error).__name__)
+
+    if not isinstance(result, dict) or result.get("status") != "success" or not isinstance(result.get("output"), dict):
+        result_trace = result.get("trace_id") if isinstance(result, dict) else None
+        return rule_fallback_diagnosis(cleaned_text, "model_unavailable", result_trace)
 
     profile = normalize_resume_profile(result["output"], cleaned_text)
     validation_errors = profile_validation_errors(profile, cleaned_text)
@@ -487,12 +588,20 @@ def diagnose_resume(resume_text):
             "suggestion_keys": sorted(first_suggestion.keys()),
             "source_span_keys": sorted(first_span.keys()) if isinstance(first_span, dict) else [],
         }, ensure_ascii=False), flush=True)
-        raise ApiError("model_output_invalid", "诊断结果未通过证据校验，请稍后重试。", 502)
+        return rule_fallback_diagnosis(cleaned_text, "validation_rejected", result.get("trace_id"))
 
     score_r = round2(calc_R({
         key: value["score"] for key, value in profile["subscores"].items()
     }))
-    return profile, score_r, result.get("trace_id") or trace_id()
+    if result.get("degraded"):
+        return (
+            profile,
+            score_r,
+            result.get("trace_id") or trace_id(),
+            "fallback_model",
+            "主模型暂时不可用，本次由备用模型完成诊断。",
+        )
+    return profile, score_r, result.get("trace_id") or trace_id(), "model", ""
 
 
 def route_api():
@@ -514,8 +623,16 @@ def route_api():
         body = request.get_json(silent=True)
         if not isinstance(body, dict):
             raise ApiError("invalid_request", "诊断请求格式无效。", 422)
-        profile, score_r, model_trace_id = diagnose_resume(validate_text(body.get("resumeText")))
-        return api_response({"resumeProfile": profile, "score_R": score_r, "model_trace_id": model_trace_id})
+        profile, score_r, model_trace_id, diagnosis_mode, diagnosis_notice = diagnose_resume(
+            validate_text(body.get("resumeText"))
+        )
+        return api_response({
+            "resumeProfile": profile,
+            "score_R": score_r,
+            "model_trace_id": model_trace_id,
+            "diagnosis_mode": diagnosis_mode,
+            "diagnosis_notice": diagnosis_notice,
+        })
     raise ApiError("not_found", "接口不存在。", 404)
 
 

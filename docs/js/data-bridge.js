@@ -22,7 +22,9 @@
     consent:         '/api/wf01/consent'
   };
 
-  var TIMEOUT_MS = 30000;
+  // 后端会依次尝试主模型与备用模型（Vercel 函数上限为 60 秒）。
+  // 30 秒会在后端完成可用的规则降级前提前中断请求。
+  var TIMEOUT_MS = 55000;
 
   // ── 内存缓存（SessionStorage 持久化） ─────────────────
   var CACHE_PREFIX = 'cb_cache_';

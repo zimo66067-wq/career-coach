@@ -216,6 +216,13 @@
 
   function renderDiagnosis(result, resumeText) {
     var profile = result.diagnosis.resumeProfile;
+    var noticeNode = document.getElementById("resumeDiagnosisNotice");
+    var noticeText = result.diagnosis.diagnosis_notice;
+    if (noticeNode) {
+      var noticeBody = noticeNode.querySelector("p");
+      if (noticeBody) noticeBody.textContent = typeof noticeText === "string" ? noticeText : "";
+      noticeNode.hidden = !noticeText;
+    }
     var score = scoreFromDiagnosis(result.diagnosis);
     var scoreText = score === null ? "--" : String(score);
     var scoreNode = document.getElementById("resumeScore");

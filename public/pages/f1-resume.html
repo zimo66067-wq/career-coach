@@ -70,6 +70,10 @@
 
   <!-- 成功 -->
   <div data-state-view="success">
+    <div class="degraded-banner" id="resumeDiagnosisNotice" hidden role="status" aria-live="polite">
+      <div class="icon" aria-hidden="true">ℹ️</div>
+      <div><p></p></div>
+    </div>
     <div class="card" style="display:flex;gap:28px;align-items:center;flex-wrap:wrap">
       <div class="score-ring" id="resumeScoreRing" style="--pct:73" role="img" aria-label="诊断分 R：73 分"><div class="inner"><span class="num" id="resumeScore">73</span><span class="lbl">诊断分 R</span></div></div>
       <div style="flex:1;min-width:260px" id="subbars"></div>
