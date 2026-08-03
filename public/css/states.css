@@ -1,0 +1,76 @@
+/* ============================================================
+   states.css · 五状态样式 v2：empty / processing / success / error / degraded
+   依赖 tokens.css + main.css；DOM 契约不变。
+   ============================================================ */
+
+/* processing：骨架屏（柔和 shimmer） */
+.skel { position: relative; overflow: hidden; background: #eceef1; border-radius: var(--zy-r-sm); min-height: 14px; }
+.skel::after { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .75), transparent);
+  animation: skel 1.4s var(--zy-ease) infinite; transform: translateX(-100%); }
+@keyframes skel { to { transform: translateX(100%); } }
+.skel.h-lg { height: 120px; }
+.skel.h-md { height: 56px; }
+.skel.h-sm { height: 14px; margin: 8px 0; }
+
+.spin-row { display: flex; align-items: center; gap: 10px; color: var(--zy-ink-2); font-size: 13.5px; padding: 8px 0; }
+.spinner {
+  width: 18px; height: 18px; flex: none;
+  border: 2.5px solid rgba(47, 107, 255, .18);
+  border-top-color: var(--zy-primary);
+  border-radius: 50%; animation: rot .9s linear infinite;
+}
+@keyframes rot { to { transform: rotate(360deg); } }
+
+/* empty：空态（克制插画位 + 柔光） */
+.empty-state { text-align: center; padding: clamp(40px, 7vw, 72px) 24px; color: var(--zy-ink-2); }
+.empty-state .art {
+  width: 92px; height: 92px; margin: 0 auto 20px; border-radius: 26px;
+  background: var(--zy-grad-ai-soft);
+  border: 1px solid rgba(47, 107, 255, .18);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 12px 32px -14px rgba(47, 107, 255, .35);
+}
+.empty-state .art svg { width: 44px; height: 44px; stroke: var(--zy-primary); }
+.empty-state h3 { color: var(--zy-ink); font-size: 17px; margin-bottom: 8px; }
+.empty-state p { font-size: 13.5px; margin-bottom: 20px; max-width: 46ch; margin-left: auto; margin-right: auto; }
+
+/* error：失败态 */
+.error-banner {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: var(--zy-error-bg);
+  border: 1px solid rgba(211, 36, 36, .22);
+  border-radius: var(--zy-r-lg); padding: 18px 20px;
+}
+.error-banner .icon { font-size: 20px; line-height: 1.2; }
+.error-banner h3 { color: var(--zy-missing); font-size: 15px; margin-bottom: 5px; }
+.error-banner p { font-size: 13px; color: #7a1f1f; margin-bottom: 12px; max-width: 64ch; }
+
+/* degraded：降级态 */
+.degraded-banner {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: var(--zy-degraded-bg);
+  border: 1px solid rgba(146, 88, 10, .24);
+  border-radius: var(--zy-r-lg); padding: 15px 18px; margin-bottom: 18px;
+}
+.degraded-banner h3 { color: var(--zy-degraded); font-size: 14px; margin-bottom: 3px; }
+.degraded-banner p { font-size: 13px; color: #6d440a; max-width: 68ch; }
+
+/* 状态容器切换：默认只显示 success（契约不变） */
+[data-state-view] { display: none; }
+body[data-state="empty"] [data-state-view="empty"],
+body[data-state="processing"] [data-state-view="processing"],
+body[data-state="success"] [data-state-view="success"],
+body[data-state="error"] [data-state-view="error"],
+body[data-state="degraded"] [data-state-view="degraded"] { display: block; }
+
+/* 状态视图切换时的轻微淡入 */
+@media (prefers-reduced-motion: no-preference) {
+  body[data-state] [data-state-view] > * {
+    animation: zy-state-in var(--zy-d-mid) var(--zy-ease) both;
+  }
+  @keyframes zy-state-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+}

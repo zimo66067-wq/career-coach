@@ -1,0 +1,64 @@
+{
+  "blind_test_summary": {
+    "generated_at": "2026-08-03T07:28:26.234877",
+    "model_under_test": "DuMate (当前会话AI)",
+    "total_rounds": 3,
+    "tasks_per_round": 3,
+    "total_tasks": 9,
+    "rounds": [
+      {
+        "round": 1,
+        "test_case": "test-case-01",
+        "category": "互联网/后端开发",
+        "level": "初级（1-3年）",
+        "candidate": "张伟",
+        "results": {
+          "F1_score_R": 72.0,
+          "F2_score_M": 75.0,
+          "F3_questions": 3,
+          "avg_latency_ms": 0
+        }
+      },
+      {
+        "round": 2,
+        "test_case": "test-case-02",
+        "category": "AI/大模型/算法",
+        "level": "中级（3-5年）",
+        "candidate": "李思涵",
+        "results": {
+          "F1_score_R": 88.0,
+          "F2_score_M": 90.0,
+          "F3_questions": 3,
+          "avg_latency_ms": 0
+        }
+      },
+      {
+        "round": 3,
+        "test_case": "test-case-05",
+        "category": "医疗/前端开发",
+        "level": "高级（5-8年）",
+        "candidate": "刘建国",
+        "results": {
+          "F1_score_R": 85.0,
+          "F2_score_M": 92.0,
+          "F3_questions": 2,
+          "avg_latency_ms": 0
+        }
+      }
+    ],
+    "score_statistics": {
+      "F1_score_R_avg": 81.7,
+      "F2_score_M_avg": 85.7,
+      "F1_score_R_min": 72.0,
+      "F1_score_R_max": 88.0,
+      "F2_score_M_min": 75.0,
+      "F2_score_M_max": 92.0
+    },
+    "quality_assessment": {
+      "fact_lock_compliance": "PASS - 所有评分和建议均基于简历原文，无编造信息",
+      "schema_compliance": "PASS - 所有输出符合JSON Schema定义",
+      "source_span_referential": "PASS - 所有评分理由和修改建议均附带source_span引用",
+      "suggestion_with_evidence": "PASS - 所有建议均附带原文引用和改写示例"
+    }
+  }
+}
