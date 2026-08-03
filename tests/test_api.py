@@ -97,6 +97,13 @@ def test_health_reports_zhipu_configuration(monkeypatch):
     assert configured.json["model_configured"] is True
 
 
+def test_unknown_paths_remain_404_instead_of_becoming_internal_errors(monkeypatch):
+    response = client(monkeypatch).get("/docs/")
+
+    assert response.status_code == 404
+    assert response.json["error"] == "not_found"
+
+
 def test_model_router_requires_zhipu_key(monkeypatch):
     monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
     monkeypatch.setenv("DUMATE_MODEL", "glm-4.7-flash")

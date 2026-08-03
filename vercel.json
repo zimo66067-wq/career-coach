@@ -17,10 +17,6 @@
     {
       "source": "/api/health",
       "destination": "/api?_route=health"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/docs/$1"
     }
   ]
 }

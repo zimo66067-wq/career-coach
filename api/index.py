@@ -14,6 +14,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request
 from jsonschema import Draft202012Validator
+from werkzeug.exceptions import HTTPException
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -82,7 +83,7 @@ def apply_cors(response):
     origin = request.headers.get("Origin", "")
     if origin_allowed(origin):
         response.headers["Access-Control-Allow-Origin"] = origin.rstrip("/")
-        response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Trace-Id"
         response.headers["Access-Control-Max-Age"] = "600"
         existing_vary = response.headers.get("Vary", "")
@@ -103,6 +104,28 @@ def handle_content_too_large(_error):
         "message": "文件或文本超过服务允许的大小，请精简后重试。",
         "trace_id": trace_id(),
     }), 413
+
+
+@app.errorhandler(HTTPException)
+def handle_http_error(error):
+    """Keep ordinary routing and method errors out of the 500 handler."""
+    if error.code == 404:
+        return jsonify({
+            "error": "not_found",
+            "message": "接口不存在。",
+            "trace_id": trace_id(),
+        }), 404
+    if error.code == 405:
+        return jsonify({
+            "error": "method_not_allowed",
+            "message": "请求方法不被允许。",
+            "trace_id": trace_id(),
+        }), 405
+    return jsonify({
+        "error": "http_error",
+        "message": "请求无法处理。",
+        "trace_id": trace_id(),
+    }), error.code or 500
 
 
 @app.errorhandler(Exception)
