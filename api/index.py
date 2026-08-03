@@ -270,12 +270,12 @@ def fallback_source_span(resume_text):
 
 
 def normalize_source_spans(raw_spans, resume_text):
-    """Fill omitted source-span fields without accepting a false quotation.
+    """Fill omitted source-span fields and flag provider citations that cannot be proven.
 
     Some providers return only ``start``/``end``.  Those offsets still point
     at the de-identified request text, so they can be converted into the
-    frozen contract.  A provider that supplied a mismatching quote is kept
-    invalid instead of being silently repaired.
+    frozen contract.  A provider citation that cannot be verified is flagged
+    so its generated prose can be replaced with a grounded fallback.
     """
     if not isinstance(raw_spans, list):
         return [], False
@@ -354,8 +354,10 @@ def normalize_resume_profile(raw_profile, resume_text):
     """Adapt known provider shape omissions into the frozen public contract.
 
     This is deliberately narrow: it reconstructs missing container fields and
-    exact excerpts from valid character offsets, but does not repair a quote
-    that disagrees with the supplied resume text.
+    exact excerpts from valid character offsets.  When a provider citation
+    disagrees with the supplied resume text, the ungrounded citation and its
+    related generated prose are discarded and replaced with a safe, exact
+    excerpt from the resume.
     """
     raw_subscores = raw_profile.get("subscores") if isinstance(raw_profile.get("subscores"), dict) else {}
     normalized_subscores = {}
@@ -364,16 +366,15 @@ def normalize_resume_profile(raw_profile, resume_text):
         raw_data = raw_subscore if isinstance(raw_subscore, dict) else {}
         spans, has_invalid_quote = normalize_source_spans(raw_data.get("source_spans"), resume_text)
         if has_invalid_quote:
-            spans = []
+            spans = [fallback_source_span(resume_text)]
         elif not spans:
             spans = [fallback_source_span(resume_text)]
+        rationale = "%s仅基于所引用的简历原文进行评估。" % label
+        if not has_invalid_quote:
+            rationale = safe_narrative(raw_data.get("rationale"), rationale, resume_text)
         normalized_subscores[key] = {
             "score": normalize_score(raw_subscore),
-            "rationale": safe_narrative(
-                raw_data.get("rationale"),
-                "%s仅基于所引用的简历原文进行评估。" % label,
-                resume_text,
-            ),
+            "rationale": rationale,
             "source_spans": spans,
         }
 
@@ -384,25 +385,24 @@ def normalize_resume_profile(raw_profile, resume_text):
             continue
         spans, has_invalid_quote = normalize_source_spans(raw_suggestion.get("source_spans"), resume_text)
         if has_invalid_quote:
-            spans = []
+            spans = [fallback_source_span(resume_text)]
         elif not spans:
             spans = [fallback_source_span(resume_text)]
+        issue = "当前简历中存在可进一步核实和完善的表达。"
+        suggestion_text = "请根据已引用的简历原文，补充职责、成果和技能的可核验证据。"
+        if not has_invalid_quote:
+            issue = safe_narrative(raw_suggestion.get("issue"), issue, resume_text)
+            suggestion_text = safe_narrative(raw_suggestion.get("suggestion"), suggestion_text, resume_text)
         suggestion = {
             "id": raw_suggestion.get("id") if isinstance(raw_suggestion.get("id"), str) and raw_suggestion["id"].strip() else "suggestion-%s" % (index + 1),
             "severity": raw_suggestion.get("severity") if raw_suggestion.get("severity") in {"P0", "P1", "P2"} else "P1",
-            "issue": safe_narrative(
-                raw_suggestion.get("issue"),
-                "当前简历中存在可进一步核实和完善的表达。",
-                resume_text,
-            ),
-            "suggestion": safe_narrative(
-                raw_suggestion.get("suggestion"),
-                "请根据已引用的简历原文，补充职责、成果和技能的可核验证据。",
-                resume_text,
-            ),
+            "issue": issue,
+            "suggestion": suggestion_text,
             "source_spans": spans,
         }
-        rewrite_draft = safe_narrative(raw_suggestion.get("rewrite_draft"), "", resume_text)
+        rewrite_draft = ""
+        if not has_invalid_quote:
+            rewrite_draft = safe_narrative(raw_suggestion.get("rewrite_draft"), "", resume_text)
         if rewrite_draft:
             suggestion["rewrite_draft"] = rewrite_draft
         normalized_suggestions.append(suggestion)

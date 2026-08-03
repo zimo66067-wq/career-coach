@@ -189,7 +189,7 @@ def test_diagnosis_normalizes_provider_offsets_and_missing_container_fields(monk
     }
 
 
-def test_degraded_or_ungrounded_model_output_is_not_shown(monkeypatch):
+def test_degraded_or_ungrounded_model_output_uses_grounded_fallback(monkeypatch):
     degraded = client(monkeypatch, FakeRouter(valid_profile(), degraded=True)).post(
         "/api/wf02/diagnose", json={"resumeText": RESUME}
     )
@@ -200,11 +200,13 @@ def test_degraded_or_ungrounded_model_output_is_not_shown(monkeypatch):
     )
     assert degraded.status_code == 503
     assert degraded.json["error"] == "model_unavailable"
-    assert invalid.status_code == 502
-    assert invalid.json["error"] == "model_output_invalid"
+    assert invalid.status_code == 200
+    repaired = invalid.json["resumeProfile"]["subscores"]["structure"]
+    assert repaired["source_spans"][0]["quote"] == RESUME
+    assert "不存在的证据" not in json.dumps(invalid.json, ensure_ascii=False)
 
 
-def test_invalid_model_result_is_not_retried_in_the_same_request(monkeypatch):
+def test_invalid_provider_citation_is_repaired_without_retry(monkeypatch):
     invalid_profile = valid_profile()
     invalid_profile["subscores"]["structure"]["source_spans"][0]["quote"] = "不存在的证据"
     router = FakeRouter(invalid_profile)
@@ -213,5 +215,5 @@ def test_invalid_model_result_is_not_retried_in_the_same_request(monkeypatch):
         "/api/wf02/diagnose", json={"resumeText": RESUME}
     )
 
-    assert response.status_code == 502
+    assert response.status_code == 200
     assert router.call_count == 1
