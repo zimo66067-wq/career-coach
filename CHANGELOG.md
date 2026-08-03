@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+### Changed - 前端视觉改版 v2（职跃AI 设计系统，基于 DuMate 最新主链路重放）
+- ui/prototype 全站升级「温润近白 + 深石墨 + 电光蓝→靛青」视觉语言：新增 css/tokens.css，重写 main.css / states.css
+- 四页新增 AI 可解释性元素：分析阶段步进器、呼吸光、语义流动线、面试官语音波形；F4 C0 数字递增动画
+- F3 语音组件（voice.js）配色对齐设计系统，ASR/TTS/文字回退逻辑零改动
+- 无障碍：skip-link、:focus-visible、prefers-reduced-motion 全量降级、aria 补全
+- docs/ GitHub Pages 部署副本全量同步（补齐 voice.js / data-bridge.js 滞后）
+- DOM ID / class / data-* / window.* 契约零破坏；pytest 42 项全过
+- docs/redesign-v2-visual.md（修改清单 + 验收记录 + 无障碍/性能检查）
+
 ### Frozen - 基线冻结（commit B）
 - docs/PRD.md、architecture.md、privacy.md 首版冻结
 - contracts/ 四个 JSON Schema + scoring.md（R/M/I/C0/C7 公式与手算示例）冻结

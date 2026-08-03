@@ -5,11 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>F1 简历诊断 · 职跃AI</title>
 <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../css/tokens.css">
 <link rel="stylesheet" href="../css/main.css">
 <link rel="stylesheet" href="../css/states.css">
 </head>
 <body data-page="f1">
-<nav class="topnav">
+<a class="skip-link" href="#main">跳到主要内容</a>
+<nav class="topnav" aria-label="主导航">
   <span class="brand">职跃AI</span>
   <a class="nav" data-page="home" href="../index.html">首页</a>
   <a class="nav" data-page="f1" href="f1-resume.html">F1 简历诊断</a>
@@ -18,7 +20,7 @@
   <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
   <a class="nav" data-page="states" href="states.html">状态墙</a>
 </nav>
-<div class="wrap">
+<div class="wrap" id="main">
   <h1 class="page-title">F1 · 简历 AI 诊断</h1>
   <p class="page-sub">R = 结构15% + 清晰20% + 成果25% + 技能20% + ATS20% ｜ 分数由规则引擎计算</p>
 
@@ -35,8 +37,15 @@
   <!-- 处理中 -->
   <div data-state-view="processing">
     <div class="card">
-      <div class="spin-row"><span class="spinner"></span>正在解析简历并锁定原文证据…（P95 ≤ 45 秒）</div>
-      <div class="skel h-lg" style="margin:14px 0"></div>
+      <div class="ai-status"><span class="ai-orb" aria-hidden="true"></span>AI 正在分析 · 解析简历并锁定原文证据…（P95 ≤ 45 秒）</div>
+      <div class="flow-line" aria-hidden="true"></div>
+      <div class="ai-stages" aria-label="AI 分析阶段">
+        <span class="ai-stage done">文本解析</span>
+        <span class="ai-stage done">结构化抽取</span>
+        <span class="ai-stage on">规则评分</span>
+        <span class="ai-stage">证据校验</span>
+      </div>
+      <div class="skel h-lg" style="margin:16px 0"></div>
       <div class="skel h-sm" style="width:60%"></div>
       <div class="skel h-sm" style="width:80%"></div>
       <div class="skel h-sm" style="width:45%"></div>
@@ -45,8 +54,8 @@
 
   <!-- 成功 -->
   <div data-state-view="success">
-    <div class="card" style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
-      <div class="score-ring" style="--pct:73"><div class="inner"><span class="num">73</span><span class="lbl">诊断分 R</span></div></div>
+    <div class="card" style="display:flex;gap:28px;align-items:center;flex-wrap:wrap">
+      <div class="score-ring" style="--pct:73" role="img" aria-label="诊断分 R：73 分"><div class="inner"><span class="num">73</span><span class="lbl">诊断分 R</span></div></div>
       <div style="flex:1;min-width:260px" id="subbars"></div>
     </div>
     <div class="card">
@@ -84,7 +93,7 @@
       <div class="subbar"><div class="meta"><span>版块完整性（教育/实习/项目/技能）</span><span>4/4</span></div><div class="track"><div class="fill" style="width:100%"></div></div></div>
       <div class="subbar"><div class="meta"><span>量化成果句数量</span><span>1 处（偏少）</span></div><div class="track"><div class="fill" style="width:25%"></div></div></div>
       <div class="subbar"><div class="meta"><span>ATS 可读性（无表格/图片/分栏）</span><span>通过</span></div><div class="track"><div class="fill" style="width:85%"></div></div></div>
-      <p style="font-size:13px;color:var(--c-text-2);margin-top:10px">完整诊断恢复后将自动重跑，无需重新上传。</p>
+      <p style="font-size:13px;color:var(--zy-ink-2);margin-top:12px">完整诊断恢复后将自动重跑，无需重新上传。</p>
     </div>
   </div>
 </div>

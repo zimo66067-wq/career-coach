@@ -5,11 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>职跃AI · AI求职面试教练（原型）</title>
 <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/main.css">
 <link rel="stylesheet" href="css/states.css">
 </head>
 <body data-page="home" data-no-fab>
-<nav class="topnav">
+<a class="skip-link" href="#main">跳到主要内容</a>
+<nav class="topnav" aria-label="主导航">
   <span class="brand">职跃AI</span>
   <a class="nav" data-page="home" href="index.html">首页</a>
   <a class="nav" data-page="f1" href="pages/f1-resume.html">F1 简历诊断</a>
@@ -18,43 +20,45 @@
   <a class="nav" data-page="f4" href="pages/f4-report.html">F4 能力报告</a>
   <a class="nav" data-page="states" href="pages/states.html">状态墙</a>
 </nav>
-<div class="wrap">
-  <h1 class="page-title">AI求职面试教练</h1>
-  <p class="page-sub">模型做语义，规则做分数，验证器做事实 ｜ 每个分数都能回指证据</p>
+<div class="wrap" id="main">
+  <header class="hero">
+    <h1 class="page-title">一位精密、安静、<br>值得信任的数字职业顾问</h1>
+    <p class="page-sub">模型做语义，规则做分数，验证器做事实 —— 每个分数都能回指证据</p>
+  </header>
+
+  <div class="feat-grid">
+    <a class="card feat" href="pages/f1-resume.html">
+      <div class="fno">F1 · 简历诊断</div>
+      <h3>简历 AI 诊断</h3>
+      <p style="font-size:13px;color:var(--zy-ink-2)">打分 R + 逐条修改建议，每条建议都能点回原文位置</p>
+    </a>
+    <a class="card feat" href="pages/f2-match.html">
+      <div class="fno">F2 · 岗位匹配</div>
+      <h3>简历-JD 匹配</h3>
+      <p style="font-size:13px;color:var(--zy-ink-2)">四类要求四态判定（covered/weak/missing/unknown）+ 缺口分级</p>
+    </a>
+    <a class="card feat" href="pages/f3-interview.html">
+      <div class="fno">F3 · 模拟面试</div>
+      <h3>AI 模拟面试</h3>
+      <p style="font-size:13px;color:var(--zy-ink-2)">会追问的文字面试，结束出表现报告（追问必引用你的上轮回答）</p>
+    </a>
+    <a class="card feat" href="pages/f4-report.html">
+      <div class="fno">F4 · 能力报告</div>
+      <h3>能力报告 + 七天计划</h3>
+      <p style="font-size:13px;color:var(--zy-ink-2)">六维雷达 + C0 基线 + 七天竞争力情景推演区间</p>
+    </a>
+  </div>
 
   <div class="card">
     <h3>主流程</h3>
-    <p style="font-size:14px;color:var(--c-text-2)">
+    <p style="font-size:14px;color:var(--zy-ink-2)">
       上传或粘贴材料 → 结构化抽取 → 原文证据锁定 → 确定性评分 → AI解释与建议 → 岗位语义匹配 → 自适应面试 → 证据化复盘 → 六维能力聚合 → 七天情景提升路径
     </p>
   </div>
 
-  <div class="feat-grid">
-    <a class="card feat" href="pages/f1-resume.html">
-      <div class="fno">F1</div>
-      <h3>简历 AI 诊断</h3>
-      <p style="font-size:13px;color:var(--c-text-2)">打分 R + 逐条修改建议，每条建议都能点回原文位置</p>
-    </a>
-    <a class="card feat" href="pages/f2-match.html">
-      <div class="fno">F2</div>
-      <h3>简历-JD 匹配</h3>
-      <p style="font-size:13px;color:var(--c-text-2)">四类要求四态判定（covered/weak/missing/unknown）+ 缺口分级</p>
-    </a>
-    <a class="card feat" href="pages/f3-interview.html">
-      <div class="fno">F3</div>
-      <h3>AI 模拟面试</h3>
-      <p style="font-size:13px;color:var(--c-text-2)">会追问的文字面试，结束出表现报告（追问必引用你的上轮回答）</p>
-    </a>
-    <a class="card feat" href="pages/f4-report.html">
-      <div class="fno">F4</div>
-      <h3>能力报告 + 七天计划</h3>
-      <p style="font-size:13px;color:var(--c-text-2)">六维雷达 + C0 基线 + 七天竞争力情景推演区间</p>
-    </a>
-  </div>
-
   <div class="card">
     <h3>演示说明</h3>
-    <p style="font-size:14px;color:var(--c-text-2)">
+    <p style="font-size:14px;color:var(--zy-ink-2)">
       每个功能页支持五种界面状态：<b>空态 / 处理中 / 成功 / 失败 / 降级</b>。
       页面右下角有状态切换器，也可直接在 URL 加 <code>?state=degraded</code> 等参数。
       全部数据来自 <code>tests/fixtures-synthetic/</code> 合成样本，与数据合同严格一致。
@@ -63,5 +67,6 @@
 </div>
 <script src="js/mock-data.js"></script>
 <script src="js/app.js"></script>
+<script src="js/data-bridge.js"></script>
 </body>
 </html>
