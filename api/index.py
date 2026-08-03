@@ -13,6 +13,7 @@ import uuid
 from pathlib import Path
 
 from flask import Flask, jsonify, request
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from jsonschema import Draft202012Validator
 from werkzeug.exceptions import HTTPException
 
@@ -38,6 +39,8 @@ MIN_TEXT_CHARS = 20
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 PUBLIC_PAGES_ORIGIN = "https://zimo66067-wq.github.io"
 TRACE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{6,96}$")
+CONSENT_TOKEN_SALT = "career-coach-consent-v1"
+DEFAULT_CONSENT_MAX_AGE_SECONDS = 1800
 SUBSCORE_DEFAULTS = {
     "structure": "结构完整度",
     "clarity": "表达清晰度",
@@ -97,7 +100,7 @@ def apply_cors(response):
     if origin_allowed(origin):
         response.headers["Access-Control-Allow-Origin"] = origin.rstrip("/")
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Trace-Id"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Trace-Id, X-Consent-Token"
         response.headers["Access-Control-Max-Age"] = "600"
         existing_vary = response.headers.get("Vary", "")
         response.headers["Vary"] = ", ".join(filter(None, [existing_vary, "Origin"]))
@@ -155,6 +158,58 @@ def handle_unexpected_error(error):
 def api_response(payload, status=200):
     payload.setdefault("trace_id", trace_id())
     return jsonify(payload), status
+
+
+def consent_ttl_seconds():
+    """Return a bounded, short-lived consent-token lifetime."""
+    try:
+        configured = int(os.environ.get("DUMATE_CONSENT_MAX_AGE_SECONDS", DEFAULT_CONSENT_MAX_AGE_SECONDS))
+    except (TypeError, ValueError):
+        configured = DEFAULT_CONSENT_MAX_AGE_SECONDS
+    return min(max(configured, 60), 86_400)
+
+
+def consent_serializer():
+    """Build a signer without storing the consent body or source material."""
+    signing_material = os.environ.get("DUMATE_CONSENT_SECRET")
+    if not signing_material:
+        if app.config.get("TESTING") or os.environ.get("APP_ENV", "production").lower() != "production":
+            signing_material = "development-consent-token-for-tests"
+        else:
+            raise ApiError(
+                "consent_not_configured",
+                "服务尚未配置同意记录签名密钥，暂不能处理材料。",
+                503,
+            )
+    return URLSafeTimedSerializer(signing_material, salt=CONSENT_TOKEN_SALT)
+
+
+def issue_consent():
+    if not request.is_json:
+        raise ApiError("invalid_content_type", "同意请求必须使用 JSON 格式。", 415)
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or body.get("accepted") is not True:
+        raise ApiError("consent_required", "请先明确同意本次会话的数据处理说明。", 422)
+    token = consent_serializer().dumps({"accepted": True, "version": "1"})
+    return {
+        "status": "ACCEPTED",
+        "consent_token": token,
+        "expires_in_seconds": consent_ttl_seconds(),
+    }
+
+
+def require_consent():
+    token = request.headers.get("X-Consent-Token", "").strip()
+    if not token:
+        raise ApiError("consent_required", "请先阅读并同意本次会话的数据处理说明。", 428)
+    try:
+        payload = consent_serializer().loads(token, max_age=consent_ttl_seconds())
+    except SignatureExpired:
+        raise ApiError("consent_expired", "同意记录已过期，请重新确认后再继续。", 401)
+    except BadSignature:
+        raise ApiError("invalid_consent", "同意记录无效，请重新确认后再继续。", 401)
+    if not isinstance(payload, dict) or payload.get("accepted") is not True or payload.get("version") != "1":
+        raise ApiError("invalid_consent", "同意记录无效，请重新确认后再继续。", 401)
 
 
 def request_route():
@@ -740,7 +795,9 @@ def build_job_profile(job_text):
 
     profile = {
         "version": "1.0",
-        "user_confirmed": True,
+        # JD is parsed first and only becomes matchable after an explicit UI
+        # confirmation.  The server must never silently assert that step.
+        "user_confirmed": False,
         "requirements": requirements,
         "prompt_injection_flags": injection_flags(job_text),
     }
@@ -826,17 +883,39 @@ def match_job_profile(resume_text, job_profile):
 def route_api():
     route = request_route()
     if request.method == "OPTIONS":
-        if route in {"wf01/upload", "wf02/diagnose", "wf03/upload", "wf03/jd", "wf03/match", "health"}:
+        if route in {
+            "wf01/consent", "wf01/upload", "wf02/diagnose", "wf03/upload", "wf03/jd", "wf03/match",
+            "wf04/start", "wf04/answer", "wf04/end", "wf05/ability", "wf06/delete", "health",
+        }:
             return ("", 204)
         raise ApiError("not_found", "接口不存在。", 404)
 
     if route == "health" and request.method == "GET":
-        return api_response({"status": "ok", "model_configured": bool(os.environ.get("ZHIPU_API_KEY"))})
+        return api_response({
+            "status": "ok",
+            "model_configured": bool(os.environ.get("ZHIPU_API_KEY")),
+            "workflows": {
+                "wf01": "available", "wf02": "available", "wf03": "available",
+                "wf04": "requires_durable_session_store",
+                "wf05": "requires_durable_session_store",
+                "wf06": "requires_server_side_data_store",
+            },
+        })
+    if route == "wf01/consent" and request.method == "POST":
+        return api_response(issue_consent())
+    if route in {"wf04/start", "wf04/answer", "wf04/end", "wf05/ability", "wf06/delete"}:
+        raise ApiError(
+            "workflow_not_configured",
+            "该工作流需要可删除的持久化会话/数据存储和外部服务配置，当前部署未启用。",
+            501,
+        )
     if route == "wf01/upload" and request.method == "POST":
+        require_consent()
         source_text = read_uploaded_resume()
         cleaned_text, _mapping = deidentify(source_text)
         return api_response({"resumeText": cleaned_text, "resumeProfile": None})
     if route == "wf02/diagnose" and request.method == "POST":
+        require_consent()
         if not request.is_json:
             raise ApiError("invalid_content_type", "诊断请求必须使用 JSON 格式。", 415)
         body = request.get_json(silent=True)
@@ -853,8 +932,10 @@ def route_api():
             "diagnosis_notice": diagnosis_notice,
         })
     if route == "wf03/upload" and request.method == "POST":
+        require_consent()
         return api_response({"jdText": read_uploaded_job(), "jobProfile": None})
     if route == "wf03/jd" and request.method == "POST":
+        require_consent()
         if not request.is_json:
             raise ApiError("invalid_content_type", "JD 解析请求必须使用 JSON 格式。", 415)
         body = request.get_json(silent=True)
@@ -862,6 +943,7 @@ def route_api():
             raise ApiError("invalid_request", "JD 解析请求格式无效。", 422)
         return api_response({"jobProfile": build_job_profile(validate_job_text(body.get("jdText")))})
     if route == "wf03/match" and request.method == "POST":
+        require_consent()
         if not request.is_json:
             raise ApiError("invalid_content_type", "岗位匹配请求必须使用 JSON 格式。", 415)
         body = request.get_json(silent=True)
@@ -876,8 +958,9 @@ def route_api():
 
 # Local test routes plus the single Vercel function route used by vercel.json.
 for _rule in (
-    "/api", "/api/wf01/upload", "/api/wf02/diagnose", "/api/wf03/upload",
-    "/api/wf03/jd", "/api/wf03/match", "/api/health",
+    "/api", "/api/wf01/consent", "/api/wf01/upload", "/api/wf02/diagnose", "/api/wf03/upload",
+    "/api/wf03/jd", "/api/wf03/match", "/api/wf04/start", "/api/wf04/answer", "/api/wf04/end",
+    "/api/wf05/ability", "/api/wf06/delete", "/api/health",
 ):
     app.add_url_rule(_rule, endpoint="route_" + _rule.replace("/", "_") or "root", view_func=route_api,
                      methods=["GET", "POST", "OPTIONS"])

@@ -23,6 +23,43 @@
   <h1 class="page-title">F4 · 能力报告 + 七天竞争力情景推演</h1>
   <p class="page-sub">C0 = 0.25R + 0.35M + 0.40I ｜ 七天结果为公开假设下的情景区间，不是预测</p>
 
+  <section class="card journey-progress" aria-labelledby="journeyProgressTitle">
+    <div class="journey-progress-head">
+      <div>
+        <p class="journey-eyebrow">报告前置任务</p>
+        <h2 id="journeyProgressTitle">F1–F3 完成进度</h2>
+      </div>
+      <p class="journey-progress-count" aria-live="polite"><strong id="journeyCompleteCount">0</strong><span> / 3 已完成</span></p>
+    </div>
+    <div class="journey-map" id="journeyMap" data-complete="0">
+      <svg class="journey-links" viewBox="0 0 960 236" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <path class="journey-link journey-link-f1" d="M218 78 C342 34, 397 76, 450 108"></path>
+        <path class="journey-link journey-link-f2" d="M742 78 C618 34, 563 76, 510 108"></path>
+        <path class="journey-link journey-link-f3" d="M480 194 C480 170, 480 154, 480 140"></path>
+      </svg>
+      <a class="journey-node journey-node-f1" id="journeyF1" href="f1-resume.html">
+        <span class="journey-node-code">F1</span>
+        <strong>简历诊断</strong>
+        <span class="journey-node-state" id="journeyF1State">待完成</span>
+      </a>
+      <a class="journey-node journey-node-f2" id="journeyF2" href="f2-match.html">
+        <span class="journey-node-code">F2</span>
+        <strong>岗位匹配</strong>
+        <span class="journey-node-state" id="journeyF2State">待完成</span>
+      </a>
+      <a class="journey-node journey-node-f3" id="journeyF3" href="f3-interview.html">
+        <span class="journey-node-code">F3</span>
+        <strong>模拟面试</strong>
+        <span class="journey-node-state" id="journeyF3State">待完成</span>
+      </a>
+      <div class="journey-hub" id="journeyHub" role="status" aria-live="polite">
+        <span>F4</span>
+        <strong id="journeyHubState">待解锁</strong>
+      </div>
+    </div>
+    <p class="journey-description" id="journeyDescription">正在读取本次浏览器会话的完成记录。</p>
+  </section>
+
   <div data-state-view="empty">
     <div class="card empty-state">
       <div class="art"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-6m4 6V7m4 10v-3M5 21h14a1 1 0 001-1V4a1 1 0 00-1-1H5a1 1 0 00-1 1v16a1 1 0 001 1z"/></svg></div>
@@ -117,7 +154,52 @@ function renderPlan(elId, plan) {
     return '<div class="plan-day"><div class="d">第 ' + p.day + " 天</div><div style=\"font-size:14px\">" + p.focus + '</div><div class="m">⏱ ' + p.minutes + " 分钟 ｜ 成果物：" + p.artifact + "</div></div>";
   }).join("");
 }
+function updateJourneyProgress() {
+  var cache = window.DataBridge && window.DataBridge._cache;
+  function hasResult(key) {
+    if (!cache || typeof cache.get !== "function") return false;
+    try {
+      var value = cache.get(key);
+      return value !== null && value !== undefined;
+    } catch (err) {
+      return false;
+    }
+  }
+  var steps = [
+    { key: "diagnoseResult", node: "journeyF1", state: "journeyF1State", label: "F1 简历诊断" },
+    { key: "matchResult", node: "journeyF2", state: "journeyF2State", label: "F2 岗位匹配" },
+    { key: "interviewReport", node: "journeyF3", state: "journeyF3State", label: "F3 模拟面试" }
+  ];
+  var completeCount = 0;
+  steps.forEach(function (step, index) {
+    var complete = hasResult(step.key);
+    if (complete) completeCount += 1;
+    var node = document.getElementById(step.node);
+    var state = document.getElementById(step.state);
+    if (node) {
+      node.classList.toggle("is-complete", complete);
+      node.setAttribute("aria-label", step.label + "：" + (complete ? "已完成" : "待完成"));
+    }
+    if (state) state.textContent = complete ? "已完成" : "待完成";
+    var map = document.getElementById("journeyMap");
+    if (map) map.classList.toggle("journey-f" + (index + 1) + "-complete", complete);
+  });
+  var count = document.getElementById("journeyCompleteCount");
+  var hub = document.getElementById("journeyHub");
+  var hubState = document.getElementById("journeyHubState");
+  var description = document.getElementById("journeyDescription");
+  var allComplete = completeCount === steps.length;
+  if (count) count.textContent = completeCount;
+  if (hub) hub.classList.toggle("is-ready", allComplete);
+  if (hubState) hubState.textContent = allComplete ? "可生成" : "待解锁";
+  if (description) {
+    description.textContent = window.APP && window.APP.isDemoMode()
+      ? "演示数据不会计入进度；完成状态仅依据本浏览器会话中的真实结果。"
+      : "仅在成功得到诊断、匹配或面试报告后计为完成；上传文件或访问页面不计入进度。";
+  }
+}
 document.addEventListener("DOMContentLoaded", function () {
+  updateJourneyProgress();
   var state = window.APP.getState();
   if (!window.APP.isDemoMode() || (state !== "success" && state !== "degraded")) return;
   // 成功/降级态的合成内容仅用于显式演示模式。

@@ -43,7 +43,7 @@ test('F2 JD 文本与文件都会走真实的解析和匹配接口', async () =>
       };
     },
     async matchJD(resumeText, profile) {
-      calls.push(['matchJD', resumeText, profile.requirements.length]);
+      calls.push(['matchJD', resumeText, profile.requirements.length, profile.user_confirmed]);
       return {
         matchResult: {
           score_M: 86,
@@ -63,11 +63,37 @@ test('F2 JD 文本与文件都会走真实的解析和匹配接口', async () =>
 
   const textResult = await flow.submitText('岗位职责：负责 Python API 开发\n任职要求：熟悉 Flask、SQL 与 Redis。');
   assert.equal(textResult.ok, true);
-  assert.equal(textResult.matchResult.score_M, 86);
+  assert.equal(textResult.requires_confirmation, true);
+  const textMatch = await flow.confirmMatch(textResult.jobText, textResult.jobProfile);
+  assert.equal(textMatch.matchResult.score_M, 86);
+  assert.equal(textMatch.jobProfile.user_confirmed, true);
 
   const fileResult = await flow.submitFile({ name: 'backend.docx', size: 2048 });
   assert.equal(fileResult.ok, true);
+  assert.equal(fileResult.requires_confirmation, true);
+  const fileMatch = await flow.confirmMatch(fileResult.jobText, fileResult.jobProfile);
+  assert.equal(fileMatch.matchResult.score_M, 86);
+  assert.equal(fileMatch.jobProfile.user_confirmed, true);
   assert.deepEqual(calls.map((item) => item[0]), ['submitJD', 'matchJD', 'uploadJD', 'submitJD', 'matchJD']);
+  assert.deepEqual(calls.filter((item) => item[0] === 'matchJD').map((item) => item[3]), [true, true]);
+});
+
+test('F2 在未取得明确同意时不发送 JD 或简历材料', async () => {
+  const upload = loadUploadModule('https://api.example.test');
+  const calls = [];
+  const flow = upload.createSubmissionFlow({
+    bridge: {
+      async submitJD() { calls.push('submitJD'); return {}; },
+      async matchJD() { calls.push('matchJD'); return {}; }
+    },
+    getResumeText: () => '具备 Python、Flask 和 SQL 的后端开发与接口设计项目经验。',
+    isApiAvailable: () => true,
+    ensureConsent: async () => ({ ok: false, error_code: 'consent_required', message: 'consent required' })
+  });
+
+  const result = await flow.submitText('岗位职责：负责后端 API 开发，任职要求：熟悉 Python、Flask、SQL 和 Redis。');
+  assert.equal(result.error_code, 'consent_required');
+  assert.deepEqual(calls, []);
 });
 
 test('F2 会在 F1 未完成或服务未配置时阻止匹配并给出明确原因', async () => {

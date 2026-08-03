@@ -2,6 +2,7 @@
 """Contract tests for the public browser API, without a real provider call."""
 import io
 import json
+from pathlib import Path
 from unittest.mock import patch
 
 import api.index as api_module
@@ -57,11 +58,40 @@ class FakeRouter:
         }
 
 
-def client(monkeypatch, router=None):
+def raw_client(monkeypatch, router=None):
     if router is not None:
         monkeypatch.setattr(api_module, "build_model_router", lambda: router)
+    monkeypatch.setenv("DUMATE_CONSENT_SECRET", "test-consent-secret")
+    monkeypatch.delenv("DUMATE_CONSENT_MAX_AGE_SECONDS", raising=False)
     api_module.app.config.update(TESTING=True)
     return api_module.app.test_client()
+
+
+class ConsentedClient:
+    """Keep pre-existing material API tests explicit about a valid consent."""
+
+    def __init__(self, raw, consent_token):
+        self._raw = raw
+        self._consent_token = consent_token
+
+    def __getattr__(self, name):
+        request_method = getattr(self._raw, name)
+        if name not in {"delete", "get", "open", "patch", "post", "put"}:
+            return request_method
+
+        def request_with_consent(*args, **kwargs):
+            headers = dict(kwargs.pop("headers", {}) or {})
+            headers.setdefault("X-Consent-Token", self._consent_token)
+            return request_method(*args, headers=headers, **kwargs)
+
+        return request_with_consent
+
+
+def client(monkeypatch, router=None):
+    raw = raw_client(monkeypatch, router)
+    consent = raw.post("/api/wf01/consent", json={"accepted": True})
+    assert consent.status_code == 200
+    return ConsentedClient(raw, consent.json["consent_token"])
 
 
 def test_upload_txt_deidentifies_and_sets_cors(monkeypatch):
@@ -87,6 +117,7 @@ def test_preflight_allows_only_public_pages_origin(monkeypatch):
     )
     assert allowed.status_code == 204
     assert allowed.headers["Access-Control-Allow-Origin"] == "https://zimo66067-wq.github.io"
+    assert "X-Consent-Token" in allowed.headers["Access-Control-Allow-Headers"]
     assert "Access-Control-Allow-Origin" not in rejected.headers
 
 
@@ -104,6 +135,51 @@ def test_unknown_paths_remain_404_instead_of_becoming_internal_errors(monkeypatc
 
     assert response.status_code == 404
     assert response.json["error"] == "not_found"
+
+
+def test_material_apis_reject_requests_without_explicit_consent(monkeypatch):
+    response = raw_client(monkeypatch).post("/api/wf02/diagnose", json={"resumeText": RESUME})
+
+    assert response.status_code == 428
+    assert response.json["error"] == "consent_required"
+
+
+def test_f2_requires_explicit_job_confirmation_before_matching(monkeypatch):
+    session = client(monkeypatch)
+    parsed = session.post(
+        "/api/wf03/jd",
+        json={"jdText": "Backend engineer role. Requirements include Python, Flask, SQL, Redis, and API delivery."},
+    )
+
+    assert parsed.status_code == 200
+    profile = parsed.json["jobProfile"]
+    assert profile["user_confirmed"] is False
+
+    rejected = session.post("/api/wf03/match", json={"resumeText": RESUME, "jobProfile": profile})
+    assert rejected.status_code == 422
+    assert rejected.json["error"] == "invalid_job_profile"
+
+    profile["user_confirmed"] = True
+    matched = session.post("/api/wf03/match", json={"resumeText": RESUME, "jobProfile": profile})
+    assert matched.status_code == 200
+    assert matched.json["match_mode"] == "rule_bm25"
+
+
+def test_unconfigured_workflows_fail_closed_instead_of_returning_404(monkeypatch):
+    response = raw_client(monkeypatch).post("/api/wf04/start", json={})
+
+    assert response.status_code == 501
+    assert response.json["error"] == "workflow_not_configured"
+
+
+def test_vercel_routes_cover_the_public_api_contract():
+    config = json.loads(Path("vercel.json").read_text(encoding="utf-8"))
+    routes = {item["source"]: item["destination"] for item in config["rewrites"]}
+
+    assert routes["/api/wf01/consent"] == "/api?_route=wf01/consent"
+    assert routes["/api/wf03/upload"] == "/api?_route=wf03/upload"
+    assert routes["/api/wf03/jd"] == "/api?_route=wf03/jd"
+    assert routes["/api/wf03/match"] == "/api?_route=wf03/match"
 
 
 def test_model_router_requires_zhipu_key(monkeypatch):

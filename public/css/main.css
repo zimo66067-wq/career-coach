@@ -456,6 +456,38 @@ table.dim th { background: var(--zy-bg-cool); font-weight: 650; }
 .state-matrix a { color: var(--zy-primary); text-decoration: none; font-size: 13px; }
 .state-matrix a:hover { text-decoration: underline; }
 
+/* ---- F4 前置任务进度图 ---- */
+.journey-progress { margin-bottom: var(--zy-s4); }
+.journey-progress-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+.journey-progress h2 { margin: 0; font-size: 18px; }
+.journey-eyebrow { margin: 0 0 5px; color: var(--zy-primary); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+.journey-progress-count { margin: 0; color: var(--zy-ink-2); font-size: 13px; white-space: nowrap; }
+.journey-progress-count strong { color: var(--zy-primary); font-family: var(--zy-font-num); font-size: 24px; line-height: 1; }
+.journey-map { position: relative; min-height: 220px; isolation: isolate; }
+.journey-links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; z-index: -1; }
+.journey-link { fill: none; stroke: #d7dce8; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 4 6; transition: stroke var(--zy-d-fast) var(--zy-ease); }
+.journey-f1-complete .journey-link-f1, .journey-f2-complete .journey-link-f2, .journey-f3-complete .journey-link-f3 { stroke: var(--zy-covered); }
+.journey-node { position: absolute; display: flex; flex-direction: column; gap: 4px; width: 27%; min-width: 174px; padding: 13px 15px; color: var(--zy-ink); text-decoration: none; background: var(--zy-surface); border: 1px solid var(--zy-line); border-radius: var(--zy-r-md); box-shadow: var(--zy-shadow-1); transition: border-color var(--zy-d-fast) var(--zy-ease), box-shadow var(--zy-d-fast) var(--zy-ease), transform var(--zy-d-fast) var(--zy-ease); }
+.journey-node:hover { border-color: rgba(47, 107, 255, .5); box-shadow: var(--zy-shadow-2); transform: translateY(-2px); }
+.journey-node:focus-visible { outline: 3px solid rgba(47, 107, 255, .35); outline-offset: 3px; }
+.journey-node-f1 { top: 18px; left: 2%; }
+.journey-node-f2 { top: 18px; right: 2%; }
+.journey-node-f3 { bottom: 2px; left: 50%; transform: translateX(-50%); }
+.journey-node-f3:hover { transform: translateX(-50%) translateY(-2px); }
+.journey-node-code { color: var(--zy-primary); font-family: var(--zy-font-num); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+.journey-node strong { font-size: 14px; }
+.journey-node-state { color: var(--zy-ink-3); font-size: 12px; }
+.journey-node-state::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #b8c0cf; }
+.journey-node.is-complete { border-color: rgba(21, 128, 61, .32); background: linear-gradient(135deg, var(--zy-surface), var(--zy-covered-bg)); }
+.journey-node.is-complete .journey-node-code, .journey-node.is-complete .journey-node-state { color: var(--zy-covered); }
+.journey-node.is-complete .journey-node-state::before { background: var(--zy-covered); }
+.journey-hub { position: absolute; top: 84px; left: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100px; height: 100px; transform: translateX(-50%); color: var(--zy-ink-2); background: var(--zy-bg-cool); border: 1px solid var(--zy-line); border-radius: 50%; box-shadow: var(--zy-shadow-1); }
+.journey-hub span { color: var(--zy-primary); font-family: var(--zy-font-num); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+.journey-hub strong { margin-top: 3px; font-size: 14px; }
+.journey-hub.is-ready { color: #fff; background: var(--zy-grad-ai); border-color: transparent; box-shadow: 0 10px 24px rgba(47, 107, 255, .28); }
+.journey-hub.is-ready span { color: rgba(255, 255, 255, .82); }
+.journey-description { margin: 10px 0 0; color: var(--zy-ink-3); font-size: 12px; }
+
 /* ---- 响应式 ---- */
 @media (max-width: 1023px) {
   .evidence-grid { grid-template-columns: 1fr; }
@@ -474,6 +506,12 @@ table.dim th { background: var(--zy-bg-cool); font-weight: 650; }
   .job-upload-layout { grid-template-columns: 1fr; }
   .resume-upload-actions .btn { flex: 1 1 160px; justify-content: center; }
   .demo-notice { top: 72px; max-width: calc(100vw - 28px); white-space: normal; text-align: center; }
+  .journey-progress-head { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .journey-map { display: grid; grid-template-columns: 1fr; gap: 10px; min-height: 0; }
+  .journey-links { display: none; }
+  .journey-node { position: static; width: auto; min-width: 0; transform: none; }
+  .journey-node:hover, .journey-node-f3:hover { transform: translateY(-2px); }
+  .journey-hub { position: static; order: -1; width: 82px; height: 82px; margin: 2px auto 6px; transform: none; }
 }
 
 /* ---- 减少动态偏好（WCAG 2.3.3 / 规范要求） ---- */

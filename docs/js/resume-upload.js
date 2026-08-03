@@ -80,6 +80,7 @@
     options = options || {};
     var bridge = options.bridge;
     var onProcessing = typeof options.onProcessing === "function" ? options.onProcessing : function () {};
+    var ensureConsent = typeof options.ensureConsent === "function" ? options.ensureConsent : async function () { return { ok: true }; };
 
     function unavailable() {
       return { ok: false, error: "api_not_configured", message: failureMessage({ error: "api_not_configured" }) };
@@ -101,11 +102,28 @@
       return { ok: true, resumeText: text, diagnosis: result };
     }
 
+    async function confirmConsent() {
+      var result;
+      try {
+        result = await ensureConsent();
+      } catch (error) {
+        return { ok: false, error: "consent_unavailable", message: "无法确认数据处理同意，请稍后重试。" };
+      }
+      if (result === true || (result && result.ok)) return null;
+      return {
+        ok: false,
+        error: (result && (result.error || result.error_code)) || "consent_required",
+        message: (result && result.message) || "请先阅读并勾选数据处理说明。"
+      };
+    }
+
     return {
       submitFile: async function (file) {
         var validation = validateFile(file);
         if (!validation.valid) return { ok: false, error: "invalid_file", message: validation.message };
         if (isStaticPagesWithoutApi() || !bridge || typeof bridge.uploadResume !== "function" || typeof bridge.diagnoseResume !== "function") return unavailable();
+        var consentError = await confirmConsent();
+        if (consentError) return consentError;
 
         onProcessing();
         var uploaded;
@@ -127,6 +145,8 @@
         var parsed = prepareResumeText(value);
         if (!parsed.valid) return { ok: false, error: "invalid_text", message: parsed.message };
         if (isStaticPagesWithoutApi() || !bridge || typeof bridge.diagnoseResume !== "function") return unavailable();
+        var consentError = await confirmConsent();
+        if (consentError) return consentError;
 
         onProcessing();
         return diagnose(parsed.text);
@@ -253,6 +273,7 @@
     var cancelText = document.getElementById("cancelResumeText");
     var retryButton = document.getElementById("retryResumeDiagnosis");
     var returnButton = document.getElementById("returnToResumeUpload");
+    var consentCheckbox = document.getElementById("resumeConsent");
     if (!card || !dropzone || !input || !chooseButton || !startButton || !status) return;
 
     var selectedFile = null;
@@ -262,6 +283,21 @@
       bridge: window.DataBridge,
       onProcessing: function () {
         if (window.APP && typeof window.APP.setState === "function") window.APP.setState("processing");
+      },
+      ensureConsent: async function () {
+        if (!consentCheckbox || !consentCheckbox.checked) {
+          return { ok: false, error: "consent_required", message: "请先阅读并勾选数据处理说明。" };
+        }
+        if (!window.DataBridge || typeof window.DataBridge.submitConsent !== "function") {
+          return { ok: false, error: "consent_unavailable", message: "同意记录服务暂不可用，请稍后重试。" };
+        }
+        var consent = await window.DataBridge.submitConsent("resume_session");
+        if (consent && !consent.error && consent.status === "ACCEPTED") return { ok: true };
+        return {
+          ok: false,
+          error: (consent && consent.error) || "consent_unavailable",
+          message: (consent && consent.message) || "同意记录服务暂不可用，请稍后重试。"
+        };
       }
     });
 

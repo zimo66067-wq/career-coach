@@ -38,6 +38,10 @@
           <button class="btn" id="startJobMatch" type="button" hidden disabled>开始匹配</button>
           <button class="btn ghost" id="openJobText" type="button">直接粘贴文本</button>
         </div>
+        <label class="data-consent" for="jobConsent">
+          <input id="jobConsent" type="checkbox">
+          <span>我已阅读并同意仅为本次岗位匹配处理我提交的 JD 和已完成诊断的简历内容。</span>
+        </label>
         <form class="resume-text-entry" id="jobTextEntry" hidden>
           <label for="jobTextInput">粘贴职位描述 / 招聘要求</label>
           <textarea id="jobTextInput" placeholder="例如：岗位职责、任职要求、技能要求、加分项等。"></textarea>
@@ -61,6 +65,19 @@
         <a class="job-help-link" href="f1-resume.html">还没有完成简历诊断？先去 F1</a>
       </aside>
     </div>
+  </div>
+
+  <div data-state-view="confirmation">
+    <section class="card job-confirm-card" aria-labelledby="jobConfirmTitle">
+      <span class="job-help-label">确认步骤</span>
+      <h2 id="jobConfirmTitle">确认解析出的岗位要求</h2>
+      <p>请核对以下要求。只有在你确认后，系统才会使用当前简历计算匹配分。</p>
+      <div class="job-requirements-preview" id="jobRequirementsPreview" aria-live="polite"></div>
+      <div class="resume-upload-actions">
+        <button class="btn" id="confirmJobProfile" type="button">确认并开始匹配</button>
+        <button class="btn ghost" id="editJobProfile" type="button">返回修改 JD</button>
+      </div>
+    </section>
   </div>
 
   <div data-state-view="processing">

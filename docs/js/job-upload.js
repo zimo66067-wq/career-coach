@@ -57,6 +57,7 @@
     var bridge = options.bridge;
     var getResumeText = options.getResumeText || function () { return ''; };
     var onProcessing = options.onProcessing || function () {};
+    var ensureConsent = options.ensureConsent || async function () { return { ok: true }; };
     var isApiAvailable = options.isApiAvailable || function () {
       return typeof window !== 'undefined' && !!window.DUMATE_API_BASE;
     };
@@ -80,7 +81,21 @@
       return { ok: true, resumeText: resumeText };
     }
 
-    async function parseAndMatch(jobText, resumeText) {
+    async function confirmConsent() {
+      try {
+        var result = await ensureConsent();
+        if (result && result.ok === false) return result;
+        return { ok: true };
+      } catch (error) {
+        return {
+          ok: false,
+          error_code: 'consent_failed',
+          message: (error && error.message) || '未能确认本次会话的数据处理同意，请稍后重试。'
+        };
+      }
+    }
+
+    async function parseAndMatch(jobText, resumeText, userConfirmed) {
       var profileResponse = await bridge.submitJD(jobText);
       var jobProfile = profileResponse && profileResponse.jobProfile;
       if (!usableResult(profileResponse) || !jobProfile || !Array.isArray(jobProfile.requirements)) {
@@ -91,7 +106,17 @@
         };
       }
 
-      var matchResponse = await bridge.matchJD(resumeText, jobProfile);
+      if (!userConfirmed) {
+        return {
+          ok: true,
+          requires_confirmation: true,
+          jobText: jobText,
+          jobProfile: jobProfile
+        };
+      }
+
+      var confirmedProfile = Object.assign({}, jobProfile, { user_confirmed: true });
+      var matchResponse = await bridge.matchJD(resumeText, confirmedProfile);
       var matchResult = matchResponse && (matchResponse.matchResult || matchResponse);
       if (!usableResult(matchResponse) || !matchResult || typeof matchResult.score_M !== 'number') {
         return {
@@ -101,7 +126,7 @@
         };
       }
 
-      return { ok: true, jobText: jobText, jobProfile: jobProfile, matchResult: matchResult };
+      return { ok: true, jobText: jobText, jobProfile: confirmedProfile, matchResult: matchResult };
     }
 
     async function submitText(value) {
@@ -109,8 +134,18 @@
       if (!prepared.ok) return prepared;
       var ready = prerequisite();
       if (!ready.ok) return ready;
+      var consent = await confirmConsent();
+      if (!consent.ok) return consent;
       onProcessing();
-      return parseAndMatch(prepared.text, ready.resumeText);
+      try {
+        return await parseAndMatch(prepared.text, ready.resumeText, false);
+      } catch (error) {
+        return {
+          ok: false,
+          error_code: 'job_parse_failed',
+          message: (error && error.message) || '未能解析职位描述，请稍后重试。'
+        };
+      }
     }
 
     async function submitFile(file) {
@@ -118,6 +153,8 @@
       if (!fileCheck.ok) return fileCheck;
       var ready = prerequisite();
       if (!ready.ok) return ready;
+      var consent = await confirmConsent();
+      if (!consent.ok) return consent;
       onProcessing();
       var uploadResponse = await bridge.uploadJD(file);
       var prepared = prepareJobText(uploadResponse && uploadResponse.jdText);
@@ -128,10 +165,57 @@
           message: usableResult(uploadResponse) ? prepared.message : messageFrom(uploadResponse, 'JD 文件解析失败，请确认文件内容后重试。')
         };
       }
-      return parseAndMatch(prepared.text, ready.resumeText);
+      try {
+        return await parseAndMatch(prepared.text, ready.resumeText, false);
+      } catch (error) {
+        return {
+          ok: false,
+          error_code: 'job_parse_failed',
+          message: (error && error.message) || '未能解析职位描述，请稍后重试。'
+        };
+      }
     }
 
-    return { submitText: submitText, submitFile: submitFile, prerequisite: prerequisite };
+    async function confirmMatch(jobText, jobProfile) {
+      var ready = prerequisite();
+      if (!ready.ok) return ready;
+      var consent = await confirmConsent();
+      if (!consent.ok) return consent;
+      if (!jobProfile || !Array.isArray(jobProfile.requirements)) {
+        return {
+          ok: false,
+          error_code: 'confirmation_required',
+          message: '请先解析并确认岗位要求，再进行匹配。'
+        };
+      }
+      onProcessing();
+      try {
+        var confirmedProfile = Object.assign({}, jobProfile, { user_confirmed: true });
+        var matchResponse = await bridge.matchJD(ready.resumeText, confirmedProfile);
+        var matchResult = matchResponse && (matchResponse.matchResult || matchResponse);
+        if (!usableResult(matchResponse) || !matchResult || typeof matchResult.score_M !== 'number') {
+          return {
+            ok: false,
+            error_code: (matchResponse && matchResponse.error_code) || 'match_failed',
+            message: messageFrom(matchResponse, '职位匹配暂未完成，请稍后重试。')
+          };
+        }
+        return { ok: true, jobText: jobText, jobProfile: confirmedProfile, matchResult: matchResult };
+      } catch (error) {
+        return {
+          ok: false,
+          error_code: 'match_failed',
+          message: (error && error.message) || '职位匹配暂未完成，请稍后重试。'
+        };
+      }
+    }
+
+    return {
+      submitText: submitText,
+      submitFile: submitFile,
+      confirmMatch: confirmMatch,
+      prerequisite: prerequisite
+    };
   }
 
   function makeElement(tag, className, content) {
@@ -259,12 +343,18 @@
     var retryButton = document.getElementById('retryJobMatch');
     var returnButton = document.getElementById('returnToJobUpload');
     var errorMessage = document.getElementById('matchErrorMessage');
+    var consentCheckbox = document.getElementById('jobConsent');
+    var confirmButton = document.getElementById('confirmJobProfile');
+    var editButton = document.getElementById('editJobProfile');
+    var profilePreview = document.getElementById('jobRequirementsPreview');
     var selectedFile = null;
     var lastAttempt = null;
+    var pendingJobText = null;
+    var pendingJobProfile = null;
     var busy = false;
     var bridge = window.DataBridge;
 
-    if (!fileInput || !dropzone || !bridge) return;
+    if (!fileInput || !dropzone || !bridge || !consentCheckbox || !confirmButton || !editButton || !profilePreview || !errorMessage) return;
 
     function setState(name) {
       if (window.APP && typeof window.APP.setState === 'function') window.APP.setState(name);
@@ -278,6 +368,31 @@
     var flow = createSubmissionFlow({
       bridge: bridge,
       getResumeText: getResumeText,
+      ensureConsent: async function () {
+        if (!consentCheckbox.checked) {
+          return {
+            ok: false,
+            error_code: 'consent_required',
+            message: '请先勾选并同意本次会话的数据处理说明。'
+          };
+        }
+        if (typeof bridge.submitConsent !== 'function') {
+          return {
+            ok: false,
+            error_code: 'consent_unavailable',
+            message: '同意记录服务尚未配置，暂不能处理岗位材料。'
+          };
+        }
+        var consent = await bridge.submitConsent('job_matching');
+        if (!consent || consent.status !== 'ACCEPTED') {
+          return {
+            ok: false,
+            error_code: (consent && consent.error_code) || 'consent_failed',
+            message: messageFrom(consent, '未能确认本次会话的数据处理同意，请稍后重试。')
+          };
+        }
+        return { ok: true };
+      },
       onProcessing: function () { setState('processing'); }
     });
 
@@ -312,17 +427,56 @@
 
     function succeed(result) {
       busy = false;
+      pendingJobText = null;
+      pendingJobProfile = null;
       if (bridge._cache && typeof bridge._cache.set === 'function') bridge._cache.set('jobText', result.jobText);
       renderMatchResult(result.matchResult);
       setState('success');
+    }
+
+    function renderJobProfilePreview(profile) {
+      profilePreview.replaceChildren();
+      if (profile && profile.job_title) {
+        profilePreview.append(makeElement('h3', 'job-profile-title', profile.job_title));
+      }
+      var requirements = profile && Array.isArray(profile.requirements) ? profile.requirements : [];
+      if (!requirements.length) {
+        profilePreview.append(makeElement('p', 'empty-result', '未识别到可确认的岗位要求。请返回修改 JD 后重试。'));
+        return;
+      }
+      var list = makeElement('ol', 'job-requirements-list');
+      requirements.forEach(function (requirement) {
+        var item = makeElement('li', 'job-requirement-item');
+        var type = requirement && requirement.type;
+        var meta = SUBSCORE_META[type] || { label: '岗位要求', weight: '' };
+        item.append(makeElement('span', 'req-type', meta.label));
+        item.append(makeElement('span', '', (requirement && requirement.text) || '未命名要求'));
+        list.append(item);
+      });
+      profilePreview.append(list);
+    }
+
+    function awaitingConfirmation(result) {
+      busy = false;
+      pendingJobText = result.jobText;
+      pendingJobProfile = result.jobProfile;
+      renderJobProfilePreview(result.jobProfile);
+      setState('confirmation');
+      confirmButton.focus();
     }
 
     async function submitFile() {
       if (busy || !selectedFile) return;
       busy = true;
       lastAttempt = { type: 'file', file: selectedFile };
-      var result = await flow.submitFile(selectedFile);
-      if (result.ok) succeed(result); else fail(result);
+      try {
+        var result = await flow.submitFile(selectedFile);
+        if (result.ok && result.requires_confirmation) awaitingConfirmation(result);
+        else if (result.ok) succeed(result);
+        else fail(result);
+      } catch (error) {
+        fail({ message: (error && error.message) || '岗位文件处理失败，请稍后重试。' });
+      }
     }
 
     async function submitText() {
@@ -330,8 +484,26 @@
       busy = true;
       var value = textInput.value;
       lastAttempt = { type: 'text', value: value };
-      var result = await flow.submitText(value);
-      if (result.ok) succeed(result); else fail(result);
+      try {
+        var result = await flow.submitText(value);
+        if (result.ok && result.requires_confirmation) awaitingConfirmation(result);
+        else if (result.ok) succeed(result);
+        else fail(result);
+      } catch (error) {
+        fail({ message: (error && error.message) || '岗位文本处理失败，请稍后重试。' });
+      }
+    }
+
+    async function confirmPendingMatch() {
+      if (busy || !pendingJobText || !pendingJobProfile) return;
+      busy = true;
+      lastAttempt = { type: 'confirmation' };
+      try {
+        var result = await flow.confirmMatch(pendingJobText, pendingJobProfile);
+        if (result.ok) succeed(result); else fail(result);
+      } catch (error) {
+        fail({ message: (error && error.message) || '岗位匹配暂未完成，请稍后重试。' });
+      }
     }
 
     chooseButton.addEventListener('click', function () { fileInput.click(); });
@@ -374,12 +546,23 @@
       event.preventDefault();
       submitText();
     });
+    confirmButton.addEventListener('click', confirmPendingMatch);
+    editButton.addEventListener('click', function () {
+      busy = false;
+      pendingJobText = null;
+      pendingJobProfile = null;
+      setState('empty');
+      if (textEntry.hidden) dropzone.focus();
+      else textInput.focus();
+    });
     retryButton.addEventListener('click', function () {
       if (!lastAttempt || busy) {
         setState('empty');
         return;
       }
-      if (lastAttempt.type === 'file') {
+      if (lastAttempt.type === 'confirmation') {
+        confirmPendingMatch();
+      } else if (lastAttempt.type === 'file') {
         selectedFile = lastAttempt.file;
         submitFile();
       } else {
@@ -389,6 +572,8 @@
     });
     returnButton.addEventListener('click', function () {
       busy = false;
+      pendingJobText = null;
+      pendingJobProfile = null;
       setState('empty');
       dropzone.focus();
     });

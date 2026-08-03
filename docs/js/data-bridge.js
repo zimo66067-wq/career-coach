@@ -90,7 +90,13 @@
     options = options || {};
     var traceId = options._traceId || genTraceId();
     var url = API_BASE + endpoint;
-    var headers = options.headers || {};
+    var headers = Object.assign({}, options.headers || {});
+    // Only the server-issued, short-lived token is sent.  Source material and
+    // consent wording remain out of headers and server-side storage.
+    if (endpoint !== ENDPOINTS.consent) {
+      var consentToken = getCache('consentToken');
+      if (consentToken) headers['X-Consent-Token'] = consentToken;
+    }
     headers['X-Trace-Id'] = traceId;
 
     var body = options.body;
@@ -143,7 +149,7 @@
           clearTimeout(timer);
           if (timedOut) return; // 已由 timer 处理
           console.warn('[DataBridge] 请求失败: ' + endpoint, err);
-          resolve({ error: 'network', message: err.message || '网络错误', trace_id: traceId, degraded: true });
+          resolve(unavailable(traceId, 'network'));
         });
     });
   }
@@ -488,19 +494,26 @@
   //  WF-06: 隐私
   // ============================================================
 
-  // 提交同意书 -> {consent_id, status}
+  // 提交同意书 -> {status, consent_token}
   async function submitConsent(consentText) {
     var traceId = genTraceId();
     var res = await request(ENDPOINTS.consent, {
-      body: { consent_text: consentText },
+      body: { accepted: true, consent_version: '1' },
       _traceId: traceId
     });
 
-    if (!res.error) {
-      return { consent_id: res.consent_id, status: res.status || 'ACCEPTED', trace_id: res.trace_id || traceId };
+    if (!res.error && res.consent_token) {
+      setCache('consentToken', res.consent_token);
+      sessionStorage.removeItem('cb_session_deleted');
+      return {
+        status: res.status || 'ACCEPTED',
+        consent_token: res.consent_token,
+        expires_in_seconds: res.expires_in_seconds,
+        trace_id: res.trace_id || traceId
+      };
     }
 
-    if (!isDemoMode()) return unavailable(traceId, res.error);
+    if (!isDemoMode()) return res.error ? res : unavailable(traceId, 'invalid_consent_response');
     console.warn('[DataBridge] 演示模式：使用合成 consent 结果');
     return {
       consent_id: 'demo_consent_' + traceId,
@@ -512,7 +525,7 @@
     };
   }
 
-  // 删除全部数据 -> {status: 'DELETED', deleted_at}
+  // 删除全部数据 -> {status: 'DELETED' | 'LOCAL_DELETED', deleted_at}
   async function deleteAllData(sessionId) {
     var traceId = genTraceId();
 
@@ -535,14 +548,15 @@
       return { status: 'DELETED', deleted_at: res.deleted_at || new Date().toISOString(), trace_id: res.trace_id || traceId };
     }
 
-    // 降级: 本地标记删除
-    console.warn('[DataBridge] 降级: 本地标记删除');
+    // 没有可删除的服务端存储时，不能把浏览器缓存清除表述为服务端删除。
+    console.warn('[DataBridge] 仅完成本地会话删除');
     markDeleted();
     return {
-      status: 'DELETED',
+      status: 'LOCAL_DELETED',
       deleted_at: new Date().toISOString(),
       degraded: true,
-      degraded_reason: 'local_delete',
+      degraded_reason: 'server_delete_unavailable',
+      message: '已清除当前浏览器会话；服务端删除功能尚未配置。',
       trace_id: traceId
     };
   }
