@@ -4,4 +4,4 @@
  * Set this value only after the Vercel production deployment has produced its
  * HTTPS URL.  Do not place model keys, tokens, or other secrets in this file.
  */
-window.DUMATE_API_BASE = window.DUMATE_API_BASE || "";
+window.DUMATE_API_BASE = "https://career-coach-o7eu-bncraxad-zimo66067.vercel.app";
