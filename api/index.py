@@ -291,6 +291,14 @@ def diagnose_resume(resume_text):
     profile = result["output"]
     validation_errors = profile_validation_errors(profile, cleaned_text)
     if validation_errors:
+        # Keep production diagnostics useful without ever logging the resume
+        # content or the model-generated narrative.
+        print(json.dumps({
+            "event": "resume_validation_rejected",
+            "trace_id": result.get("trace_id"),
+            "error_codes": sorted(set(validation_errors))[:20],
+            "profile_keys": sorted(profile.keys()),
+        }, ensure_ascii=False), flush=True)
         raise ApiError("model_output_invalid", "诊断结果未通过证据校验，请稍后重试。", 502)
 
     score_r = round2(calc_R({
