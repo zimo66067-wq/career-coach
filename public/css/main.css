@@ -193,6 +193,25 @@ a.card:hover, .card.hoverable:hover {
 .resume-text-entry textarea:focus { outline: none; border-color: var(--zy-primary); box-shadow: var(--zy-shadow-focus); }
 .resume-text-help { margin-top: 8px !important; max-width: none !important; font-size: 12.5px; color: var(--zy-ink-3) !important; }
 
+/* ---- F2 岗位描述输入：与 F1 采用同一文件接收规范，并补充术语解释 ---- */
+.job-upload-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 310px); gap: 18px; align-items: stretch; }
+.job-upload-layout .card { margin-bottom: 0; }
+.job-help-card { padding: 24px; background: linear-gradient(160deg, var(--zy-surface), var(--zy-bg-cool)); }
+.job-help-label { display: inline-flex; padding: 4px 9px; border-radius: var(--zy-r-pill); background: var(--zy-primary-soft); color: var(--zy-primary); font-size: 12px; font-weight: 700; }
+.job-help-card h3 { margin: 13px 0 8px; }
+.job-help-card p { font-size: 13.5px; line-height: 1.65; color: var(--zy-ink-2); }
+.job-help-card em { font-style: normal; color: var(--zy-ink); }
+.job-help-list { margin: 16px 0; padding: 13px 0 13px 19px; border-top: 1px solid var(--zy-line); border-bottom: 1px solid var(--zy-line); color: var(--zy-ink-2); font-size: 13px; line-height: 1.65; }
+.job-help-list li + li { margin-top: 7px; }
+.job-help-list b { color: var(--zy-ink); }
+.job-format-note { padding: 10px 12px; border-radius: var(--zy-r-md); background: rgba(47, 107, 255, .07); border: 1px solid rgba(47, 107, 255, .16); }
+.job-format-note b { color: var(--zy-ink); }
+.job-help-link { display: inline-block; margin-top: 12px; color: var(--zy-primary); font-size: 13px; font-weight: 650; text-decoration: none; }
+.job-help-link:hover { text-decoration: underline; }
+.match-notice { margin-top: 18px; }
+.match-notice[hidden] { display: none; }
+.error-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+
 /* ---- 状态徽章 ---- */
 .badge {
   display: inline-flex; align-items: center;
@@ -452,6 +471,7 @@ table.dim th { background: var(--zy-bg-cool); font-weight: 650; }
   .score-ring .inner { width: 90px; height: 90px; }
   .score-ring .num { font-size: 27px; }
   .resume-upload-card { padding: 30px 18px; }
+  .job-upload-layout { grid-template-columns: 1fr; }
   .resume-upload-actions .btn { flex: 1 1 160px; justify-content: center; }
   .demo-notice { top: 72px; max-width: calc(100vw - 28px); white-space: normal; text-align: center; }
 }

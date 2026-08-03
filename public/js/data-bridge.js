@@ -11,6 +11,7 @@
   var API_BASE = String(window.DUMATE_API_BASE || '').replace(/\/+$/, '');
   var ENDPOINTS = {
     uploadResume:    '/api/wf01/upload',
+    uploadJD:        '/api/wf03/upload',
     diagnoseResume:  '/api/wf02/diagnose',
     submitJD:        '/api/wf03/jd',
     matchJD:         '/api/wf03/match',
@@ -261,6 +262,23 @@
   //  F2: JD 匹配
   // ============================================================
 
+  // 上传 JD 文件 -> {jdText, trace_id}
+  async function uploadJD(file) {
+    var traceId = genTraceId();
+    var formData = new FormData();
+    formData.append('file', file);
+    var res = await request(ENDPOINTS.uploadJD, {
+      body: formData,
+      _traceId: traceId
+    });
+
+    // JD 与简历一样不能在当前文件上传失败时复用旧会话内容，
+    // 否则可能把上一份岗位要求错配给用户的新职位。
+    if (res.error) return res;
+    setCache('jobText', res.jdText);
+    return { jdText: res.jdText, trace_id: res.trace_id || traceId };
+  }
+
   // 提交 JD -> {jobProfile, trace_id}
   async function submitJD(jdText) {
     var traceId = genTraceId();
@@ -274,53 +292,26 @@
       return { jobProfile: res.jobProfile, trace_id: res.trace_id || traceId };
     }
 
-    // 缓存
-    var cached = getCache('jobProfile');
-    if (cached) {
-      console.warn('[DataBridge] 使用缓存数据: jobProfile');
-      return { jobProfile: cached, degraded: true, degraded_reason: 'cached', trace_id: traceId };
-    }
-
-    // 降级: 返回结构化 JD（从 JD 文本提取基础结构）
-    console.warn('[DataBridge] 降级到本地 JD 解析');
-    var jobProfile = {
-      source: jdText,
-      requirements: [],
-      degraded: true,
-      degraded_reason: 'local_parse'
-    };
-    return { jobProfile: jobProfile, degraded: true, degraded_reason: 'local_parse', trace_id: traceId };
+    // 岗位要求是本次输入的直接依据；失败时必须明确失败，不能使用旧 JD
+    // 或伪造空的本地解析结果继续匹配。
+    return res;
   }
 
   // 匹配 JD -> {matchResult, trace_id}
-  async function matchJD(resumeProfile, jobProfile) {
+  async function matchJD(resumeText, jobProfile) {
     var traceId = genTraceId();
     var res = await request(ENDPOINTS.matchJD, {
-      body: { resumeProfile: resumeProfile, jobProfile: jobProfile },
+      body: { resumeText: resumeText, jobProfile: jobProfile },
       _traceId: traceId
     });
 
     if (!res.error) {
-      setCache('matchResult', res.matchResult);
-      return { matchResult: res.matchResult, trace_id: res.trace_id || traceId };
+      setCache('matchResult', res);
+      return { matchResult: res, trace_id: res.trace_id || traceId };
     }
 
-    // 缓存
-    var cached = getCache('matchResult');
-    if (cached) {
-      console.warn('[DataBridge] 使用缓存数据: matchResult');
-      return { matchResult: cached, degraded: true, degraded_reason: 'cached', trace_id: traceId };
-    }
-
-    var demo = demoData('matchResult', traceId, res.error);
-    if (demo.error) return demo;
-    return {
-      matchResult: demo.data,
-      degraded: true,
-      degraded_reason: 'demo_mock',
-      demo_data: true,
-      trace_id: traceId
-    };
+    // 当前简历和 JD 的组合发生变化时，不允许复用旧匹配结果。
+    return res;
   }
 
   // ============================================================
@@ -564,6 +555,7 @@
   // ── 暴露接口 ──────────────────────────────────────────
   window.DataBridge = {
     uploadResume: uploadResume,
+    uploadJD: uploadJD,
     diagnoseResume: diagnoseResume,
     submitJD: submitJD,
     matchJD: matchJD,

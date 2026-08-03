@@ -23,6 +23,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from tools.deidentify import deidentify  # noqa: E402
 from tools.extract_text import extract_docx, extract_pdf, extract_txt  # noqa: E402
+from tools.match_requirements import Bm25Matcher, judge, split_sentences, tokenize, unigrams  # noqa: E402
 from tools.model_router import ZhipuModelRouter  # noqa: E402
 from tools.redflag import JSON_NOISE, RE_NUMBER, RE_PLACEHOLDER  # noqa: E402
 from tools.rescore import calc_R, round2  # noqa: E402
@@ -52,6 +53,11 @@ with (REPOSITORY_ROOT / "contracts" / "resume-profile.schema.json").open(
     encoding="utf-8"
 ) as schema_file:
     RESUME_PROFILE_VALIDATOR = Draft202012Validator(json.load(schema_file))
+
+with (REPOSITORY_ROOT / "contracts" / "job-profile.schema.json").open(
+    encoding="utf-8"
+) as schema_file:
+    JOB_PROFILE_VALIDATOR = Draft202012Validator(json.load(schema_file))
 
 
 class ApiError(Exception):
@@ -161,19 +167,27 @@ def request_route():
     return ""
 
 
-def validate_text(value):
+def validate_document_text(value, label, error_code):
     text = str(value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
     if len(text) < MIN_TEXT_CHARS:
-        raise ApiError("invalid_resume_text", "简历正文至少需要 20 个字符。", 422)
+        raise ApiError(error_code, "%s正文至少需要 20 个字符。" % label, 422)
     if len(text) > MAX_TEXT_CHARS:
-        raise ApiError("payload_too_large", "简历正文不能超过 20 万个字符。", 413)
+        raise ApiError("payload_too_large", "%s正文不能超过 20 万个字符。" % label, 413)
     return text
 
 
-def read_uploaded_resume():
+def validate_text(value):
+    return validate_document_text(value, "简历", "invalid_resume_text")
+
+
+def validate_job_text(value):
+    return validate_document_text(value, "职位说明（JD）", "invalid_jd_text")
+
+
+def read_uploaded_document(label, error_code):
     uploaded = request.files.get("file")
     if not uploaded or not uploaded.filename:
-        raise ApiError("missing_file", "请选择要上传的 PDF、DOCX 或 TXT 简历。", 422)
+        raise ApiError("missing_file", "请选择要上传的 PDF、DOCX 或 TXT %s。" % label, 422)
 
     extension = Path(uploaded.filename).suffix.lower()
     if extension not in ALLOWED_EXTENSIONS:
@@ -192,7 +206,7 @@ def read_uploaded_resume():
             text = extract_docx(temporary_path)
         else:
             text = extract_txt(temporary_path)
-        return validate_text(text)
+        return validate_document_text(text, label, error_code)
     except ApiError:
         raise
     except SystemExit:
@@ -205,6 +219,14 @@ def read_uploaded_resume():
                 os.remove(temporary_path)
             except OSError:
                 pass
+
+
+def read_uploaded_resume():
+    return read_uploaded_document("简历", "invalid_resume_text")
+
+
+def read_uploaded_job():
+    return read_uploaded_document("职位说明（JD）", "invalid_jd_text")
 
 
 def build_model_router():
@@ -604,10 +626,207 @@ def diagnose_resume(resume_text):
     return profile, score_r, result.get("trace_id") or trace_id(), "model", ""
 
 
+JOB_TYPE_LABELS = {
+    "hard": "硬性要求",
+    "responsibility": "岗位职责",
+    "preferred": "加分项",
+    "terminology": "术语与工具",
+}
+MATCH_WEIGHTS = {
+    "hard": 0.50,
+    "responsibility": 0.25,
+    "preferred": 0.15,
+    "terminology": 0.10,
+}
+JOB_SECTION_HINTS = (
+    (("岗位职责", "工作职责", "职位职责", "工作内容", "你将负责"), "responsibility"),
+    (("任职要求", "职位要求", "岗位要求", "基本要求", "硬性要求", "资格要求"), "hard"),
+    (("加分项", "优先条件", "优先考虑", "bonus"), "preferred"),
+    (("技术栈", "工具", "术语", "技术要求"), "terminology"),
+)
+PROMPT_INJECTION_PATTERN = re.compile(
+    r"(?:忽略(?:以上|之前|前面)|ignore\s+(?:previous|above)|system\s+prompt|提示词|指令注入)",
+    re.IGNORECASE,
+)
+
+
+def job_requirement_type(text, active_type):
+    lowered = text.lower()
+    for hints, requirement_type in JOB_SECTION_HINTS:
+        if any(hint.lower() in lowered for hint in hints):
+            return requirement_type
+    if any(word in text for word in ("负责", "协同", "推进", "交付", "维护")):
+        return "responsibility"
+    if any(word in text for word in ("优先", "加分", "有过")):
+        return "preferred"
+    return active_type or "hard"
+
+
+def strip_requirement_prefix(text):
+    cleaned = re.sub(r"^[\s•·●▪◆\-—]+", "", text).strip()
+    cleaned = re.sub(r"^\d+[.、)）]\s*", "", cleaned)
+    cleaned = re.sub(r"^(?:任职要求|岗位职责|工作职责|职位要求|岗位要求|加分项|技术栈|工具)[：:\s]*", "", cleaned)
+    return cleaned.strip()
+
+
+def injection_flags(text):
+    flags = []
+    for match in PROMPT_INJECTION_PATTERN.finditer(text):
+        flags.append({
+            "quote": match.group(0),
+            "start": match.start(),
+            "end": match.end(),
+            "reason": "疑似指令性文本，已按普通 JD 文本处理。",
+        })
+    return flags
+
+
+def build_job_profile(job_text):
+    requirements = []
+    active_type = "hard"
+    offset = 0
+    job_title = ""
+    for raw_line in job_text.splitlines(keepends=True):
+        line = raw_line.strip()
+        line_start = offset + (len(raw_line) - len(raw_line.lstrip()))
+        offset += len(raw_line)
+        if not line:
+            continue
+        title_match = re.match(r"^(?:职位名称|岗位名称|招聘职位|职位|岗位)[：:]\s*(.{2,80})$", line)
+        if title_match and not job_title:
+            job_title = title_match.group(1).strip()
+            continue
+        matched_heading = None
+        for hints, requirement_type in JOB_SECTION_HINTS:
+            if line.rstrip("：:") in hints:
+                active_type = requirement_type
+                matched_heading = True
+                break
+        if matched_heading:
+            continue
+        requirement_text = strip_requirement_prefix(line)
+        if len(requirement_text) < 4:
+            continue
+        quote_start = job_text.find(line, max(0, line_start - 2))
+        if quote_start < 0:
+            quote_start = line_start
+        requirements.append({
+            "id": "req_%02d" % (len(requirements) + 1),
+            "type": job_requirement_type(line, active_type),
+            "text": requirement_text[:500],
+            "source_span": {
+                "doc": "job",
+                "quote": line,
+                "start": quote_start,
+                "end": quote_start + len(line),
+            },
+        })
+        if len(requirements) >= 30:
+            break
+
+    if not requirements:
+        for match in re.finditer(r"[^。；;！？!?]{4,500}", job_text):
+            quote = match.group(0).strip()
+            if not quote:
+                continue
+            requirements.append({
+                "id": "req_%02d" % (len(requirements) + 1),
+                "type": job_requirement_type(quote, "hard"),
+                "text": strip_requirement_prefix(quote),
+                "source_span": {"doc": "job", "quote": quote, "start": match.start(), "end": match.end()},
+            })
+            if len(requirements) >= 30:
+                break
+
+    profile = {
+        "version": "1.0",
+        "user_confirmed": True,
+        "requirements": requirements,
+        "prompt_injection_flags": injection_flags(job_text),
+    }
+    if job_title:
+        profile["job_title"] = job_title
+    errors = sorted(JOB_PROFILE_VALIDATOR.iter_errors(profile), key=str)
+    if errors:
+        raise ApiError("invalid_jd_text", "未能从 JD 中识别出可匹配的岗位要求，请补充职责或任职要求。", 422)
+    return profile
+
+
+def validate_job_profile(value):
+    if not isinstance(value, dict):
+        raise ApiError("invalid_job_profile", "岗位要求解析结果无效，请重新提交 JD。", 422)
+    errors = sorted(JOB_PROFILE_VALIDATOR.iter_errors(value), key=str)
+    if errors or not value.get("user_confirmed"):
+        raise ApiError("invalid_job_profile", "岗位要求解析结果无效，请重新提交 JD。", 422)
+    return value
+
+
+def match_job_profile(resume_text, job_profile):
+    cleaned_resume, _mapping = deidentify(resume_text)
+    sentences = split_sentences(cleaned_resume) or [cleaned_resume]
+    sentence_tokens = [tokenize(sentence) for sentence in sentences]
+    sentence_unigrams = [unigrams(sentence) for sentence in sentences]
+    document_unigrams = unigrams(cleaned_resume)
+    matcher = Bm25Matcher()
+    requirements = []
+    type_values = {name: [] for name in MATCH_WEIGHTS}
+
+    for requirement in job_profile["requirements"]:
+        confidence, sentence_index = matcher.best(
+            requirement["text"], sentence_tokens, sentence_unigrams, document_unigrams
+        )
+        query_words = unigrams(requirement["text"])
+        partial = bool(query_words & document_unigrams)
+        status = judge(confidence, partial)
+        result = {
+            "id": requirement["id"],
+            "type": requirement["type"],
+            "typeLabel": JOB_TYPE_LABELS[requirement["type"]],
+            "text": requirement["text"],
+            "status": status,
+            "evidence": sentences[sentence_index] if status in {"covered", "weak"} and sentence_index >= 0 else "",
+        }
+        requirements.append(result)
+        if status != "unknown":
+            type_values[requirement["type"]].append({"covered": 1.0, "weak": 0.5, "missing": 0.0}[status])
+
+    subscores = {}
+    weighted_score = 0.0
+    active_weight = 0.0
+    for requirement_type, weight in MATCH_WEIGHTS.items():
+        values = type_values[requirement_type]
+        score = round(sum(values) / len(values) * 100) if values else 0
+        subscores[requirement_type] = {"label": JOB_TYPE_LABELS[requirement_type], "score": score}
+        if values:
+            weighted_score += weight * score
+            active_weight += weight
+    score_m = round(weighted_score / active_weight) if active_weight else 0
+
+    gaps = []
+    for item in requirements:
+        if item["status"] == "covered" or item["status"] == "unknown":
+            continue
+        priority = "P0" if item["type"] == "hard" else ("P1" if item["type"] == "responsibility" else "P2")
+        gaps.append({
+            "level": priority,
+            "text": item["text"],
+            "action": "在简历中补充与该要求直接相关的真实经历、成果或技能证据。",
+        })
+
+    return {
+        "score_M": score_m,
+        "subscores": subscores,
+        "requirements": requirements,
+        "gaps": gaps,
+        "match_mode": "rule_bm25",
+        "match_notice": "本次使用基于简历原文的规则关键词匹配；未调用模型。",
+    }
+
+
 def route_api():
     route = request_route()
     if request.method == "OPTIONS":
-        if route in {"wf01/upload", "wf02/diagnose", "health"}:
+        if route in {"wf01/upload", "wf02/diagnose", "wf03/upload", "wf03/jd", "wf03/match", "health"}:
             return ("", 204)
         raise ApiError("not_found", "接口不存在。", 404)
 
@@ -633,10 +852,32 @@ def route_api():
             "diagnosis_mode": diagnosis_mode,
             "diagnosis_notice": diagnosis_notice,
         })
+    if route == "wf03/upload" and request.method == "POST":
+        return api_response({"jdText": read_uploaded_job(), "jobProfile": None})
+    if route == "wf03/jd" and request.method == "POST":
+        if not request.is_json:
+            raise ApiError("invalid_content_type", "JD 解析请求必须使用 JSON 格式。", 415)
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            raise ApiError("invalid_request", "JD 解析请求格式无效。", 422)
+        return api_response({"jobProfile": build_job_profile(validate_job_text(body.get("jdText")))})
+    if route == "wf03/match" and request.method == "POST":
+        if not request.is_json:
+            raise ApiError("invalid_content_type", "岗位匹配请求必须使用 JSON 格式。", 415)
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            raise ApiError("invalid_request", "岗位匹配请求格式无效。", 422)
+        return api_response(match_job_profile(
+            validate_text(body.get("resumeText")),
+            validate_job_profile(body.get("jobProfile")),
+        ))
     raise ApiError("not_found", "接口不存在。", 404)
 
 
 # Local test routes plus the single Vercel function route used by vercel.json.
-for _rule in ("/api", "/api/wf01/upload", "/api/wf02/diagnose", "/api/health"):
+for _rule in (
+    "/api", "/api/wf01/upload", "/api/wf02/diagnose", "/api/wf03/upload",
+    "/api/wf03/jd", "/api/wf03/match", "/api/health",
+):
     app.add_url_rule(_rule, endpoint="route_" + _rule.replace("/", "_") or "root", view_func=route_api,
                      methods=["GET", "POST", "OPTIONS"])
