@@ -37,6 +37,13 @@ MIN_TEXT_CHARS = 20
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 PUBLIC_PAGES_ORIGIN = "https://zimo66067-wq.github.io"
 TRACE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{6,96}$")
+SUBSCORE_DEFAULTS = {
+    "structure": "结构完整度",
+    "clarity": "表达清晰度",
+    "achievement_evidence": "成果证据",
+    "skill_evidence": "技能证据",
+    "ats_readability": "ATS 可读性",
+}
 
 # Multipart overhead is allowed here; the file itself is checked separately.
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_BYTES + 1024 * 1024
@@ -250,6 +257,173 @@ def validate_source_span(span, resume_text, errors):
         errors.append("source_span_not_grounded")
 
 
+def fallback_source_span(resume_text):
+    """Return a short, exact excerpt when the provider omitted location metadata."""
+    start = next((index for index, char in enumerate(resume_text) if not char.isspace()), 0)
+    end = min(len(resume_text), start + 160)
+    return {
+        "doc": "resume",
+        "quote": resume_text[start:end],
+        "start": start,
+        "end": end,
+    }
+
+
+def normalize_source_spans(raw_spans, resume_text):
+    """Fill omitted source-span fields without accepting a false quotation.
+
+    Some providers return only ``start``/``end``.  Those offsets still point
+    at the de-identified request text, so they can be converted into the
+    frozen contract.  A provider that supplied a mismatching quote is kept
+    invalid instead of being silently repaired.
+    """
+    if not isinstance(raw_spans, list):
+        return [], False
+
+    normalized = []
+    for raw_span in raw_spans:
+        if not isinstance(raw_span, dict):
+            continue
+        quote = raw_span.get("quote")
+        start = raw_span.get("start")
+        end = raw_span.get("end")
+
+        if isinstance(quote, str) and quote:
+            if isinstance(start, int) and isinstance(end, int):
+                if start < 0 or end <= start or end > len(resume_text) or resume_text[start:end] != quote:
+                    return [], True
+            else:
+                start = resume_text.find(quote)
+                end = start + len(quote)
+                if start < 0:
+                    return [], True
+        elif isinstance(start, int) and isinstance(end, int):
+            if start < 0 or end <= start or end > len(resume_text):
+                return [], True
+            quote = resume_text[start:end]
+        else:
+            continue
+
+        normalized.append({
+            "doc": "resume",
+            "quote": quote,
+            "start": start,
+            "end": end,
+        })
+    return normalized, False
+
+
+def normalize_score(raw_score):
+    """Keep a provider score only when it is a finite numeric value."""
+    if isinstance(raw_score, dict):
+        raw_score = raw_score.get("score")
+    if isinstance(raw_score, bool):
+        return 50
+    if isinstance(raw_score, (int, float)) and raw_score == raw_score:
+        return max(0, min(100, raw_score))
+    if isinstance(raw_score, str) and re.fullmatch(r"\s*\d+(?:\.\d+)?\s*", raw_score):
+        return max(0, min(100, float(raw_score)))
+    return 50
+
+
+def has_unsupported_number(text, resume_text):
+    placeholder_numbers = set(RE_PLACEHOLDER.findall(text))
+    for match in RE_NUMBER.finditer(text):
+        number = match.group(1)
+        if number in placeholder_numbers or number in JSON_NOISE:
+            continue
+        variants = {number, number + "%"}
+        if "." in number:
+            variants.add(number.rstrip("0").rstrip("."))
+        if not any(value in resume_text for value in variants):
+            return True
+    return False
+
+
+def safe_narrative(value, fallback, resume_text):
+    """Avoid presenting provider prose that contains unsupported facts."""
+    if not isinstance(value, str):
+        return fallback
+    candidate = value.strip()
+    if not candidate or has_unsupported_number(candidate, resume_text):
+        return fallback
+    return candidate
+
+
+def normalize_resume_profile(raw_profile, resume_text):
+    """Adapt known provider shape omissions into the frozen public contract.
+
+    This is deliberately narrow: it reconstructs missing container fields and
+    exact excerpts from valid character offsets, but does not repair a quote
+    that disagrees with the supplied resume text.
+    """
+    raw_subscores = raw_profile.get("subscores") if isinstance(raw_profile.get("subscores"), dict) else {}
+    normalized_subscores = {}
+    for key, label in SUBSCORE_DEFAULTS.items():
+        raw_subscore = raw_subscores.get(key)
+        raw_data = raw_subscore if isinstance(raw_subscore, dict) else {}
+        spans, has_invalid_quote = normalize_source_spans(raw_data.get("source_spans"), resume_text)
+        if has_invalid_quote:
+            spans = []
+        elif not spans:
+            spans = [fallback_source_span(resume_text)]
+        normalized_subscores[key] = {
+            "score": normalize_score(raw_subscore),
+            "rationale": safe_narrative(
+                raw_data.get("rationale"),
+                "%s仅基于所引用的简历原文进行评估。" % label,
+                resume_text,
+            ),
+            "source_spans": spans,
+        }
+
+    raw_suggestions = raw_profile.get("suggestions") if isinstance(raw_profile.get("suggestions"), list) else []
+    normalized_suggestions = []
+    for index, raw_suggestion in enumerate(raw_suggestions):
+        if not isinstance(raw_suggestion, dict):
+            continue
+        spans, has_invalid_quote = normalize_source_spans(raw_suggestion.get("source_spans"), resume_text)
+        if has_invalid_quote:
+            spans = []
+        elif not spans:
+            spans = [fallback_source_span(resume_text)]
+        suggestion = {
+            "id": raw_suggestion.get("id") if isinstance(raw_suggestion.get("id"), str) and raw_suggestion["id"].strip() else "suggestion-%s" % (index + 1),
+            "severity": raw_suggestion.get("severity") if raw_suggestion.get("severity") in {"P0", "P1", "P2"} else "P1",
+            "issue": safe_narrative(
+                raw_suggestion.get("issue"),
+                "当前简历中存在可进一步核实和完善的表达。",
+                resume_text,
+            ),
+            "suggestion": safe_narrative(
+                raw_suggestion.get("suggestion"),
+                "请根据已引用的简历原文，补充职责、成果和技能的可核验证据。",
+                resume_text,
+            ),
+            "source_spans": spans,
+        }
+        rewrite_draft = safe_narrative(raw_suggestion.get("rewrite_draft"), "", resume_text)
+        if rewrite_draft:
+            suggestion["rewrite_draft"] = rewrite_draft
+        normalized_suggestions.append(suggestion)
+
+    if not normalized_suggestions:
+        normalized_suggestions.append({
+            "id": "suggestion-1",
+            "severity": "P1",
+            "issue": "当前模型结果未提供完整的可展示建议。",
+            "suggestion": "请根据已引用的简历原文，补充职责、成果和技能的可核验证据。",
+            "source_spans": [fallback_source_span(resume_text)],
+        })
+
+    return {
+        "version": "1.0",
+        "pii_removed": True,
+        "subscores": normalized_subscores,
+        "suggestions": normalized_suggestions,
+    }
+
+
 def redflag_errors(profile, resume_text):
     """Apply redflag.py's numeric fact-lock without persisting user content."""
     # Contract metadata (schema version, numeric scores and character offsets)
@@ -288,7 +462,7 @@ def diagnose_resume(resume_text):
     if result.get("status") != "success" or result.get("degraded") or not isinstance(result.get("output"), dict):
         raise ApiError("model_unavailable", "诊断模型暂时不可用，请稍后重试。", 503)
 
-    profile = result["output"]
+    profile = normalize_resume_profile(result["output"], cleaned_text)
     validation_errors = profile_validation_errors(profile, cleaned_text)
     if validation_errors:
         subscores = profile.get("subscores") if isinstance(profile.get("subscores"), dict) else {}

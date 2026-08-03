@@ -157,6 +157,38 @@ def test_diagnosis_returns_only_valid_grounded_profile(monkeypatch):
     assert response.json["resumeProfile"]["pii_removed"] is True
 
 
+def test_diagnosis_normalizes_provider_offsets_and_missing_container_fields(monkeypatch):
+    provider_profile = {
+        "version": "1.0",
+        "pii_removed": True,
+        "subscores": {
+            "structure": 80,
+            "clarity": 75,
+            "achievement_evidence": 70,
+            "skill_evidence": 70,
+            "ats_readability": 85,
+        },
+        "suggestions": [{
+            "severity": "P1",
+            "issue": "项目成果描述不够具体。",
+            "suggestion": "建议补充可验证的项目成果描述。",
+            "source_spans": [{"start": 0, "end": len(RESUME)}],
+        }],
+    }
+
+    response = client(monkeypatch, FakeRouter(provider_profile)).post(
+        "/api/wf02/diagnose", json={"resumeText": RESUME}
+    )
+
+    assert response.status_code == 200
+    profile = response.json["resumeProfile"]
+    assert profile["subscores"]["structure"]["score"] == 80
+    assert profile["suggestions"][0]["id"] == "suggestion-1"
+    assert profile["suggestions"][0]["source_spans"][0] == {
+        "doc": "resume", "quote": RESUME, "start": 0, "end": len(RESUME)
+    }
+
+
 def test_degraded_or_ungrounded_model_output_is_not_shown(monkeypatch):
     degraded = client(monkeypatch, FakeRouter(valid_profile(), degraded=True)).post(
         "/api/wf02/diagnose", json={"resumeText": RESUME}
