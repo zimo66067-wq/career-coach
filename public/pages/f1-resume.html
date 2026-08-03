@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F1 简历诊断 · 职跃AI</title>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/main.css">
+<link rel="stylesheet" href="../css/states.css">
+</head>
+<body data-page="f1">
+<a class="skip-link" href="#main">跳到主要内容</a>
+<nav class="topnav" aria-label="主导航">
+  <span class="brand">职跃AI</span>
+  <a class="nav" data-page="home" href="../index.html">首页</a>
+  <a class="nav" data-page="f1" href="f1-resume.html">F1 简历诊断</a>
+  <a class="nav" data-page="f2" href="f2-match.html">F2 岗位匹配</a>
+  <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
+  <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
+</nav>
+<div class="wrap" id="main">
+  <h1 class="page-title">F1 · 简历 AI 诊断</h1>
+  <p class="page-sub">R = 结构15% + 清晰20% + 成果25% + 技能20% + ATS20% ｜ 分数由规则引擎计算</p>
+
+  <!-- 空态 -->
+  <div data-state-view="empty">
+    <div class="card empty-state resume-upload-card" id="resumeUploadCard">
+      <input class="visually-hidden" id="resumeFileInput" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain">
+      <div class="resume-dropzone" id="resumeDropzone" role="button" tabindex="0" aria-label="简历文件投放区域" aria-describedby="resumeUploadHint resumeUploadStatus">
+        <div class="art"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></div>
+        <h3>拖入或选择你的简历</h3>
+        <p id="resumeUploadHint">支持 PDF / DOCX / TXT；可直接将一个文件拖到此处</p>
+        <p class="resume-file-status" id="resumeUploadStatus" role="status" aria-live="polite">尚未选择文件</p>
+      </div>
+      <div class="resume-upload-actions">
+        <button class="btn" type="button" id="chooseResumeFile">选择文件</button>
+        <button class="btn" type="button" id="startResumeDiagnosis" hidden disabled>开始诊断</button>
+        <button class="btn ghost" type="button" id="openResumeText">直接粘贴文本</button>
+      </div>
+      <form class="resume-text-entry" id="resumeTextEntry" hidden>
+        <label for="resumeTextInput">粘贴简历正文</label>
+        <textarea id="resumeTextInput" rows="9" maxlength="200000" placeholder="请粘贴简历正文；确认后将直接进入诊断。"></textarea>
+        <p class="resume-text-help">至少 20 个字符；请勿粘贴身份证号、住址等与求职无关的敏感信息。</p>
+        <div class="resume-upload-actions">
+          <button class="btn" type="submit" id="diagnoseResumeText">开始诊断</button>
+          <button class="btn ghost" type="button" id="cancelResumeText">取消</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 处理中 -->
+  <div data-state-view="processing">
+    <div class="card">
+      <div class="ai-status"><span class="ai-orb" aria-hidden="true"></span>AI 正在分析 · 解析简历并锁定原文证据…（P95 ≤ 45 秒）</div>
+      <div class="flow-line" aria-hidden="true"></div>
+      <div class="ai-stages" aria-label="AI 分析阶段">
+        <span class="ai-stage done">文本解析</span>
+        <span class="ai-stage done">结构化抽取</span>
+        <span class="ai-stage on">规则评分</span>
+        <span class="ai-stage">证据校验</span>
+      </div>
+      <div class="skel h-lg" style="margin:16px 0"></div>
+      <div class="skel h-sm" style="width:60%"></div>
+      <div class="skel h-sm" style="width:80%"></div>
+      <div class="skel h-sm" style="width:45%"></div>
+    </div>
+  </div>
+
+  <!-- 成功 -->
+  <div data-state-view="success">
+    <div class="card" style="display:flex;gap:28px;align-items:center;flex-wrap:wrap">
+      <div class="score-ring" id="resumeScoreRing" style="--pct:73" role="img" aria-label="诊断分 R：73 分"><div class="inner"><span class="num" id="resumeScore">73</span><span class="lbl">诊断分 R</span></div></div>
+      <div style="flex:1;min-width:260px" id="subbars"></div>
+    </div>
+    <div class="card">
+      <h3>证据对照：点击右侧评分理由，左侧原文自动定位高亮</h3>
+      <div class="evidence-grid">
+        <div class="doc-pane" id="resumeDoc"></div>
+        <div id="reasonList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 失败 -->
+  <div data-state-view="error">
+    <div class="error-banner">
+      <div class="icon">⚠️</div>
+      <div>
+        <h3>诊断未完成</h3>
+        <p id="resumeErrorMessage">模型输出未通过证据校验（出现无法回指原文的内容），已按事实锁阻断展示。你的已确认数据不受影响。</p>
+        <button class="btn" type="button" id="retryResumeDiagnosis">重试一次</button>
+        <button class="btn ghost" type="button" id="returnToResumeUpload">返回修改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 降级 -->
+  <div data-state-view="degraded">
+    <div class="degraded-banner">
+      <div class="icon">🔶</div>
+      <div>
+        <h3>已切换降级路径 · 简化诊断</h3>
+        <p>AI 语义分析暂不可用，当前展示规则引擎的静态结构检查结果，分数仅供参考。</p>
+      </div>
+    </div>
+    <div class="card">
+      <h3>结构检查清单（规则静态分析）</h3>
+      <div class="subbar"><div class="meta"><span>版块完整性（教育/实习/项目/技能）</span><span>4/4</span></div><div class="track"><div class="fill" style="width:100%"></div></div></div>
+      <div class="subbar"><div class="meta"><span>量化成果句数量</span><span>1 处（偏少）</span></div><div class="track"><div class="fill" style="width:25%"></div></div></div>
+      <div class="subbar"><div class="meta"><span>ATS 可读性（无表格/图片/分栏）</span><span>通过</span></div><div class="track"><div class="fill" style="width:85%"></div></div></div>
+      <p style="font-size:13px;color:var(--zy-ink-2);margin-top:12px">完整诊断恢复后将自动重跑，无需重新上传。</p>
+    </div>
+  </div>
+</div>
+
+<script src="../js/mock-data.js"></script>
+<script src="../js/app.js"></script>
+<script src="../js/evidence.js"></script>
+<script src="../js/pages-api-config.js"></script>
+<script src="../js/data-bridge.js"></script>
+<script src="../js/resume-upload.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (!window.APP.isDemoMode() || window.APP.getState() !== "success") return;
+  // 成功态的合成内容仅用于显式演示模式。
+  var DB = window.DataBridge;
+  function fetchSync(key) {
+    if (DB && DB.getMockData) { var d = DB.getMockData(key); if (d) return d; }
+    return null;
+  }
+  var p = fetchSync('resumeProfile');
+  if (!p) return;
+  // 子分条
+  var weights = { structure: "15%", clarity: "20%", achievement_evidence: "25%", skill_evidence: "20%", ats_readability: "20%" };
+  var html = "";
+  Object.keys(p.subscores).forEach(function (k) {
+    var s = p.subscores[k];
+    html += '<div class="subbar"><div class="meta"><span>' + s.label + "（权重 " + weights[k] + "）</span><span>" + s.score + "</span></div>" +
+      '<div class="track"><div class="fill" style="width:' + s.score + '%"></div></div></div>';
+  });
+  document.getElementById("subbars").innerHTML = html;
+  // 证据对照
+  var highlight = window.EVIDENCE.renderDoc("resumeDoc", fetchSync('resumeText'));
+  var list = "";
+  Object.keys(p.subscores).forEach(function (k) {
+    var s = p.subscores[k];
+    list += '<div class="reason-item" data-quote="' + encodeURIComponent(s.quote) + '"><b>' + s.label + " · " + s.score + '分</b><br>' +
+      s.rationale + '<div class="tag">证据：' + (s.quote.length > 24 ? s.quote.slice(0, 24) + "…" : s.quote) + "</div></div>";
+  });
+  p.suggestions.forEach(function (s) {
+    list += '<div class="reason-item" data-quote="' + encodeURIComponent(s.quote) + '"><span class="badge ' + s.severity.toLowerCase() + '">' + s.severity + "</span> <b>" + s.issue + "</b><br>" +
+      "建议：" + s.suggestion + '<br><span class="tag">改写草案：' + s.rewrite_draft + "</span></div>";
+  });
+  document.getElementById("reasonList").innerHTML = list;
+  window.EVIDENCE.bindReasons(".reason-item", highlight, function (item) {
+    return decodeURIComponent(item.getAttribute("data-quote"));
+  });
+});
+</script>
+</body>
+</html>
