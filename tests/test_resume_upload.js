@@ -82,12 +82,14 @@ async function run() {
 
   const page = fs.readFileSync('docs/pages/f1-resume.html', 'utf8');
   assert(page.includes('id="openResumeText"'), 'paste control must be actionable');
+  assert(page.includes('id="startResumeDiagnosis"'), 'selected files must expose a next-step button');
   assert(page.includes('id="resumeTextEntry"'), 'paste form must be present');
   assert(page.includes('id="retryResumeDiagnosis"'), 'error retry must be actionable');
   assert(source.includes('bridge.uploadResume'), 'file flow must call the upload API');
   assert(source.includes('bridge.diagnoseResume'), 'all flows must call the diagnosis API');
   assert(source.includes('is-dragging'), 'dragging must apply the page visual state');
   assert(source.includes('setProperty("--pct"'), 'diagnosis score must update the existing score ring variable');
+  assert(source.includes('function selectFile(file)'), 'file selection must be separated from diagnosis submission');
   console.log('resume upload flow tests passed');
 }
 

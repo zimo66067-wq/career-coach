@@ -234,6 +234,7 @@
     var dropzone = document.getElementById("resumeDropzone");
     var input = document.getElementById("resumeFileInput");
     var chooseButton = document.getElementById("chooseResumeFile");
+    var startButton = document.getElementById("startResumeDiagnosis");
     var status = document.getElementById("resumeUploadStatus");
     var textButton = document.getElementById("openResumeText");
     var textEntry = document.getElementById("resumeTextEntry");
@@ -241,7 +242,7 @@
     var cancelText = document.getElementById("cancelResumeText");
     var retryButton = document.getElementById("retryResumeDiagnosis");
     var returnButton = document.getElementById("returnToResumeUpload");
-    if (!card || !dropzone || !input || !chooseButton || !status) return;
+    if (!card || !dropzone || !input || !chooseButton || !startButton || !status) return;
 
     var selectedFile = null;
     var lastAttempt = null;
@@ -283,17 +284,31 @@
       });
     }
 
-    function submitFile(file) {
+    function selectFile(file) {
       var validation = validateFile(file);
       if (!validation.valid) {
         setStatus(validation.message, true);
+        startButton.hidden = true;
+        startButton.disabled = true;
         return;
       }
       selectedFile = file;
       card.classList.add("has-file");
-      setStatus("正在上传“" + file.name + "”…", false);
+      setStatus("已选择“" + file.name + "”（" + formatFileSize(file.size) + "），请点击“开始诊断”。", false);
       lastAttempt = { type: "file", value: file };
-      submit(function () { return flow.submitFile(file); });
+      startButton.hidden = false;
+      startButton.disabled = false;
+      startButton.focus();
+    }
+
+    function submitSelectedFile() {
+      if (!selectedFile) {
+        setStatus("请先选择或拖入一份简历。", true);
+        return;
+      }
+      setStatus("正在上传“" + selectedFile.name + "”…", false);
+      startButton.disabled = true;
+      submit(function () { return flow.submitFile(selectedFile); });
     }
 
     function submitText() {
@@ -326,7 +341,7 @@
       });
     });
     dropzone.addEventListener("drop", function (event) {
-      submitFile(event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]);
+      selectFile(event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]);
     });
     dropzone.addEventListener("click", function (event) {
       if (event.target.closest && event.target.closest("button, textarea, label, form")) return;
@@ -344,13 +359,15 @@
       event.stopPropagation();
       openFilePicker();
     });
-    input.addEventListener("change", function () { submitFile(input.files && input.files[0]); });
+    startButton.addEventListener("click", function () { submitSelectedFile(); });
+    input.addEventListener("change", function () { selectFile(input.files && input.files[0]); });
 
     if (textButton && textEntry && textInput) {
       textButton.addEventListener("click", function (event) {
         event.preventDefault();
         event.stopPropagation();
         textEntry.hidden = false;
+        startButton.hidden = true;
         textInput.focus();
       });
       textEntry.addEventListener("submit", function (event) {
@@ -361,6 +378,7 @@
     if (cancelText && textEntry) {
       cancelText.addEventListener("click", function () {
         textEntry.hidden = true;
+        startButton.hidden = !selectedFile;
         setStatus("", false);
       });
     }
@@ -370,7 +388,10 @@
           showError("请先选择简历文件或粘贴简历正文。 ");
           return;
         }
-        if (lastAttempt.type === "file") submitFile(lastAttempt.value);
+        if (lastAttempt.type === "file") {
+          selectFile(lastAttempt.value);
+          submitSelectedFile();
+        }
         else if (textInput) {
           textInput.value = lastAttempt.value;
           submitText();
