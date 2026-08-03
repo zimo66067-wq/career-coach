@@ -22,7 +22,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from tools.deidentify import deidentify  # noqa: E402
 from tools.extract_text import extract_docx, extract_pdf, extract_txt  # noqa: E402
-from tools.model_router import QianfanModelRouter  # noqa: E402
+from tools.model_router import ZhipuModelRouter  # noqa: E402
 from tools.redflag import JSON_NOISE, RE_NUMBER, RE_PLACEHOLDER  # noqa: E402
 from tools.rescore import calc_R, round2  # noqa: E402
 from tools.validate_schema import business_rules  # noqa: E402
@@ -178,11 +178,15 @@ def read_uploaded_resume():
 
 
 def build_model_router():
-    primary_model = os.environ.get("DUMATE_MODEL") or os.environ.get("PRIMARY_MODEL")
-    fallback_model = os.environ.get("QIANFAN_MODEL") or os.environ.get("FALLBACK_MODEL")
-    if not os.environ.get("QIANFAN_API_KEY") or not (primary_model or fallback_model):
+    primary_model = (
+        os.environ.get("DUMATE_MODEL")
+        or os.environ.get("ZHIPU_MODEL")
+        or os.environ.get("PRIMARY_MODEL")
+    )
+    fallback_model = os.environ.get("ZHIPU_FALLBACK_MODEL") or os.environ.get("FALLBACK_MODEL")
+    if not os.environ.get("ZHIPU_API_KEY") or not (primary_model or fallback_model):
         raise ApiError("model_not_configured", "诊断模型尚未配置完成，请联系服务管理员。", 503)
-    return QianfanModelRouter(primary_model=primary_model, fallback_model=fallback_model)
+    return ZhipuModelRouter(primary_model=primary_model, fallback_model=fallback_model)
 
 
 def profile_validation_errors(profile, resume_text):
@@ -285,7 +289,7 @@ def route_api():
         raise ApiError("not_found", "接口不存在。", 404)
 
     if route == "health" and request.method == "GET":
-        return api_response({"status": "ok", "model_configured": bool(os.environ.get("QIANFAN_API_KEY"))})
+        return api_response({"status": "ok", "model_configured": bool(os.environ.get("ZHIPU_API_KEY"))})
     if route == "wf01/upload" and request.method == "POST":
         source_text = read_uploaded_resume()
         cleaned_text, _mapping = deidentify(source_text)

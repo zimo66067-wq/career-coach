@@ -110,7 +110,7 @@ def _gen_trace_id():
 class ModelRouter:
     """抽象基类：统一模型调用入口。
 
-    子类（如 DuMateModelRouter / QianfanModelRouter）必须实现 ``_try_call``。
+    子类（如 DuMateModelRouter / ZhipuModelRouter）必须实现 ``_try_call``。
     """
 
     def __init__(self, primary_model=None, fallback_model=None, enable_log=True):
@@ -125,8 +125,8 @@ class ModelRouter:
         )
         self.fallback_model = (
             fallback_model
+            or os.environ.get("ZHIPU_FALLBACK_MODEL")
             or os.environ.get("FALLBACK_MODEL")
-            or os.environ.get("QIANFAN_MODEL")
         )
         self.enable_log = enable_log
 
@@ -264,7 +264,7 @@ class ModelRouter:
         """
         raise NotImplementedError(
             "ModelRouter is abstract; subclass must implement _try_call "
-            "(e.g. DuMateModelRouter / QianfanModelRouter)"
+            "(e.g. DuMateModelRouter / ZhipuModelRouter)"
         )
 
     def _degrade(self, task_type, context):
@@ -290,6 +290,85 @@ class DuMateModelRouter(ModelRouter):
             "DuMateModelRouter._try_call: SDK not connected yet. "
             "Wire up DuMate platform SDK here."
         )
+
+
+class ZhipuModelRouter(ModelRouter):
+    """智谱 Chat Completions 路由器。
+
+    使用智谱开放平台的 HTTP API，并且只使用 Python 标准库，适合 Vercel
+    Serverless 运行环境。密钥只从 ``ZHIPU_API_KEY`` 环境变量读取。
+    """
+
+    def __init__(self, primary_model=None, fallback_model=None, enable_log=True):
+        super().__init__(primary_model, fallback_model, enable_log)
+        self.api_key = os.environ.get("ZHIPU_API_KEY")
+        self.base_url = os.environ.get(
+            "ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4"
+        ).rstrip("/")
+        if not self.api_key:
+            raise ValueError(
+                "ZhipuModelRouter: ZHIPU_API_KEY not set; "
+                "configure it to enable Zhipu model calls"
+            )
+
+    def _try_call(self, model, prompt, user_input, params, context):
+        """Call Zhipu's OpenAI-compatible chat completions endpoint."""
+        messages = []
+        if prompt:
+            messages.append({"role": "system", "content": prompt})
+
+        content = user_input or ""
+        if context:
+            content += "\n\ncontext_json:\n" + json.dumps(
+                context, ensure_ascii=False, separators=(",", ":")
+            )
+        messages.append({"role": "user", "content": content})
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": params["temperature"],
+            "max_tokens": params["max_tokens"],
+            "stream": False,
+        }
+        request = Request(
+            self.base_url + "/chat/completions",
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={
+                "Authorization": "Bearer " + self.api_key,
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=params["timeout"]) as response:
+                body = json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            raise RuntimeError("zhipu_http_%s" % exc.code) from exc
+        except URLError as exc:
+            raise RuntimeError("zhipu_network_error") from exc
+
+        try:
+            output = body["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ValueError("zhipu_invalid_response") from exc
+        return self._parse_output(output)
+
+    @staticmethod
+    def _parse_output(output):
+        """Decode plain text or a fenced JSON object returned by the model."""
+        if not isinstance(output, str):
+            return output
+        text = output.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[-1]
+            if text.endswith("```"):
+                text = text[:-3]
+            text = text.strip()
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return text
 
 
 class QianfanModelRouter(ModelRouter):

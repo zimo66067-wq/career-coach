@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """Contract tests for the public browser API, without a real provider call."""
 import io
+import json
+from unittest.mock import patch
 
 import api.index as api_module
+from tools.model_router import ZhipuModelRouter
 
 
 RESUME = "项目经历：负责接口开发并完成上线验证，持续跟进问题闭环。"
@@ -83,6 +86,52 @@ def test_preflight_allows_only_public_pages_origin(monkeypatch):
     assert allowed.status_code == 204
     assert allowed.headers["Access-Control-Allow-Origin"] == "https://zimo66067-wq.github.io"
     assert "Access-Control-Allow-Origin" not in rejected.headers
+
+
+def test_health_reports_zhipu_configuration(monkeypatch):
+    monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
+    unconfigured = client(monkeypatch).get("/api/health")
+    monkeypatch.setenv("ZHIPU_API_KEY", "test-key")
+    configured = client(monkeypatch).get("/api/health")
+    assert unconfigured.json["model_configured"] is False
+    assert configured.json["model_configured"] is True
+
+
+def test_model_router_requires_zhipu_key(monkeypatch):
+    monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
+    monkeypatch.setenv("DUMATE_MODEL", "glm-4.7-flash")
+    try:
+        api_module.build_model_router()
+    except api_module.ApiError as error:
+        assert error.code == "model_not_configured"
+    else:
+        raise AssertionError("model router must require ZHIPU_API_KEY")
+
+
+def test_zhipu_router_calls_chat_completions_and_parses_json(monkeypatch):
+    monkeypatch.setenv("ZHIPU_API_KEY", "test-key")
+    router = ZhipuModelRouter(primary_model="glm-4.7-flash", enable_log=False)
+
+    class FakeResponse:
+        def read(self):
+            return json.dumps(
+                {"choices": [{"message": {"content": '{"ok": true}'}}]}
+            ).encode("utf-8")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    with patch("tools.model_router.urlopen", return_value=FakeResponse()) as mocked_open:
+        result = router.call("resume_diagnosis", "分析简历", "简历正文")
+
+    request = mocked_open.call_args.args[0]
+    assert request.full_url == "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    assert request.get_header("Authorization") == "Bearer test-key"
+    assert result["status"] == "success"
+    assert result["output"] == {"ok": True}
 
 
 def test_diagnosis_returns_only_valid_grounded_profile(monkeypatch):

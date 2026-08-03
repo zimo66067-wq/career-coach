@@ -61,12 +61,14 @@ career-coach/
 仓库已包含 `api/index.py` 和 `vercel.json`，用于在 Vercel 部署真实上传与诊断服务。Vercel 项目需配置以下环境变量，所有密钥只能保存在 Vercel，不能写入 GitHub Pages 或仓库：
 
 ```text
-QIANFAN_API_KEY=...
-DUMATE_MODEL=...
-# 可选：QIANFAN_MODEL=...（备用模型）
+ZHIPU_API_KEY=...
+DUMATE_MODEL=glm-4.7-flash
+# 可选：ZHIPU_FALLBACK_MODEL=...（备用智谱 Chat 模型）
 DUMATE_ALLOWED_ORIGINS=https://zimo66067-wq.github.io
 APP_ENV=production
 ```
+
+当前 F1 简历诊断只调用智谱 Chat，因此不需要单独的 Embedding 密钥；F2 语义 Embedding 接入时再按对应实现增加配置。`DUMATE_MODEL` 必须填写该智谱账号已开通的模型标识。
 
 部署完成后，将 Vercel 的 HTTPS 生产地址写入 `docs/js/pages-api-config.js` 的 `window.DUMATE_API_BASE`，并确保该脚本在 `data-bridge.js` 之前加载。API 会仅对 `DUMATE_ALLOWED_ORIGINS` 白名单来源返回 CORS 响应；文件原件只写入请求临时目录并在响应前删除。
 
