@@ -1,13 +1,16 @@
 # Core testing
-pytest>=8.0,<9.0
-jsonschema>=4.21,<5.0
+pytest==8.4.2
+jsonschema==4.26.0
 
 # Document parsing
-pypdf>=4.0,<6.0
-python-docx>=1.1,<2.0
+pypdf==5.9.0
+python-docx==1.2.0
 
-# Semantic matching (千帆 embedding)
-requests>=2.31,<3.0
+# HTTP client (for model API calls)
+requests==2.34.2
 
-# Optional: jieba for better Chinese tokenization
-# jieba>=0.42,<1.0
+# UI automation (screenshots)
+playwright==1.62.0
+
+# Chinese tokenization (optional)
+jieba==0.42.1

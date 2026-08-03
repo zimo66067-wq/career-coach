@@ -18,12 +18,31 @@ pages = [
     ("states", UI_DIR / "pages" / "states.html"),
 ]
 
+degraded_pages = [
+    ("homepage-degraded", UI_DIR / "index.html"),
+    ("f1-degraded", UI_DIR / "pages" / "f1-resume.html"),
+    ("f2-degraded", UI_DIR / "pages" / "f2-match.html"),
+    ("f3-degraded", UI_DIR / "pages" / "f3-interview.html"),
+    ("f4-degraded", UI_DIR / "pages" / "f4-report.html"),
+    ("states-degraded", UI_DIR / "pages" / "states.html"),
+]
+
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     page = browser.new_page(viewport={"width": 1280, "height": 800})
 
     for name, html_path in pages:
         url = f"file:///{str(html_path).replace(chr(92), '/')}"
+        page.goto(url, wait_until="networkidle")
+        time.sleep(1)
+        out = SHOTS_DIR / f"{name}.png"
+        page.screenshot(path=str(out), full_page=True)
+        print(f"  {name}.png  ({out.stat().st_size // 1024} KB)")
+
+    # ── 降级路径截图 ──
+    print("\n--- degraded ---")
+    for name, html_path in degraded_pages:
+        url = f"file:///{str(html_path).replace(chr(92), '/')}?state=degraded"
         page.goto(url, wait_until="networkidle")
         time.sleep(1)
         out = SHOTS_DIR / f"{name}.png"

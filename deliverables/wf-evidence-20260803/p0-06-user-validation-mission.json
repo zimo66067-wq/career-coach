@@ -1,0 +1,41 @@
+{
+  "p0-06_user_validation": {
+    "date": "2026-08-03T08:46:00.419472",
+    "status": "template_ready",
+    "template": "docs/user-research-template.md (145行, 已冻结)",
+    "participant_target": "N >= 1 (比赛最低要求)",
+    "ideal_target": "N = 3-5 (定性洞察)",
+    "methods": [
+      {
+        "name": "线上远程验证",
+        "steps": [
+          "1. 发送用户测试邀请(含披露声明)",
+          "2. 用户打开 https://github.com/zimo66067-wq/career-coach 或本地ui/prototype/index.html",
+          "3. 用户用自己的简历+目标JD走F1-F4",
+          "4. 用户填写 docs/user-research-template.md 定量表",
+          "5. 10分钟语音访谈(可选)",
+          "6. 收集反馈, 更新 aggregate-report.md"
+        ],
+        "effort": "1-2小时/人"
+      },
+      {
+        "name": "线下现场验证",
+        "steps": [
+          "1. 准备测试环境(笔记本+浏览器)",
+          "2. 现场口头披露声明",
+          "3. 用户现场操作, 观察员记录",
+          "4. 当场完成定量表+访谈",
+          "5. 拍照/录屏(需用户同意)"
+        ],
+        "effort": "30分钟/人"
+      }
+    ],
+    "deliverables": [
+      "tests/user-research/participant-01/quantitative-metrics.json",
+      "tests/user-research/participant-01/interview-notes.md",
+      "tests/user-research/aggregate-report.md"
+    ],
+    "blocker": "需至少1位真实用户(同学/朋友/家人)",
+    "next_action": "找1位用户, 发送邀请链接, 收集反馈"
+  }
+}

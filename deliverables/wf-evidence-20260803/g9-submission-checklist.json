@@ -2,7 +2,7 @@
   "project": "career-coach",
   "freeze_tag": "v1.0.0-g9-freeze",
   "freeze_date": "2026-08-03T08:44:16.047028",
-  "freeze_commit": null,
+  "freeze_commit": "bb7b111",
   "branch": "main",
   "total_files": 213,
   "manifest": {
