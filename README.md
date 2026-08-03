@@ -5,7 +5,7 @@
 > - ✅ 数据合同冻结（4 Schema + scoring.md）
 > - ✅ 工具链 8/8 已实现并测试通过
 > - ✅ 提示词 7/7 已完成
-> - ✅ 静态原型 6 页面完整
+> - ✅ 公开静态入口默认空态，未提交材料不展示合成诊断结果
 > - 🔧 DuMate 六工作流实现中
 > - 🔧 真实 AI 调用与模型路由对接中
 > - ⬜ G8 用户验证未开始
@@ -46,7 +46,11 @@ career-coach/
 
 ## 快速开始
 
-**看原型**：双击打开 `ui/prototype/index.html`，零依赖。每个功能页支持 `?state=empty|processing|success|error|degraded` 演示五种状态。
+**看公开入口**：GitHub Pages 从 `docs/` 发布；本地可双击打开 `ui/prototype/index.html`。功能页默认均为等待用户材料的空态，普通 `?state=...` 参数不会展示诊断结果。
+
+**内部 QA 演示**：仅限显式使用 `?demo=1&state=empty|processing|success|error|degraded`；该入口不在公开导航中，合成数据不得作为用户诊断结果使用。
+
+> 上线边界：当前仓库仍处于真实上传、AI 调用及 DuMate 工作流集成阶段。公开静态页只提供前端入口；没有经过用户提交、服务端处理和证据校验的材料，页面不得展示评分、建议或匹配结论。
 
 **跑测试**（Windows）：
 

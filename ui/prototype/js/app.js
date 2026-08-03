@@ -1,21 +1,26 @@
-/* app.js · 公共逻辑：?state= 参数解析 + 状态切换悬浮器 */
+/* app.js · 公开入口默认空态；演示状态仅限显式 ?demo=1 */
 (function () {
   var STATES = ["empty", "processing", "success", "error", "degraded"];
   var LABELS = { empty: "空态", processing: "处理中", success: "成功", error: "失败", degraded: "降级" };
 
+  function isDemo() {
+    return /[?&]demo=1(?:[&#]|$)/.test(location.search);
+  }
+
   function getState() {
+    if (!isDemo()) return "empty";
     var m = /[?&]state=([a-z]+)/.exec(location.search);
-    var s = m && STATES.indexOf(m[1]) >= 0 ? m[1] : "success";
+    var s = m && STATES.indexOf(m[1]) >= 0 ? m[1] : "empty";
     return s;
   }
 
   function setState(s) {
-    var url = location.pathname + "?state=" + s + location.hash;
+    var url = location.pathname + "?demo=1&state=" + s + location.hash;
     location.href = url;
   }
 
   function mountFab() {
-    if (document.body.hasAttribute("data-no-fab")) return;
+    if (!isDemo() || document.body.hasAttribute("data-no-fab")) return;
     var cur = getState();
     var fab = document.createElement("div");
     fab.className = "state-fab";
@@ -49,5 +54,5 @@
     mountNav(document.body.getAttribute("data-page"));
   });
 
-  window.APP = { getState: getState, STATES: STATES, LABELS: LABELS };
+  window.APP = { getState: getState, isDemo: isDemo, STATES: STATES, LABELS: LABELS };
 })();

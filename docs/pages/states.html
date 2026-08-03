@@ -8,6 +8,9 @@
 <link rel="stylesheet" href="../css/tokens.css">
 <link rel="stylesheet" href="../css/main.css">
 <link rel="stylesheet" href="../css/states.css">
+<script>
+  if (!/[?&]demo=1(?:[&#]|$)/.test(location.search)) location.replace("../index.html");
+</script>
 </head>
 <body data-page="states" data-no-fab>
 <a class="skip-link" href="#main">跳到主要内容</a>
@@ -18,7 +21,6 @@
   <a class="nav" data-page="f2" href="f2-match.html">F2 岗位匹配</a>
   <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
   <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
-  <a class="nav" data-page="states" href="states.html">状态墙</a>
 </nav>
 <div class="wrap" id="main">
   <h1 class="page-title">状态墙 · 五状态演示入口</h1>
@@ -53,7 +55,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var states = ["empty", "processing", "success", "error", "degraded"];
   document.getElementById("matrix").innerHTML = pages.map(function (p) {
     return "<tr><td><b>" + p[0] + "</b></td>" + states.map(function (s) {
-      return '<td><a href="' + p[1] + "?state=" + s + '">' + s + "</a></td>";
+      return '<td><a href="' + p[1] + "?demo=1&state=" + s + '">' + s + "</a></td>";
     }).join("") + "</tr>";
   }).join("");
 });
