@@ -291,6 +291,14 @@ def diagnose_resume(resume_text):
     profile = result["output"]
     validation_errors = profile_validation_errors(profile, cleaned_text)
     if validation_errors:
+        subscores = profile.get("subscores") if isinstance(profile.get("subscores"), dict) else {}
+        suggestions = profile.get("suggestions") if isinstance(profile.get("suggestions"), list) else []
+        first_suggestion = suggestions[0] if suggestions and isinstance(suggestions[0], dict) else {}
+        first_span = (
+            first_suggestion.get("source_spans", [])[0]
+            if isinstance(first_suggestion.get("source_spans"), list) and first_suggestion.get("source_spans")
+            else {}
+        )
         # Keep production diagnostics useful without ever logging the resume
         # content or the model-generated narrative.
         print(json.dumps({
@@ -298,6 +306,12 @@ def diagnose_resume(resume_text):
             "trace_id": result.get("trace_id"),
             "error_codes": sorted(set(validation_errors))[:20],
             "profile_keys": sorted(profile.keys()),
+            "subscore_keys": {
+                name: sorted(value.keys()) for name, value in subscores.items()
+                if isinstance(value, dict)
+            },
+            "suggestion_keys": sorted(first_suggestion.keys()),
+            "source_span_keys": sorted(first_span.keys()) if isinstance(first_span, dict) else [],
         }, ensure_ascii=False), flush=True)
         raise ApiError("model_output_invalid", "诊断结果未通过证据校验，请稍后重试。", 502)
 
