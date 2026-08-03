@@ -1,2 +1,19 @@
--r tools/requirements.txt
+# Core testing
+pytest==8.4.2
+jsonschema==4.26.0
+
+# Document parsing
+pypdf==5.9.0
+python-docx==1.2.0
+
+# HTTP client (for model API calls)
+requests==2.34.2
+
+# UI automation (screenshots)
+playwright==1.62.0
+
+# Chinese tokenization (optional)
+jieba==0.42.1
+
+# Flask for Vercel serverless
 Flask>=3.0,<4.0
