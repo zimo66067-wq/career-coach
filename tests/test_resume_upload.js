@@ -1,29 +1,97 @@
-/* Resume upload intake checks. Run with: node tests/test_resume_upload.js */
 const assert = require('assert');
 const fs = require('fs');
-const path = require('path');
 const vm = require('vm');
 
-const root = path.resolve(__dirname, '..');
-const pageSource = fs.readFileSync(path.join(root, 'docs', 'pages', 'f1-resume.html'), 'utf8');
-const cssSource = fs.readFileSync(path.join(root, 'docs', 'css', 'main.css'), 'utf8');
-const uploadSource = fs.readFileSync(path.join(root, 'docs', 'js', 'resume-upload.js'), 'utf8');
-
+const scriptPath = 'docs/js/resume-upload.js';
+const source = fs.readFileSync(scriptPath, 'utf8');
 const context = {
-  document: { addEventListener: function () {} }
+  window: {},
+  document: { addEventListener() {} },
+  console,
+  encodeURIComponent,
+  isFinite,
+  Promise
 };
-context.window = context;
-vm.runInNewContext(uploadSource, context, { filename: 'resume-upload.js' });
+vm.createContext(context);
+vm.runInContext(source, context, { filename: scriptPath });
 
-assert.ok(pageSource.includes('id="resumeFileInput"'), 'F1 must expose a native file input');
-assert.ok(pageSource.includes('id="resumeDropzone"'), 'F1 must expose a drop target');
-assert.ok(pageSource.includes('../js/resume-upload.js'), 'F1 must load drag-and-drop behavior');
-assert.ok(pageSource.includes('accept=".pdf,.docx,.txt'), 'F1 must limit picker types to supported resume files');
-assert.ok(cssSource.includes('.resume-dropzone.is-dragging'), 'dragging must have visible feedback');
-assert.strictEqual(context.ResumeUpload.validateFile({ name: 'resume.PDF' }).valid, true, 'PDF must be accepted case-insensitively');
-assert.strictEqual(context.ResumeUpload.validateFile({ name: 'resume.docx' }).valid, true, 'DOCX must be accepted');
-assert.strictEqual(context.ResumeUpload.validateFile({ name: 'resume.txt' }).valid, true, 'TXT must be accepted');
-assert.strictEqual(context.ResumeUpload.validateFile({ name: 'resume.png' }).valid, false, 'unsupported files must be rejected');
-assert.strictEqual(context.ResumeUpload.formatFileSize(1536), '1.5 KB', 'file size display must be human-readable');
+async function run() {
+  const upload = context.window.ResumeUpload;
+  assert(upload, 'ResumeUpload should be exposed');
+  assert.strictEqual(upload.validateFile({ name: 'resume.PDF', size: 1024 }).valid, true);
+  assert.strictEqual(upload.validateFile({ name: 'resume.doc' }).valid, false);
+  assert.strictEqual(upload.validateFile({ name: 'large.pdf', size: 11 * 1024 * 1024 }).valid, false);
+  assert.strictEqual(upload.prepareResumeText('too short').valid, false);
+  assert.strictEqual(upload.prepareResumeText('这是一段足够长的简历正文，用于验证直接粘贴后能够提交到诊断流程。').valid, true);
 
-console.log('resume upload intake checks passed');
+  const profile = {
+    subscores: {
+      structure: { score: 80 },
+      clarity: { score: 70 },
+      achievement_evidence: { score: 60 },
+      skill_evidence: { score: 75 },
+      ats_readability: { score: 85 }
+    }
+  };
+  const calls = [];
+  let processingCount = 0;
+  const flow = upload.createSubmissionFlow({
+    bridge: {
+      async uploadResume(file) {
+        calls.push(['upload', file.name]);
+        return { resumeText: '张三\n三年前端开发经验，负责多个可量化交付项目。' };
+      },
+      async diagnoseResume(text) {
+        calls.push(['diagnose', text]);
+        return { resumeProfile: profile };
+      }
+    },
+    onProcessing() { processingCount += 1; }
+  });
+
+  const fileOutcome = await flow.submitFile({ name: 'resume.pdf', size: 2048 });
+  assert.strictEqual(fileOutcome.ok, true, 'valid file must complete upload then diagnosis');
+  assert.deepStrictEqual(calls.map((call) => call[0]), ['upload', 'diagnose']);
+  assert.strictEqual(processingCount, 1);
+
+  calls.length = 0;
+  const textOutcome = await flow.submitText('李四\n五年产品运营经验，主导增长项目并完成可衡量的用户转化提升。');
+  assert.strictEqual(textOutcome.ok, true, 'pasted text must enter diagnosis directly');
+  assert.deepStrictEqual(calls.map((call) => call[0]), ['diagnose']);
+
+  const unavailableFlow = upload.createSubmissionFlow({
+    bridge: {
+      async uploadResume() { return { resumeText: '旧缓存内容不应被诊断。' }; },
+      async diagnoseResume() { return { degraded: true, error: 'service_unavailable' }; }
+    }
+  });
+  const unavailable = await unavailableFlow.submitText('王五\n有足够长度的简历正文，用于验证服务失败时不会显示旧缓存或演示结果。');
+  assert.strictEqual(unavailable.ok, false);
+  assert.strictEqual(unavailable.error, 'service_unavailable');
+
+  context.window.location = { hostname: 'zimo66067-wq.github.io' };
+  const staticFlow = upload.createSubmissionFlow({
+    bridge: {
+      async diagnoseResume() { throw new Error('static page must not silently continue'); }
+    }
+  });
+  const staticResult = await staticFlow.submitText('赵六\n有足够长度的简历正文，用于验证未配置服务的公开页面会给出明确错误。');
+  assert.strictEqual(staticResult.ok, false);
+  assert.strictEqual(staticResult.error, 'api_not_configured');
+  delete context.window.location;
+
+  const page = fs.readFileSync('docs/pages/f1-resume.html', 'utf8');
+  assert(page.includes('id="openResumeText"'), 'paste control must be actionable');
+  assert(page.includes('id="resumeTextEntry"'), 'paste form must be present');
+  assert(page.includes('id="retryResumeDiagnosis"'), 'error retry must be actionable');
+  assert(source.includes('bridge.uploadResume'), 'file flow must call the upload API');
+  assert(source.includes('bridge.diagnoseResume'), 'all flows must call the diagnosis API');
+  assert(source.includes('is-dragging'), 'dragging must apply the page visual state');
+  assert(source.includes('setProperty("--pct"'), 'diagnosis score must update the existing score ring variable');
+  console.log('resume upload flow tests passed');
+}
+
+run().catch((error) => {
+  console.error(error.stack || error);
+  process.exit(1);
+});

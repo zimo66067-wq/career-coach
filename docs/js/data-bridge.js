@@ -196,18 +196,8 @@
       return { resumeText: res.resumeText, resumeProfile: res.resumeProfile, trace_id: res.trace_id || traceId };
     }
 
-    // 降级: 当前会话缓存 -> 显式错误；只有演示模式才可使用合成样本。
-    var cached = getCache('resumeText');
-    if (cached) {
-      console.warn('[DataBridge] 使用缓存数据: resumeText');
-      return {
-        resumeText: cached,
-        resumeProfile: getCache('resumeProfile'),
-        degraded: true,
-        degraded_reason: 'cached',
-        trace_id: traceId
-      };
-    }
+    // 新上传的简历绝不能在接口失败时回退到上一份会话缓存；否则会把旧结果
+    // 错配给当前用户材料。生产路径直接返回明确错误，演示模式才允许样本数据。
     var demoText = demoData('resumeText', traceId, res.error);
     var demoProfile = demoData('resumeProfile', traceId, res.error);
     if (demoText.error || demoProfile.error) return demoText.error ? demoText : demoProfile;
@@ -242,20 +232,7 @@
       };
     }
 
-    // 缓存
-    var cached = getCache('diagnoseResult');
-    if (cached) {
-      console.warn('[DataBridge] 使用缓存数据: diagnoseResult');
-      return {
-        resumeProfile: cached.resumeProfile,
-        score_R: cached.score_R,
-        suggestions: cached.suggestions,
-        degraded: true,
-        degraded_reason: 'cached',
-        trace_id: traceId
-      };
-    }
-
+    // 对当前提交的材料，失败时不得回退到上一份诊断缓存。
     // 演示模式才可显示合成诊断。
     var demo = demoData('resumeProfile', traceId, res.error);
     if (demo.error) return demo;

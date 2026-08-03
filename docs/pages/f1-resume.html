@@ -35,8 +35,17 @@
       </div>
       <div class="resume-upload-actions">
         <button class="btn" type="button" id="chooseResumeFile">选择文件</button>
-        <span class="btn ghost">直接粘贴文本</span>
+        <button class="btn ghost" type="button" id="openResumeText">直接粘贴文本</button>
       </div>
+      <form class="resume-text-entry" id="resumeTextEntry" hidden>
+        <label for="resumeTextInput">粘贴简历正文</label>
+        <textarea id="resumeTextInput" rows="9" maxlength="200000" placeholder="请粘贴简历正文；确认后将直接进入诊断。"></textarea>
+        <p class="resume-text-help">至少 20 个字符；请勿粘贴身份证号、住址等与求职无关的敏感信息。</p>
+        <div class="resume-upload-actions">
+          <button class="btn" type="submit" id="diagnoseResumeText">开始诊断</button>
+          <button class="btn ghost" type="button" id="cancelResumeText">取消</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -61,7 +70,7 @@
   <!-- 成功 -->
   <div data-state-view="success">
     <div class="card" style="display:flex;gap:28px;align-items:center;flex-wrap:wrap">
-      <div class="score-ring" style="--pct:73" role="img" aria-label="诊断分 R：73 分"><div class="inner"><span class="num">73</span><span class="lbl">诊断分 R</span></div></div>
+      <div class="score-ring" id="resumeScoreRing" style="--pct:73" role="img" aria-label="诊断分 R：73 分"><div class="inner"><span class="num" id="resumeScore">73</span><span class="lbl">诊断分 R</span></div></div>
       <div style="flex:1;min-width:260px" id="subbars"></div>
     </div>
     <div class="card">
@@ -79,8 +88,9 @@
       <div class="icon">⚠️</div>
       <div>
         <h3>诊断未完成</h3>
-        <p>模型输出未通过证据校验（出现无法回指原文的内容），已按事实锁阻断展示。你的已确认数据不受影响。</p>
-        <span class="btn">重试一次</span> <span class="btn ghost">查看阻断详情</span>
+        <p id="resumeErrorMessage">模型输出未通过证据校验（出现无法回指原文的内容），已按事实锁阻断展示。你的已确认数据不受影响。</p>
+        <button class="btn" type="button" id="retryResumeDiagnosis">重试一次</button>
+        <button class="btn ghost" type="button" id="returnToResumeUpload">返回修改</button>
       </div>
     </div>
   </div>

@@ -52,6 +52,8 @@ career-coach/
 
 > 上线边界：当前仓库仍处于真实上传、AI 调用及 DuMate 工作流集成阶段。公开静态页只提供前端入口；没有经过用户提交、服务端处理和证据校验的材料，页面不得展示评分、建议或匹配结论。
 
+要让公开页完成真实上传与诊断，部署方必须在加载 `data-bridge.js` 前配置 `window.DUMATE_API_BASE`，并提供可从 Pages 域名访问的 `POST /api/wf01/upload` 与 `POST /api/wf02/diagnose` 服务。未接入时页面会明确显示失败状态，不会使用旧缓存或合成诊断代替用户结果。
+
 **跑测试**（Windows）：
 
 ```bat

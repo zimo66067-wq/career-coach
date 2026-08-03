@@ -178,6 +178,19 @@ a.card:hover, .card.hoverable:hover {
 .resume-file-status.is-selected { color: var(--zy-covered) !important; }
 .resume-file-status.is-error { color: var(--zy-missing) !important; }
 .resume-upload-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.resume-text-entry {
+  max-width: 640px; margin: 24px auto 0; padding-top: 22px; border-top: 1px solid var(--zy-line);
+  text-align: left;
+}
+.resume-text-entry[hidden] { display: none; }
+.resume-text-entry label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 650; color: var(--zy-ink); }
+.resume-text-entry textarea {
+  width: 100%; min-height: 176px; resize: vertical; box-sizing: border-box; padding: 12px 14px;
+  color: var(--zy-ink); background: var(--zy-surface); border: 1px solid var(--zy-line); border-radius: var(--zy-r-md);
+  font: inherit; line-height: 1.55;
+}
+.resume-text-entry textarea:focus { outline: none; border-color: var(--zy-primary); box-shadow: var(--zy-shadow-focus); }
+.resume-text-help { margin-top: 8px !important; max-width: none !important; font-size: 12.5px; color: var(--zy-ink-3) !important; }
 
 /* ---- 状态徽章 ---- */
 .badge {
