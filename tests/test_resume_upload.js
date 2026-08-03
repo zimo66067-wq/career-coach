@@ -4,6 +4,8 @@ const vm = require('vm');
 
 const scriptPath = 'docs/js/resume-upload.js';
 const source = fs.readFileSync(scriptPath, 'utf8');
+const apiConfigPath = 'docs/js/pages-api-config.js';
+const apiConfigSource = fs.readFileSync(apiConfigPath, 'utf8');
 const context = {
   window: {},
   document: { addEventListener() {} },
@@ -16,6 +18,24 @@ vm.createContext(context);
 vm.runInContext(source, context, { filename: scriptPath });
 
 async function run() {
+  const configuredApi = { window: {} };
+  vm.createContext(configuredApi);
+  vm.runInContext(apiConfigSource, configuredApi, { filename: apiConfigPath });
+  assert.strictEqual(
+    configuredApi.window.DUMATE_API_BASE,
+    'https://career-coach-o7eu.vercel.app',
+    'GitHub Pages must target the Vercel production API by default'
+  );
+
+  const overriddenApi = { window: { DUMATE_API_BASE: 'https://preview.example.test' } };
+  vm.createContext(overriddenApi);
+  vm.runInContext(apiConfigSource, overriddenApi, { filename: apiConfigPath });
+  assert.strictEqual(
+    overriddenApi.window.DUMATE_API_BASE,
+    'https://preview.example.test',
+    'an explicit API override must remain supported'
+  );
+
   const upload = context.window.ResumeUpload;
   assert(upload, 'ResumeUpload should be exposed');
   assert.strictEqual(upload.validateFile({ name: 'resume.PDF', size: 1024 }).valid, true);
