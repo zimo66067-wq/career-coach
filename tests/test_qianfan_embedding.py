@@ -15,14 +15,15 @@ import os
 import sys
 import time
 
+import pytest
+
 # ---- 环境变量读取 ----
 # 注意：千帆应用 API Key 与智能云 IAM Access Key 不同！
 # 请从千帆控制台「应用管理」中获取，而非 IAM 安全认证。
 AK = os.environ.get("QIANFAN_AK", "")
 SK = os.environ.get("QIANFAN_SK", "")
 if not AK or not SK:
-    print("错误: 请设置环境变量 QIANFAN_AK 和 QIANFAN_SK")
-    sys.exit(2)
+    pytest.skip("QIANFAN_AK 和 QIANFAN_SK 未设置，跳过千帆 Embedding 测试", allow_module_level=True)
 
 COVERED_TH = 0.55
 WEAK_TH = 0.30

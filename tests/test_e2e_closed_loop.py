@@ -265,7 +265,7 @@ def test_full_pipeline(resume_path=None, job_path=None, verbose=False):
     except Exception as e:
         result.add_step("WF-05: seven_day_plan", False, str(e), int((time.time() - t0) * 1000))
 
-    return result
+    assert result.success is True, "全链路应全部通过, 实际: %s" % result.summary()
 
 
 # ────────────────────────────────────────────────────────────────── #
@@ -302,7 +302,7 @@ def test_degraded_closed_loop(verbose=False):
                 int((time.time() - t0) * 1000)
             )
 
-    return result
+    assert result.success is True, "降级闭环应全部通过: %s" % result.summary()
 
 
 # ────────────────────────────────────────────────────────────────── #
@@ -387,7 +387,7 @@ def test_data_bridge_degradation(verbose=False):
     except Exception as e:
         result.add_step("DataBridge: normalizeResumeProfile", False, str(e), int((time.time() - t0) * 1000))
 
-    return result
+    assert result.success is True, "DataBridge 降级应通过: %s" % result.summary()
 
 
 # ────────────────────────────────────────────────────────────────── #
@@ -451,7 +451,7 @@ def test_privacy_closed_loop(verbose=False):
     except Exception as e:
         result.add_step("Privacy: full lifecycle", False, str(e), int((time.time() - t0) * 1000))
 
-    return result
+    assert result.success is True, "隐私闭环应通过: %s" % result.summary()
 
 
 # ────────────────────────────────────────────────────────────────── #

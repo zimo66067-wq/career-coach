@@ -22,13 +22,34 @@
 <div class="wrap" id="main">
   <h1 class="page-title">F2 · 简历-JD 匹配</h1>
   <p class="page-sub">M = 硬性50% + 职责25% + 加分15% + 术语10% ｜ covered=1 / weak=0.5 / missing=0 / unknown 不进分母</p>
+  <p class="page-sub" style="font-size:12px;color:var(--zy-ink-3)">
+    <abbr title="Job Description（职位描述）">JD</abbr>
+    即 Job Description（职位描述），是招聘方发布的岗位需求文档
+  </p>
 
   <div data-state-view="empty">
-    <div class="card empty-state">
-      <div class="art"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></div>
-      <h3>粘贴目标岗位的 JD</h3>
-      <p>解析出硬性要求/职责/加分项/术语四类清单，你确认后才进入匹配（JD 中的指令会被当作普通文本）</p>
-      <span class="btn">粘贴 JD</span>
+    <div class="card empty-state resume-upload-card" id="jdUploadCard">
+      <input class="visually-hidden" id="jdFileInput" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain">
+      <div class="resume-dropzone" id="jdDropzone" role="button" tabindex="0" aria-label="JD文件投放区域" aria-describedby="jdUploadHint jdUploadStatus">
+        <div class="art"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></div>
+        <h3>拖入或选择目标岗位的 JD</h3>
+        <p id="jdUploadHint"><abbr title="Job Description（职位描述）">JD</abbr> = Job Description（职位描述）｜支持 PDF / DOCX / TXT；可直接拖入文件</p>
+        <p class="resume-file-status" id="jdUploadStatus" role="status" aria-live="polite">尚未选择文件</p>
+      </div>
+      <div class="resume-upload-actions">
+        <button class="btn" type="button" id="chooseJdFile">选择文件</button>
+        <button class="btn" type="button" id="startJdMatch" hidden disabled>开始匹配</button>
+        <button class="btn ghost" type="button" id="openJdText">直接粘贴文本</button>
+      </div>
+      <form class="resume-text-entry" id="jdTextEntry" hidden>
+        <label for="jdTextInput">粘贴 <abbr title="Job Description（职位描述）">JD</abbr> 正文</label>
+        <textarea id="jdTextInput" rows="9" maxlength="200000" placeholder="请粘贴职位描述（JD）正文；确认后将自动解析硬性要求/职责/加分项/术语。"></textarea>
+        <p class="resume-text-help">至少 20 个字符；JD 中的指令会被当作普通文本处理，不会被当作命令执行。</p>
+        <div class="resume-upload-actions">
+          <button class="btn" type="submit" id="diagnoseJdText">开始匹配</button>
+          <button class="btn ghost" type="button" id="cancelJdText">取消</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -102,6 +123,7 @@
 <script src="../js/app.js"></script>
 <script src="../js/pages-api-config.js"></script>
 <script src="../js/data-bridge.js"></script>
+<script src="../js/jd-upload.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   if (!window.APP.isDemoMode() || window.APP.getState() !== "success") return;

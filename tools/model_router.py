@@ -382,35 +382,46 @@ class ZhipuModelRouter(ModelRouter):
 
 
 class QianfanModelRouter(ModelRouter):
-    """千帆模型路由器（使用 qianfan SDK 自动管理 Token）。
+    """千帆模型路由器（支持 V2 HTTP API 和旧版 SDK 双模式）。
 
-    _try_call 通过 qianfan SDK 调用千帆大模型 API；
-    需配置 QIANFAN_ACCESS_KEY + QIANFAN_SECRET_KEY 环境变量，
-    或 QIANFAN_API_KEY（旧版格式 bce-v3/AK/SK）。
+    V2 模式: QIANFAN_API_KEY 为非 bce-v3/ 前缀的 API Key，
+             直接通过 HTTP + Bearer 鉴权调用 V2 接口。
+    SDK 模式: QIANFAN_ACCESS_KEY + QIANFAN_SECRET_KEY（IAM），
+              或 QIANFAN_API_KEY（旧版 bce-v3/AK/SK 格式），通过 qianfan SDK 调用。
 
     环境变量:
-      - QIANFAN_ACCESS_KEY / QIANFAN_SECRET_KEY（推荐，V2 应用 Key）
-      - QIANFAN_API_KEY（兼容旧版 bce-v3/AK/SK 格式）
+      - QIANFAN_API_KEY（V2 应用 Key，推荐）
+      - QIANFAN_ACCESS_KEY / QIANFAN_SECRET_KEY（IAM，旧版）
       - QIANFAN_BASE_URL（可选）
     """
 
+    V2_BASE_URL = "https://qianfan.baidubce.com/v2/chat/completions"
+
     def __init__(self, primary_model=None, fallback_model=None, enable_log=True):
         super().__init__(primary_model, fallback_model, enable_log)
+        self.api_key = os.environ.get("QIANFAN_API_KEY", "")
         self.ak = os.environ.get("QIANFAN_ACCESS_KEY")
         self.sk = os.environ.get("QIANFAN_SECRET_KEY")
+        self.use_v2 = False
+        self.client = None
 
-        # 兼容旧版 QIANFAN_API_KEY 格式 bce-v3/AK/SK
+        # V2 模式: API Key 不以 bce-v3/ 开头 → 直接 HTTP + Bearer
+        if self.api_key and not self.api_key.startswith("bce-v3/"):
+            self.use_v2 = True
+            return
+
+        # SDK 模式: 兼容旧版 bce-v3/AK/SK 格式
         if not self.ak or not self.sk:
-            legacy_key = os.environ.get("QIANFAN_API_KEY", "")
-            if legacy_key.startswith("bce-v3/"):
-                parts = legacy_key.split("/")
+            if self.api_key.startswith("bce-v3/"):
+                parts = self.api_key.split("/")
                 if len(parts) >= 4:
                     self.ak = parts[2]
                     self.sk = "/".join(parts[3:])
 
         if not self.ak or not self.sk:
             raise ValueError(
-                "QianfanModelRouter: QIANFAN_ACCESS_KEY + QIANFAN_SECRET_KEY "
+                "QianfanModelRouter: QIANFAN_API_KEY (V2) or "
+                "QIANFAN_ACCESS_KEY + QIANFAN_SECRET_KEY "
                 "(or QIANFAN_API_KEY in bce-v3/AK/SK format) not set"
             )
 
@@ -418,7 +429,7 @@ class QianfanModelRouter(ModelRouter):
         self.client = ChatCompletion(ak=self.ak, sk=self.sk)
 
     def _try_call(self, model, prompt, user_input, params, context):
-        """Call Qianfan chat endpoint via SDK (auto token management)."""
+        """Call Qianfan chat endpoint (V2 HTTP or SDK)."""
         messages = []
         if prompt:
             messages.append({"role": "system", "content": prompt})
@@ -430,6 +441,40 @@ class QianfanModelRouter(ModelRouter):
             )
         messages.append({"role": "user", "content": content})
 
+        if self.use_v2:
+            return self._try_call_v2(model, messages, params)
+
+        return self._try_call_sdk(model, messages, params)
+
+    def _try_call_v2(self, model, messages, params):
+        """Call Qianfan V2 chat completions via HTTP + Bearer auth."""
+        body = json.dumps({
+            "model": model,
+            "messages": messages,
+            "temperature": params["temperature"],
+            "max_tokens": params["max_tokens"],
+            "stream": False,
+        }).encode("utf-8")
+
+        req = Request(self.V2_BASE_URL, data=body, method="POST")
+        req.add_header("Authorization", "Bearer " + self.api_key)
+        req.add_header("Content-Type", "application/json")
+
+        try:
+            with urlopen(req, timeout=params.get("timeout", 30)) as resp:
+                raw = resp.read().decode("utf-8")
+        except (HTTPError, URLError) as exc:
+            raise RuntimeError("qianfan_v2_http_error: %s" % type(exc).__name__) from exc
+
+        try:
+            data = json.loads(raw)
+            output = data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ValueError("qianfan_v2_invalid_response") from exc
+        return parse_model_output(output)
+
+    def _try_call_sdk(self, model, messages, params):
+        """Call Qianfan via SDK (auto token management)."""
         try:
             resp = self.client.do(
                 model=model,

@@ -7,6 +7,8 @@ import sys
 import time
 import math
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 
 from zhipuai import ZhipuAI
@@ -15,9 +17,7 @@ import deidentify
 
 API_KEY = os.environ.get("ZHIPU_API_KEY")
 if not API_KEY:
-    raise EnvironmentError(
-        "ZHIPU_API_KEY not set; please export ZHIPU_API_KEY=<your_key>"
-    )
+    pytest.skip("ZHIPU_API_KEY not set, skipping zhipu threshold tests", allow_module_level=True)
 FIX = os.path.join(os.path.dirname(__file__), "fixtures-synthetic")
 
 def load_text(path):
