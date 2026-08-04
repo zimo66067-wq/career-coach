@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# 环境变量（含密钥，绝不入库）
+.env
+
 # Node
 node_modules/
 
@@ -32,3 +35,4 @@ preview-*.png
 Thumbs.db
 .DS_Store
 ~$*
+deliverables/career-coach-push.bundle
