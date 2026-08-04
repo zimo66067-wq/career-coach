@@ -6,7 +6,7 @@ set -euo pipefail
 OWNER="${1:-zimo66067-wq}"
 REPO="${2:-career-coach}"
 BRANCH="${3:-main}"
-TOKEN="${4:-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}"
+TOKEN="${4:-${GITHUB_TOKEN:-}}"
 BASE="https://api.github.com/repos/${OWNER}/${REPO}"
 
 api() {
