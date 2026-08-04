@@ -21,6 +21,15 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from tools.database import (  # noqa: E402
+    admin_password_ok,
+    count_resumes,
+    export_all,
+    get_resume_detail,
+    list_resumes,
+    save_diagnosis,
+    save_resume,
+)
 from tools.deidentify import deidentify  # noqa: E402
 from tools.extract_text import extract_docx, extract_pdf, extract_txt  # noqa: E402
 from tools.model_router import ZhipuModelRouter  # noqa: E402
@@ -184,7 +193,8 @@ def read_uploaded_resume():
         with tempfile.NamedTemporaryFile(suffix=extension, delete=False) as temporary_file:
             temporary_path = temporary_file.name
         uploaded.save(temporary_path)
-        if os.path.getsize(temporary_path) > MAX_FILE_BYTES:
+        file_size = os.path.getsize(temporary_path)
+        if file_size > MAX_FILE_BYTES:
             raise ApiError("payload_too_large", "文件不能超过 10 MB。", 413)
         if extension == ".pdf":
             text = extract_pdf(temporary_path)
@@ -192,7 +202,7 @@ def read_uploaded_resume():
             text = extract_docx(temporary_path)
         else:
             text = extract_txt(temporary_path)
-        return validate_text(text)
+        return validate_text(text), uploaded.filename, extension, file_size
     except ApiError:
         raise
     except SystemExit:
@@ -607,16 +617,30 @@ def diagnose_resume(resume_text):
 def route_api():
     route = request_route()
     if request.method == "OPTIONS":
-        if route in {"wf01/upload", "wf02/diagnose", "health"}:
+        if route in {"wf01/upload", "wf02/diagnose", "health", "admin/resumes", "admin/export"}:
             return ("", 204)
         raise ApiError("not_found", "接口不存在。", 404)
 
     if route == "health" and request.method == "GET":
         return api_response({"status": "ok", "model_configured": bool(os.environ.get("ZHIPU_API_KEY"))})
     if route == "wf01/upload" and request.method == "POST":
-        source_text = read_uploaded_resume()
+        source_text, filename, extension, file_size = read_uploaded_resume()
         cleaned_text, _mapping = deidentify(source_text)
-        return api_response({"resumeText": cleaned_text, "resumeProfile": None})
+        session_id = request.headers.get("X-Trace-Id", uuid.uuid4().hex)
+        try:
+            save_resume(
+                session_id=session_id,
+                client_ip=request.remote_addr or "",
+                user_agent=request.headers.get("User-Agent", "")[:500],
+                filename=filename[:200],
+                file_type=extension,
+                file_size=file_size,
+                resume_text=cleaned_text[:100000],  # cap at 100k chars
+            )
+        except Exception:
+            # DB write must never fail the upload.
+            app.logger.exception("DB save resume failed")
+        return api_response({"resumeText": cleaned_text, "resumeProfile": None, "session_id": session_id})
     if route == "wf02/diagnose" and request.method == "POST":
         if not request.is_json:
             raise ApiError("invalid_content_type", "诊断请求必须使用 JSON 格式。", 415)
@@ -626,17 +650,52 @@ def route_api():
         profile, score_r, model_trace_id, diagnosis_mode, diagnosis_notice = diagnose_resume(
             validate_text(body.get("resumeText"))
         )
+        session_id = body.get("session_id") or request.headers.get("X-Trace-Id", uuid.uuid4().hex)
+        try:
+            save_diagnosis(
+                session_id=session_id,
+                score_r=score_r,
+                diagnosis_mode=diagnosis_mode,
+                diagnosis_notice=diagnosis_notice,
+                model_trace_id=model_trace_id,
+                diagnosis_json=json.dumps(profile, ensure_ascii=False)[:500000],
+            )
+        except Exception:
+            app.logger.exception("DB save diagnosis failed")
         return api_response({
             "resumeProfile": profile,
             "score_R": score_r,
             "model_trace_id": model_trace_id,
             "diagnosis_mode": diagnosis_mode,
             "diagnosis_notice": diagnosis_notice,
+            "session_id": session_id,
         })
+    if route == "admin/resumes" and request.method == "GET":
+        password = request.headers.get("X-Admin-Password", "")
+        if not admin_password_ok(password):
+            raise ApiError("forbidden", "访问被拒绝。", 403)
+        try:
+            limit = min(int(request.args.get("limit", 100)), 500)
+            offset = max(int(request.args.get("offset", 0)), 0)
+        except ValueError:
+            limit, offset = 100, 0
+        return api_response({
+            "total": count_resumes(),
+            "limit": limit,
+            "offset": offset,
+            "items": list_resumes(limit=limit, offset=offset),
+            "warning": "Vercel /tmp 是临时文件系统；服务重启后数据会丢失。请定期导出。",
+        })
+    if route == "admin/export" and request.method == "GET":
+        password = request.headers.get("X-Admin-Password", "")
+        if not admin_password_ok(password):
+            raise ApiError("forbidden", "访问被拒绝。", 403)
+        return api_response(export_all())
     raise ApiError("not_found", "接口不存在。", 404)
 
 
 # Local test routes plus the single Vercel function route used by vercel.json.
-for _rule in ("/api", "/api/wf01/upload", "/api/wf02/diagnose", "/api/health"):
+for _rule in ("/api", "/api/wf01/upload", "/api/wf02/diagnose", "/api/health",
+              "/api/admin/resumes", "/api/admin/export"):
     app.add_url_rule(_rule, endpoint="route_" + _rule.replace("/", "_") or "root", view_func=route_api,
                      methods=["GET", "POST", "OPTIONS"])
