@@ -24,6 +24,7 @@ tags:
 
 - 对照基准：PRD v1.0（F1-F4 四项 MVP、事实锁五条、性能门、验收门）+ workflows WF-01~06 合同 + contracts 四 Schema。
 - 测试基线：**pytest 220 通过 / 4 跳过；Node 契约测试 7/7 通过；Schema 全量校验通过**。
+- 2026-08-06 自动解决批次：能力矩阵证据回填、10 次自动化彩排、会话备份脚本、G9 可自动材料、语音 UI 契约测试、移动端截图（详见第六节）；Node 契约测试增至 9/9。
 - 结论：GitHub main 与本地分支均不完整（main 缺 F2/F3/F4 接口与同意门；本地缺持久化与 F3/F4 实现）。已在 `codex/complete` 分支（基于 main）完成统一补全，四个 MVP 与六个工作流在后端、前端、测试三端闭合。
 - 工作区：`C:\Users\Administrator\Documents\职业教练\career-coach-complete`（分支 `codex/complete`，基于 `origin/main` da5e41e）。原本地工作区未改动。
 
@@ -112,6 +113,20 @@ tags:
 4. G8 用户验证（5-8 人）与 G9 提交包冻结（PDF/MP4/10 次彩排）。
 5. Vercel 部署后 `/tmp` 数据会随冷启动清空：生产如需长期留存，应接外部数据库或定期 admin/export。
 
+> 说明：以上 1-4 均为外部资源型，无法在本机完全闭环；其中 G9 的可自动材料（简介/冻结清单/自动化彩排证据）已在第六节完成，PDF 方案与 MP4 演示仍需人工审定后生成。
+
+## 六、可自动解决部分执行结果（2026-08-06）
+
+| 自动解决项 | 产物/结果 | 证据 |
+|---|---|---|
+| 能力矩阵证据回填 | N5/N8/N10/N12/N15/N17/N18、V3/V5 共 9 项由“待验证”改“已验证”（附自动化测试或实测报告）；汇总同步为 37/31 | docs/capability_matrix.md（已同步 public/） |
+| 10 次自动化彩排 | 10/10 轮完整闭环无阻断（consent→diagnose→jd→match→interview→ability→delete） | deliverables/wf-evidence-20260806/rehearsal-10x.json |
+| 会话数据自动备份 | 新增 scripts/backup-sessions.py，导出日期化 JSON，缓解 Vercel /tmp 丢数据 | deliverables/session-backup-20260806.json |
+| G9 可自动材料 | 200 字项目简介、g9-submission-checklist.json（p0-07-freeze.py 已修复 gbk 编码并运行） | deliverables/200字项目简介.md、deliverables/wf-evidence-20260806/g9-submission-checklist.json |
+| 语音 UI 契约测试 | 新增 tests/test_voice_ui.js（F3 语音 DOM/接线/10s 回退契约，docs 与 public 双镜像），2/2 通过并纳入 CI | node 9/9 通过 |
+| 移动端截图 | scripts/capture_mobile_ui.py 生成 375×812 截图 10 张（含降级态，页面 JS 错误 0）；MT-3/4/5/8/9/10 回填为已验证 | deliverables/mobile-screenshots-20260806/ |
+| README/文档一致性 | README 状态、目录导航、WF-01~06 端点与环境变量说明更新；docs 索引补新文档 | README.md、docs/index.md |
+
 ## 行动项
 
 - [x] 汇总设计路径与技术路径文档（docs/design-and-tech-path.md）
@@ -119,6 +134,7 @@ tags:
 - [x] 统一前端（F2 确认流程、同意令牌、发布镜像）
 - [x] 恢复严格 CI 与 Node 契约测试
 - [x] 全量回归：pytest 220 通过、Node 7/7、Schema VALID
+- [x] 2026-08-06 自动解决批次：矩阵回填、10 次彩排、备份脚本、G9 可自动材料、语音 UI 测试、移动端截图
 - [ ] 提交 codex/complete 分支并合并/推送（需用户确认，涉及分支策略）
 - [ ] 平台与真实密钥类验收（见遗留项）
 

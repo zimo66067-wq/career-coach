@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """P0-07 G9 提交包冻结脚本"""
 import subprocess, json
+import sys
 from datetime import datetime
 from pathlib import Path
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
 
 PROJECT = Path(__file__).resolve().parent.parent
 EVIDENCE = PROJECT / "deliverables/wf-evidence-20260803"

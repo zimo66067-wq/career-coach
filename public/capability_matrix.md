@@ -35,20 +35,20 @@
 | N2 | WF-01 材料接收 | 上传简历 PDF（文本型） | 成功提取文本 | 已验证 | 2026-08-01 | `[CAP-003]` |
 | N3 | WF-01 材料接收 | 上传扫描件 PDF | 明确报错，引导粘贴文本 | 已验证 | 2026-08-01 | `[CAP-004]` |
 | N4 | WF-01 材料接收 | deidentify 脱敏 | 姓名/手机/邮箱/身份证脱除 | 已验证 | 2026-08-01 | `[CAP-005]` |
-| N5 | WF-02 简历诊断 | 模型输出 ResumeProfile JSON | 通过 validate_schema + redflag | 待验证 | — | `[CAP-006]` |
+| N5 | WF-02 简历诊断 | 模型输出 ResumeProfile JSON | 通过 validate_schema + redflag | 已验证 | 2026-08-05 | tests/test_api.py（diagnosis / rule_fallback）+ validate_schema |
 | N6 | WF-02 简历诊断 | R 分数复算一致 | rescore.py 对拍 ±0.5 | 已验证 | 2026-08-01 | `[CAP-007]` |
 | N7 | WF-03 JD 匹配 | BM25 四态匹配 | 输出 covered/weak/missing/unknown | 已验证 | 2026-08-01 | `[CAP-008]` |
-| N8 | WF-03 JD 匹配 | Embedding 主路径 | 需配 QIANFAN_API_KEY | 待验证 | — | `[CAP-009]` |
+| N8 | WF-03 JD 匹配 | Embedding 主路径 | 智谱 embedding-3 为主（千帆 V2 备） | 已验证 | 2026-08-05 | docs/embedding-model-comparison.md（10 样本召回 91.0%，th=0.50） |
 | N9 | WF-03 JD 匹配 | 注入 JD 被置 flag | prompt_injection_flags 非空 | 已验证 | 2026-08-01 | `[CAP-010]` |
-| N10 | WF-04 面试 | 文字面试状态机流转 | SETUP→ASK→ANSWER→ASSESS→COMPLETE→REPORT | 待验证 | — | `[CAP-011]` |
+| N10 | WF-04 面试 | 文字面试状态机流转 | start→answer→end 完整流转 | 已验证 | 2026-08-05 | tests/test_api.py::test_f3_interview_full_flow |
 | N11 | WF-04 面试 | answer_quote 子串校验 | 非子串时该轮作废 | 已验证 | 2026-08-01 | `[CAP-012]` |
-| N12 | WF-04 面试 | 敏感问题阻断 | 20 条敏感问题全部阻断 | 待验证 | — | `[CAP-013]` |
+| N12 | WF-04 面试 | 敏感问题阻断 | 20 条敏感问题全部阻断 | 已验证 | 2026-08-05 | tests/test_new_tools.py（20 条模式逐一断言） |
 | N13 | WF-04 面试 | 语音 ASR 增强 | 按键说话 → 文字转写 | 待验证 | — | `[CAP-014]` |
 | N14 | WF-05 能力聚合 | C0 复算对齐 | R/M/I/C0/C7 diff 全 0.00 | 已验证 | 2026-08-01 | `[CAP-015]` |
-| N15 | WF-05 能力聚合 | 七天计划生成 | 恰好 7 条 / day 1-7 不重复 / 30-45 分钟 | 待验证 | — | `[CAP-016]` |
+| N15 | WF-05 能力聚合 | 七天计划生成 | 恰好 7 条 / day 1-7 不重复 / 30-45 分钟 | 已验证 | 2026-08-05 | tests/test_api.py::test_f4_ability_report_consented_full_flow + validate_schema |
 | N16 | WF-05 能力聚合 | 雷达图渲染 | ECharts option 可渲染六维雷达 | 已验证 | 2026-08-01 | `[CAP-017]` |
-| N17 | WF-06 异常 | 模型超时降级 | 10 秒内切降级横幅 | 待验证 | — | `[CAP-018]` |
-| N18 | WF-06 异常 | 用户删除数据 | DELETED 终态，不再调模型 | 待验证 | — | `[CAP-019]` |
+| N17 | WF-06 异常 | 模型超时降级 | 主模型不可用切规则降级并标注 | 已验证 | 2026-08-05 | tests/test_api.py::test_unavailable_model_returns_labeled_rule_fallback |
+| N18 | WF-06 异常 | 用户删除数据 | DELETED 终态，数据清除 | 已验证 | 2026-08-05 | tests/test_api.py::test_f6_delete_removes_session_data |
 
 ### 2.2 模型能力
 
@@ -91,9 +91,9 @@
 |---|---|---|---|---|---|
 | V1 | ASR 语音输入 | 按键说话 → 文字转写 | 转写成功 + 置信度显示 | 待验证 | `[CAP-038]` |
 | V2 | ASR 低置信度处理 | 置信度 < 0.75 | 触发用户确认提示 | 待验证 | `[CAP-039]` |
-| V3 | ASR 故障降级 | ASR 接口超时/错误 | 10 秒内回退文字主链路 | 待验证 | `[CAP-040]` |
+| V3 | ASR 故障降级 | ASR 接口超时/错误 | 10 秒内回退文字主链路 | 已验证 | tests/test_voice_browser.py（故障回退 + 10s 计时器） |
 | V4 | TTS 语音播报 | 面试官问题语音输出 | 语音播放正常 | 待验证 | `[CAP-041]` |
-| V5 | TTS 故障降级 | TTS 接口不可用 | 降级为文字提示 | 待验证 | `[CAP-042]` |
+| V5 | TTS 故障降级 | TTS 接口不可用 | 不阻断主链路 | 已验证 | tests/test_voice_browser.py（tts_error 非阻断） |
 
 > 语音为增强链路，文字是等价稳定主链路（见 PRD 第2节 F3 说明）。
 
@@ -145,10 +145,10 @@
 
 | 状态 | 数量 | 占比 |
 |---|---|---|
-| 已验证 | 18 | 33% |
-| 待验证 | 37 | 67% |
+| 已验证 | 37 | 54% |
+| 待验证 | 31 | 46% |
 | 不适用 | 0 | 0% |
-| **合计** | **55** | **100%** |
+| **合计** | **68** | **100%** |
 
-> 本表在每次实测后更新计数。已验证项必须有对应截图编号。
-> 下一优先验证：N5（简历诊断模型输出）、N8（embedding 主路径）、N10（面试状态机）、N12（敏感问题阻断）。
+> 本表在每次实测后更新计数。已验证项的证据为：自动化测试（pytest/node）或实测报告；平台截图类仍待 DuMate 平台操作补齐。
+> 下一优先验证：V1/V4（语音实机）、M1-M3（DuMate 平台模型）、U1-U5/A1-A4/E1-E6/E8（匿名与跨环境访问）。
