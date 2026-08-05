@@ -53,12 +53,13 @@ def load_pairs():
 
 
 def get_expected_labels(expected_path):
-    """从 expected.json 提取每条要求的期望状态。"""
-    with open(expected_path, encoding="utf-8") as f:
+    """从 ground-truth-labels.json 读取该 job 的期望状态（人工真值标注）。"""
+    base = os.path.basename(expected_path)
+    with open(os.path.join(FIXTURES, "ground-truth-labels.json"), encoding="utf-8") as f:
         data = json.load(f)
-    labels = {}
-    for req in data.get("requirements", []):
-        labels[req["id"]] = req["status"]
+    labels = data.get(base)
+    if labels is None:
+        raise KeyError("ground-truth-labels.json 缺少 %s 的标注" % base)
     return labels
 
 
@@ -74,7 +75,9 @@ def run_match(resume_path, job_path, backend, model=None, output_path=None):
         cmd.extend(["--embedding-model", model])
     if output_path:
         cmd.extend(["--output", output_path])
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, encoding="utf-8")
+    child_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120,
+                            encoding="utf-8", env=child_env)
     if result.returncode != 0:
         print("STDERR:", result.stderr[-500:] if result.stderr else "")
         return None
@@ -135,7 +138,7 @@ def main():
 
     for pair in pairs:
         out_path = "/tmp/match_%s.json" % pair["num"]
-        data = run_match(pair["resume_txt"], pair["job_txt"],
+        data = run_match(pair["resume_txt"], pair["job_expected"],
                          args.backend, args.model, out_path)
         if data is None:
             print("[FAIL] pair %s: 匹配失败" % pair["num"])

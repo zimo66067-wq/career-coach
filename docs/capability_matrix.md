@@ -38,7 +38,7 @@
 | N5 | WF-02 简历诊断 | 模型输出 ResumeProfile JSON | 通过 validate_schema + redflag | 已验证 | 2026-08-05 | tests/test_api.py（diagnosis / rule_fallback）+ validate_schema |
 | N6 | WF-02 简历诊断 | R 分数复算一致 | rescore.py 对拍 ±0.5 | 已验证 | 2026-08-01 | `[CAP-007]` |
 | N7 | WF-03 JD 匹配 | BM25 四态匹配 | 输出 covered/weak/missing/unknown | 已验证 | 2026-08-01 | `[CAP-008]` |
-| N8 | WF-03 JD 匹配 | Embedding 主路径 | 智谱 embedding-3 为主（千帆 V2 备） | 已验证 | 2026-08-05 | docs/embedding-model-comparison.md（10 样本召回 91.0%，th=0.50） |
+| N8 | WF-03 JD 匹配 | Embedding 主路径 | 智谱 embedding-3 为主（千帆 V2 备） | 已验证 | 2026-08-06 | tests/embedding_full_recall_zhipu-3.json（2000 对召回 91.0%，th=0.50）+ tests/integration_recall_zhipu_embedding_3.json（10 对召回 100%/精确率 37.0%，证据归档 deliverables/p0-03-evidence/） |
 | N9 | WF-03 JD 匹配 | 注入 JD 被置 flag | prompt_injection_flags 非空 | 已验证 | 2026-08-01 | `[CAP-010]` |
 | N10 | WF-04 面试 | 文字面试状态机流转 | start→answer→end 完整流转 | 已验证 | 2026-08-05 | tests/test_api.py::test_f3_interview_full_flow |
 | N11 | WF-04 面试 | answer_quote 子串校验 | 非子串时该轮作废 | 已验证 | 2026-08-01 | `[CAP-012]` |

@@ -25,3 +25,4 @@
 1. 禁止放入真实简历/JD/面试记录（见 docs/privacy.md）。
 2. 修改样本必须同步修改对应 expected.json，并跑通 `pytest tests/`。
 3. source_span 的 start/end 为 UTF-8 字符偏移，修改 txt 后需重新校准。
+4. `ground-truth-labels.json` 为 2026-08-06 人工标注的覆盖真值（covered/weak/missing），键为 job expected 文件名，值是「与该编号配对简历相比，该 JD 每条要求是否被覆盖」，供 `test_integration_recall.py` 计算召回率/精确率；调整配对样本时须同步复核该标注。

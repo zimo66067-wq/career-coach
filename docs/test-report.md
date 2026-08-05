@@ -104,16 +104,17 @@ tags:
   - contracts + rescore 对拍、故障注入、脱敏、提取、BM25、面试引擎、语音后端、隐私生命周期、端到端
 - Node 契约测试 7/7：public page states、resume upload、job upload（F2）、publish mirror
 - Schema 校验：resume/ability fixtures VALID；CI 同款全量循环可用
+- 真实模型 7×3 复测（2026-08-06，glm-4-flash）：21/21 成功（100%），降级 0
+- Embedding 全量召回（2026-08-06，embedding-3）：2000 对样本召回率 91.0%（th=0.50）；集成召回 10 对召回率 100%、精确率 37.0%（详见第七节）
 
 ## 五、遗留项（不在代码层，需外部资源/平台）
 
 1. DuMate 平台六工作流实际搭建与截图（P0-02/P0-05，需平台操作）。
-2. 真实模型 7×3 复测与 embedding 全量召回（需 ZHIPU_API_KEY / 千帆密钥）。
-3. 语音实机五类用例（需麦克风/百度语音 token）。
-4. G8 用户验证（5-8 人）与 G9 提交包冻结（PDF/MP4/10 次彩排）。
-5. Vercel 部署后 `/tmp` 数据会随冷启动清空：生产如需长期留存，应接外部数据库或定期 admin/export。
+2. 语音实机五类用例（需麦克风/百度语音 token）。
+3. G8 用户验证（5-8 人）与 G9 提交包冻结（PDF/MP4/10 次彩排）。
+4. Vercel 部署后 `/tmp` 数据会随冷启动清空：生产如需长期留存，应接外部数据库或定期 admin/export。
 
-> 说明：以上 1-4 均为外部资源型，无法在本机完全闭环；其中 G9 的可自动材料（简介/冻结清单/自动化彩排证据）已在第六节完成，PDF 方案与 MP4 演示仍需人工审定后生成。
+> 说明：以上 1-3 均为外部资源型，无法在本机完全闭环；其中 G9 的可自动材料（简介/冻结清单/自动化彩排证据）已在第六节完成，PDF 方案与 MP4 演示仍需人工审定后生成。真实模型 7×3 复测与 embedding 全量召回已由用户提供 ZHIPU_API_KEY 在本机完成实测（见第七节）。
 
 ## 六、可自动解决部分执行结果（2026-08-06）
 
@@ -127,6 +128,20 @@ tags:
 | 移动端截图 | scripts/capture_mobile_ui.py 生成 375×812 截图 10 张（含降级态，页面 JS 错误 0）；MT-3/4/5/8/9/10 回填为已验证 | deliverables/mobile-screenshots-20260806/ |
 | README/文档一致性 | README 状态、目录导航、WF-01~06 端点与环境变量说明更新；docs 索引补新文档 | README.md、docs/index.md |
 
+## 七、真实模型 7×3 复测与 embedding 全量召回（2026-08-06，ZHIPU_API_KEY 实测）
+
+| 测试 | 范围 | 结果 | 证据 |
+|---|---|---|---|
+| P0-03 真实模型 7×3 复测 | 7 类任务 × 3 次，智谱 glm-4-flash | 21/21 成功（100%），降级 0，失败 0，总耗时 435.6s | deliverables/p0-03-evidence/p0-03-report-20260806_015207.json |
+| Embedding 全量召回 | 2000 对句子（20 正样本 × 100 负样本），智谱 embedding-3 | 召回率 91.0%（th=0.50，precision 5.3%，F1 10.0%）；th=0.10~0.50 区间召回率均 ≥90% | deliverables/p0-03-evidence/embedding_full_recall_zhipu-3.json |
+| 集成召回率 | 10 组 resume/job 端到端匹配（100 条要求），embedding-3 | 召回率 100%（37/37 应有匹配全部命中）、精确率 37.0%、F1 54.0% | deliverables/p0-03-evidence/integration_recall_zhipu_embedding_3.json |
+
+发现的问题与修复：
+
+1. 三个脚本在 Windows GBK 控制台下打印 Unicode 符号即崩溃 → 复测/召回运行前置 `PYTHONIOENCODING=utf-8`；`test_integration_recall.py` 已在子进程注入 UTF-8 环境，其他脚本在文档注明运行方式。
+2. `test_integration_recall.py` 此前从未跑通，两处缺陷：a) job expected.json 无逐条覆盖真值 → 新建 `tests/fixtures-synthetic/ground-truth-labels.json`（10 对 × 100 条人工真值，covered/weak/missing）；b) 脚本把 JD 原文喂给匹配器 CLI，要求编号为 L 系列与真值 J/R/P/T 错位 → 改为传 job expected.json，编号统一。
+3. 【新发现，建议后续】embedding 匹配存在过匹配：10 对中 7 对为跨技能配对（如 Java 应届 ↔ 前端 JD），精确率仅 8%~38%；63 条误报中 43 条被判 covered、20 条 weak（置信度 0.45~0.76），典型例：证据句为 Java 技能却判定「熟悉 HTML/CSS/JavaScript」为 covered。根因是 0.55/0.30 阈值下逐句取最大相似度普遍超线。建议后续做阈值校准或证据句验证（不改变本次召回结论，但影响 F2 岗位匹配的展示准确度）。
+
 ## 行动项
 
 - [x] 汇总设计路径与技术路径文档（docs/design-and-tech-path.md）
@@ -135,6 +150,7 @@ tags:
 - [x] 恢复严格 CI 与 Node 契约测试
 - [x] 全量回归：pytest 220 通过、Node 7/7、Schema VALID
 - [x] 2026-08-06 自动解决批次：矩阵回填、10 次彩排、备份脚本、G9 可自动材料、语音 UI 测试、移动端截图
+- [x] 2026-08-06 真实模型 7×3 复测 + embedding 全量召回（智谱实测，证据见第七节）
 - [ ] 提交 codex/complete 分支并合并/推送（需用户确认，涉及分支策略）
 - [ ] 平台与真实密钥类验收（见遗留项）
 

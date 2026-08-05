@@ -1,0 +1,122 @@
+{
+  "job-01-swe.expected.json": {
+    "J1": "covered",
+    "J2": "covered",
+    "J3": "covered",
+    "J4": "covered",
+    "R1": "covered",
+    "R2": "missing",
+    "P1": "covered",
+    "T1": "covered",
+    "T2": "covered"
+  },
+  "job-02-fe.expected.json": {
+    "J1": "covered",
+    "J2": "covered",
+    "J3": "covered",
+    "J4": "covered",
+    "R1": "weak",
+    "R2": "missing",
+    "P1": "covered",
+    "T1": "covered"
+  },
+  "job-03-data.expected.json": {
+    "J1": "covered",
+    "J2": "covered",
+    "J3": "covered",
+    "J4": "covered",
+    "R1": "covered",
+    "R2": "covered",
+    "P1": "covered",
+    "T1": "covered"
+  },
+  "job-04-injection.expected.json": {
+    "J1": "covered",
+    "J2": "missing",
+    "J3": "missing",
+    "J4": "weak",
+    "R1": "weak",
+    "R2": "missing",
+    "P1": "missing",
+    "T1": "missing"
+  },
+  "job-05-frontend.expected.json": {
+    "J1": "covered",
+    "J2": "missing",
+    "J3": "missing",
+    "J4": "missing",
+    "J5": "missing",
+    "R1": "missing",
+    "R2": "missing",
+    "R3": "missing",
+    "P1": "missing",
+    "P2": "missing",
+    "P3": "missing",
+    "T1": "missing"
+  },
+  "job-06-data-analyst.expected.json": {
+    "J1": "covered",
+    "J2": "missing",
+    "J3": "missing",
+    "J4": "missing",
+    "J5": "missing",
+    "R1": "missing",
+    "R2": "missing",
+    "R3": "missing",
+    "P1": "weak",
+    "P2": "missing",
+    "T1": "missing"
+  },
+  "job-07-pm.expected.json": {
+    "J1": "covered",
+    "J2": "missing",
+    "J3": "missing",
+    "J4": "covered",
+    "J5": "missing",
+    "R1": "weak",
+    "R2": "missing",
+    "R3": "missing",
+    "P1": "missing",
+    "P2": "missing",
+    "T1": "missing"
+  },
+  "job-08-qa.expected.json": {
+    "J1": "weak",
+    "J2": "missing",
+    "J3": "missing",
+    "J4": "missing",
+    "J5": "missing",
+    "R1": "missing",
+    "R2": "missing",
+    "R3": "missing",
+    "P1": "missing",
+    "P2": "missing",
+    "T1": "missing"
+  },
+  "job-09-algo.expected.json": {
+    "J1": "missing",
+    "J2": "weak",
+    "J3": "missing",
+    "J4": "missing",
+    "J5": "missing",
+    "R1": "missing",
+    "R2": "missing",
+    "R3": "missing",
+    "P1": "missing",
+    "P2": "missing",
+    "T1": "weak"
+  },
+  "job-10-bigdata.expected.json": {
+    "J1": "covered",
+    "J2": "weak",
+    "J3": "missing",
+    "J4": "missing",
+    "J5": "missing",
+    "R1": "missing",
+    "R2": "missing",
+    "R3": "missing",
+    "P1": "missing",
+    "P2": "missing",
+    "T1": "missing"
+  }
+}
