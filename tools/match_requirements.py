@@ -9,11 +9,14 @@
   - embedding: 千帆 Embedding-V1（HTTP API；需配置 QIANFAN_API_KEY + QIANFAN_SECRET_KEY）
   - bm25: 纯 stdlib TF-IDF/BM25 实现（默认，标注「简化匹配」）
 
-输出: 逐条 requirement 的 {status: covered|weak|missing|unknown, evidence}
-  covered: 最佳匹配分 >= COVERED_TH
-  weak:    WEAK_TH <= 分 < COVERED_TH
-  missing: 分 < WEAK_TH 且简历中存在部分相关词
-  unknown: 分 < WEAK_TH 且几乎无相关词（材料不足以判断）
+ 输出: 逐条 requirement 的 {status: covered|weak|missing|unknown, evidence}
+  covered: 最佳匹配分 >= COVERED_TH 且证据句通过词级验证
+  weak:    WEAK_TH <= 分 < COVERED_TH 且证据句通过词级验证
+  missing: 分 < WEAK_TH（或未通过证据验证）且简历中存在部分相关词
+  unknown: 分 < WEAK_TH（或未通过证据验证）且几乎无相关词（材料不足以判断）
+
+证据验证器（embedding 主路径）：模型负责语义排序，验证器负责事实——covered/weak
+必须能找到与要求存在词级重叠的证据句；找不到则降为 missing/unknown，避免"语义像"的误报。
 """
 import argparse
 import io
@@ -27,6 +30,57 @@ from collections import Counter
 COVERED_TH = 0.55
 WEAK_TH = 0.30
 UNKNOWN_TH = 0.12
+
+# 证据句门槛与验证器
+MIN_EVIDENCE_LEN = 8          # 证据句最短字符数，过滤"技能清单"等标题
+VERIFY_MIN_RATIO = 0.10       # 证据句与要求的最小词级重叠比例
+EVIDENCE_TOP_K = 20           # 证据重排候选数：验证器从前 K 个语义候选中选有事实重叠者
+VERIFY_STOP = frozenset({     # 验证不计入的泛化词（避免"熟悉/了解"等单字凑数）
+    "熟悉", "熟练", "了解", "掌握", "编写", "使用", "参与", "负责", "具备",
+    "相关", "经验", "能力", "基本", "良好", "流程", "有", "或", "和",
+    "与", "及", "等",
+})
+VERIFY_GENERIC = frozenset({   # 词义过泛、不足以证明覆盖的词（仅靠它们不算证据）
+    "语言", "测试", "项目", "数据", "分析", "开发", "设计", "实现",
+    "维护", "交付", "团队", "输出", "推动", "系统", "平台", "功能",
+    "方案", "报告", "工具", "服务", "技术", "线上", "业务", "用户",
+    "产品", "管理", "环境", "处理", "支持", "优化", "实践", "经验",
+})
+EVIDENCE_HEADERS = frozenset({
+    "技能清单", "项目经历", "教育经历", "实习经历", "工作经历", "自我评价",
+    "个人简历", "求职意向", "联系方式", "pii_removed:true",
+    "个人简历（合成样本，非真实人物）",
+})
+
+
+def _is_substantive_evidence(sentence):
+    """候选证据句过滤：过短或纯章节标题不作为匹配证据。"""
+    s = (sentence or "").strip()
+    if len(s) < MIN_EVIDENCE_LEN:
+        return False
+    if s in EVIDENCE_HEADERS:
+        return False
+    return True
+
+
+def verify_evidence(requirement, evidence):
+    """验证器：证据句必须与要求存在词级事实重叠（比例 >= VERIFY_MIN_RATIO）。
+
+    用 jieba 词级分词（而非单字集合），避免"熟悉"被拆成"熟/悉"凑数；
+    泛化词（熟悉/了解/经验等）与过泛词（语言/测试/项目等）也不计入重叠，
+    必须至少有一个"具体词"重叠，防止"语义像但无事实"的误报。
+    """
+    if not evidence:
+        return False
+    req_toks = set(tokenize(requirement)) - VERIFY_STOP
+    ev_toks = set(tokenize(evidence)) - VERIFY_STOP
+    if not req_toks:
+        return False
+    shared = (req_toks & ev_toks) - VERIFY_GENERIC
+    if not shared:
+        return False
+    return len(shared) / len(req_toks) >= VERIFY_MIN_RATIO
+
 
 # ---------------- 文本切分（中英文混合，优先 jieba，降级到 unigram+bigram） ----------------
 RE_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9+#.\-]*|[\u4e00-\u9fa5]")
@@ -204,22 +258,17 @@ class ZhipuEmbedder(EmbedderBase):
             sentences: List[str]，简历切分后的句子列表
 
         Returns:
-            List of (best_conf, best_idx) 对，长度 == len(requirements_text)
+            List of Top-K (conf, idx) 对（按相似度降序），供证据验证器重排。
         """
         # 一次性 embed 全部句子和全部要求
         sent_vecs = self.embed(sentences)
         req_vecs = self.embed(requirements_text)
 
         results = []
-        for ri, rv in enumerate(req_vecs):
-            best_conf = 0.0
-            best_idx = -1
-            for si, sv in enumerate(sent_vecs):
-                conf = self._cosine(rv, sv)
-                if conf > best_conf:
-                    best_conf = conf
-                    best_idx = si
-            results.append((best_conf, best_idx))
+        for rv in req_vecs:
+            scored = [(self._cosine(rv, sv), si) for si, sv in enumerate(sent_vecs)]
+            scored.sort(key=lambda x: x[0], reverse=True)
+            results.append(scored[:EVIDENCE_TOP_K])
         return results
 
 
@@ -331,39 +380,50 @@ def _run_embedding_match(embedder, requirements, sentences, resume_tokens):
 
     优先用 batch_match（批量 embed + 矩阵计算）；
     若 embedder 不支持 batch_match，逐条降级到 similarity。
+
+    证据验证：先过滤章节标题/过短句，再从 Top-K 语义候选中选第一个通过
+    verify_evidence（词级事实重叠）的句子作证据；全部未通过则降为 missing/unknown。
     """
+    candidates = [s for s in sentences if _is_substantive_evidence(s)]
+    if not candidates:
+        candidates = sentences  # 全部被过滤时兜底，避免空证据
+
     req_texts = [r["text"] for r in requirements]
 
     if hasattr(embedder, "batch_match"):
         # 批量模式：只调 2 次 API（句子 + 要求），矩阵计算余弦
-        match_results = embedder.batch_match(req_texts, sentences)
+        topk_list = embedder.batch_match(req_texts, candidates)
     else:
         # 逐条模式
-        match_results = []
+        topk_list = []
         for req_text in req_texts:
-            best_conf = 0.0
-            best_idx = -1
-            for si, sent in enumerate(sentences):
+            scored = []
+            for si, sent in enumerate(candidates):
                 try:
                     conf = embedder.similarity(req_text, sent)
                 except Exception as exc:
                     print("[match] embedding 调用失败: %s" % exc, file=sys.stderr)
                     conf = 0.0
-                if conf > best_conf:
-                    best_conf = conf
-                    best_idx = si
-            match_results.append((best_conf, best_idx))
+                scored.append((conf, si))
+            scored.sort(key=lambda x: x[0], reverse=True)
+            topk_list.append(scored[:EVIDENCE_TOP_K])
 
     results = []
     for i, req in enumerate(requirements):
-        best_conf, best_idx = match_results[i]
         req_tokens = unigrams(req["text"])
         has_partial = bool(req_tokens & resume_tokens)
-        status = judge(best_conf, has_partial)
+        best_conf, best_idx = topk_list[i][0]
+        evidence = ""
+        for conf, idx in topk_list[i]:
+            if conf >= WEAK_TH and verify_evidence(req["text"], candidates[idx]):
+                best_conf, best_idx, evidence = conf, idx, candidates[idx]
+                break
+        # 验证器否决：Top-K 均无词级事实支撑时，不判定为已覆盖/部分覆盖
+        status = judge(best_conf, has_partial) if evidence else judge(0.0, has_partial)
         results.append({
             "id": req["id"], "type": req["type"], "text": req["text"],
             "status": status, "confidence": round(best_conf, 3),
-            "evidence": sentences[best_idx] if best_idx >= 0 and best_conf >= WEAK_TH else "",
+            "evidence": evidence,
         })
     return results
 

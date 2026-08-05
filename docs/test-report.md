@@ -99,13 +99,13 @@ tags:
 
 ## 四、验证通过的模块
 
-- pytest 220 通过（4 跳过为需要外部密钥的 embedding 实测类）：
+- pytest 222 通过（4 跳过为需要外部密钥的 embedding 实测类）：
   - API 契约 20/20（consent/上传/诊断/降级/F2/F3/F4/F6/管理员/CORS）
   - contracts + rescore 对拍、故障注入、脱敏、提取、BM25、面试引擎、语音后端、隐私生命周期、端到端
-- Node 契约测试 7/7：public page states、resume upload、job upload（F2）、publish mirror
+- Node 契约测试 9/9：public page states、resume upload、job upload（F2）、publish mirror、voice UI
 - Schema 校验：resume/ability fixtures VALID；CI 同款全量循环可用
 - 真实模型 7×3 复测（2026-08-06，glm-4-flash）：21/21 成功（100%），降级 0
-- Embedding 全量召回（2026-08-06，embedding-3）：2000 对样本召回率 91.0%（th=0.50）；集成召回 10 对召回率 100%、精确率 37.0%（详见第七节）
+- Embedding 全量召回（2026-08-06，embedding-3）：2000 对样本召回率 91.0%（th=0.50）；集成召回 10 对召回率 83.8%、精确率 96.9%、F1 90.0%（证据验证器生效后，详见第七节）
 
 ## 五、遗留项（不在代码层，需外部资源/平台）
 
@@ -132,15 +132,19 @@ tags:
 
 | 测试 | 范围 | 结果 | 证据 |
 |---|---|---|---|
-| P0-03 真实模型 7×3 复测 | 7 类任务 × 3 次，智谱 glm-4-flash | 21/21 成功（100%），降级 0，失败 0，总耗时 435.6s | deliverables/p0-03-evidence/p0-03-report-20260806_015207.json |
+| P0-03 真实模型 7×3 复测 | 7 类任务 × 3 次，智谱 glm-4-flash | 21/21 成功（100%），降级 0，失败 0，总耗时 409.5s | deliverables/p0-03-evidence/p0-03-report-20260806_023311.json |
 | Embedding 全量召回 | 2000 对句子（20 正样本 × 100 负样本），智谱 embedding-3 | 召回率 91.0%（th=0.50，precision 5.3%，F1 10.0%）；th=0.10~0.50 区间召回率均 ≥90% | deliverables/p0-03-evidence/embedding_full_recall_zhipu-3.json |
-| 集成召回率 | 10 组 resume/job 端到端匹配（100 条要求），embedding-3 | 召回率 100%（37/37 应有匹配全部命中）、精确率 37.0%、F1 54.0% | deliverables/p0-03-evidence/integration_recall_zhipu_embedding_3.json |
+| 集成召回率 | 10 组 resume/job 端到端匹配（100 条要求），embedding-3 | 召回率 83.8%（31/37）、精确率 96.9%、F1 90.0%（修复前 100%/37.0%/54.0%） | deliverables/p0-03-evidence/integration_recall_zhipu_embedding_3.json |
 
 发现的问题与修复：
 
 1. 三个脚本在 Windows GBK 控制台下打印 Unicode 符号即崩溃 → 复测/召回运行前置 `PYTHONIOENCODING=utf-8`；`test_integration_recall.py` 已在子进程注入 UTF-8 环境，其他脚本在文档注明运行方式。
 2. `test_integration_recall.py` 此前从未跑通，两处缺陷：a) job expected.json 无逐条覆盖真值 → 新建 `tests/fixtures-synthetic/ground-truth-labels.json`（10 对 × 100 条人工真值，covered/weak/missing）；b) 脚本把 JD 原文喂给匹配器 CLI，要求编号为 L 系列与真值 J/R/P/T 错位 → 改为传 job expected.json，编号统一。
-3. 【新发现，建议后续】embedding 匹配存在过匹配：10 对中 7 对为跨技能配对（如 Java 应届 ↔ 前端 JD），精确率仅 8%~38%；63 条误报中 43 条被判 covered、20 条 weak（置信度 0.45~0.76），典型例：证据句为 Java 技能却判定「熟悉 HTML/CSS/JavaScript」为 covered。根因是 0.55/0.30 阈值下逐句取最大相似度普遍超线。建议后续做阈值校准或证据句验证（不改变本次召回结论，但影响 F2 岗位匹配的展示准确度）。
+3. 【已处理】embedding 匹配过匹配：修复前 100 条要求中 63 条误报（43 covered / 20 weak，精确率 37%），典型例：证据句是 Java 技能却判定「熟悉 HTML/CSS/JavaScript」为 covered。已在 `tools/match_requirements.py` 增加**证据验证器**（embedding 主路径）：
+   - 证据句过滤：章节标题/过短句不作为证据；
+   - Top-20 证据重排：从模型 Top 语义候选中选第一个有词级事实重叠的句子；
+   - 词级验证：jieba 分词后要求与证据至少有一个"具体词"重叠（泛化词如 熟悉/熟练/了解、过泛词如 语言/测试/项目/数据 不计入）。
+   修复后集成召回：精确率 37.0% → **96.9%**，F1 54.0% → **90.0%**，召回率 100% → 83.8%（7 个漏报中 4 个为"弱标注"边界、简历确无相关内容，3 个为同义改写型匹配如"输出报告↔周报""BI 工具↔Tableau"——词级验证器的设计边界，不强行放水）。真实模型链路与 2000 对全量召回（91.0%）不受影响。
 
 ## 行动项
 
@@ -151,7 +155,8 @@ tags:
 - [x] 全量回归：pytest 220 通过、Node 7/7、Schema VALID
 - [x] 2026-08-06 自动解决批次：矩阵回填、10 次彩排、备份脚本、G9 可自动材料、语音 UI 测试、移动端截图
 - [x] 2026-08-06 真实模型 7×3 复测 + embedding 全量召回（智谱实测，证据见第七节）
-- [ ] 提交 codex/complete 分支并合并/推送（需用户确认，涉及分支策略）
+- [x] 2026-08-06 embedding 过匹配处理：证据验证器 + 全量回归（pytest 222、Node 9/9、7×3、2000 对召回）
+- [x] 提交 codex/complete 分支并推送（用户已确认）
 - [ ] 平台与真实密钥类验收（见遗留项）
 
 ## 标签

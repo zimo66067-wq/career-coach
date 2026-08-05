@@ -59,3 +59,23 @@ def test_embedding_backend_not_implemented():
     import pytest
     with pytest.raises(NotImplementedError):
         mr.QianfanEmbedder(api_key=None)
+
+
+def test_evidence_filter_removes_headers():
+    """章节标题/过短句不作为匹配证据。"""
+    assert not mr._is_substantive_evidence("技能清单")
+    assert not mr._is_substantive_evidence("项目经历")
+    assert not mr._is_substantive_evidence("姓名：张三")
+    assert mr._is_substantive_evidence("语言：Go（熟练）、Java（熟练）、Python（了解）")
+
+
+def test_verify_evidence_requires_factual_overlap():
+    """证据验证器：泛化词不算重叠，无事实重叠即否决。"""
+    assert mr.verify_evidence("熟悉 Go 语言", "使用 Go 语言实现订单查询接口")
+    assert not mr.verify_evidence("熟悉 HTML/CSS/JavaScript 及 ES6+",
+                                  "Java（熟悉）、MySQL（熟悉）、Spring Boot（入门）")
+    assert not mr.verify_evidence("熟练使用 SQL 进行数据分析",
+                                  "语言：JavaScript（熟练）、TypeScript（熟练）")
+    assert not mr.verify_evidence("编写单元测试保证代码质量",
+                                  "编写接口文档并推动联调，与前端约定统一的错误码规范")
+    assert not mr.verify_evidence("熟悉 Go", "")

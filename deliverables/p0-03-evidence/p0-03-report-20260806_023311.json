@@ -1,0 +1,62 @@
+{
+  "meta": {
+    "title": "P0-03 真实 AI 模型调用复测报告",
+    "date": "2026-08-06T02:40:01.335721",
+    "model": "glm-4-flash",
+    "total_tasks": 7,
+    "repeat_per_task": 3,
+    "total_calls": 21,
+    "total_time_ms": 409548
+  },
+  "summary": {
+    "success_rate": "21/21",
+    "success_pct": 100.0,
+    "degraded_count": 0,
+    "failed_count": 0
+  },
+  "per_task": {
+    "resume_diagnosis": {
+      "success": 3,
+      "failed": 0,
+      "avg_latency_ms": 34336,
+      "degraded": 0
+    },
+    "resume_report": {
+      "success": 3,
+      "failed": 0,
+      "avg_latency_ms": 19559,
+      "degraded": 0
+    },
+    "jd_extract": {
+      "success": 3,
+      "failed": 0,
+      "avg_latency_ms": 16198,
+      "degraded": 0
+    },
+    "jd_match_explain": {
+      "success": 3,
+      "failed": 0,
+      "avg_latency_ms": 29061,
+      "degraded": 0
+    },
+    "interview_question": {
+      "success": 3,
+      "failed": 0,
+      "avg_latency_ms": 5374,
+      "degraded": 0
+    },
+    "interview_review": {
+      "success": 3,
+      "failed": 0,
+      "avg_latency_ms": 16027,
+      "degraded": 0
+    },
+    "seven_day_plan": {
+      "success": 3,
+      "failed": 0,
+      "avg_latency_ms": 13849,
+      "degraded": 0
+    }
+  },
+  "log_file": "C:\\Users\\Administrator\\Documents\\职业教练\\career-coach-complete\\scripts\\..\\deliverables\\p0-03-evidence\\p0-03-run-20260806_023311.jsonl"
+}
