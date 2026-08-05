@@ -102,7 +102,7 @@ jobs:
           allowed_suffixes = {".py", ".js", ".html", ".md", ".json", ".yml", ".yaml", ".txt", ".sh"}
           ignored_paths = {".env.example", ".gitignore", "SECURITY.md", ".github/workflows/ci.yml", "docs/observability.md"}
           ignored_dirs = {".git", "node_modules", ".venv", "venv"}
-          placeholders = re.compile(r"your_|example|placeholder|here|xxx|todo|change|replace|<", re.I)
+          placeholders = re.compile(r"your_|example|placeholder|here|xxx|todo|change|replace|替换|<", re.I)
           patterns = {
               "literal API key": re.compile(r"(?:api[_-]?key|apikey)\s*[=:]\s*['\"][^'\"]{8,}['\"]", re.I),
               "literal secret": re.compile(r"(?:secret|secret_key)\s*[=:]\s*['\"][^'\"]{8,}['\"]", re.I),
