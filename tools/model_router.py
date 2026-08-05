@@ -389,6 +389,8 @@ class QianfanModelRouter(ModelRouter):
     不在本路由器中接受或复用。
     """
 
+    V2_BASE_URL = "https://qianfan.baidubce.com/v2/chat/completions"
+
     def __init__(self, primary_model=None, fallback_model=None, enable_log=True):
         super().__init__(primary_model, fallback_model, enable_log)
         self.api_key = os.environ.get("QIANFAN_API_KEY", "").strip()

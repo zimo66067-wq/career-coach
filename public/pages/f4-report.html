@@ -8,6 +8,143 @@
 <link rel="stylesheet" href="../css/tokens.css">
 <link rel="stylesheet" href="../css/main.css">
 <link rel="stylesheet" href="../css/states.css">
+<style>
+  /* F1-F3 完成进度追踪器 */
+  .progress-tracker {
+    margin-bottom: 24px;
+    padding: 20px 24px;
+  }
+  .progress-tracker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+  .progress-summary {
+    font-size: 13px;
+    color: var(--zy-ink-3, #68707e);
+    font-weight: 600;
+    background: var(--zy-bg-cool, #f4f6f9);
+    padding: 4px 12px;
+    border-radius: var(--zy-r-pill, 999px);
+  }
+  .progress-steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 16px;
+  }
+  .progress-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+  .step-node {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--zy-line-2, rgba(22,30,52,.16));
+    background: var(--zy-surface, #fff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all var(--zy-d-mid, 260ms) var(--zy-ease, ease);
+  }
+  .step-num {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--zy-ink-3, #68707e);
+    transition: opacity .2s;
+  }
+  .step-icon {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    stroke: #fff;
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .progress-step.done .step-node {
+    border-color: var(--zy-covered, #15803d);
+    background: var(--zy-covered, #15803d);
+  }
+  .progress-step.done .step-num { opacity: 0; }
+  .progress-step.done .step-icon { opacity: 1; }
+  .step-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .step-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--zy-ink, #1b1e26);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .step-status {
+    font-size: 12px;
+    color: var(--zy-ink-3, #68707e);
+    transition: color .2s;
+  }
+  .progress-step.done .step-status {
+    color: var(--zy-covered, #15803d);
+    font-weight: 600;
+  }
+  .step-link {
+    font-size: 12px;
+    color: var(--zy-primary, #2f5fe8);
+    cursor: pointer;
+    text-decoration: none;
+    padding: 4px 10px;
+    border-radius: var(--zy-r-sm, 8px);
+    border: 1px solid var(--zy-line, rgba(22,30,52,.10));
+    transition: all .2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .step-link:hover {
+    background: var(--zy-primary-soft, #eef2ff);
+    border-color: var(--zy-primary, #2f5fe8);
+  }
+  .progress-step.done .step-link { display: none; }
+  .progress-connector {
+    flex: 0 1 32px;
+    height: 2px;
+    background: var(--zy-line-2, rgba(22,30,52,.16));
+    margin: 0 4px;
+    border-radius: 1px;
+    transition: background var(--zy-d-mid, 260ms) var(--zy-ease, ease);
+    align-self: center;
+    margin-top: -28px;
+  }
+  .progress-connector.active {
+    background: var(--zy-covered, #15803d);
+  }
+  .progress-bar-track {
+    width: 100%;
+    height: 6px;
+    background: var(--zy-bg-cool, #f4f6f9);
+    border-radius: var(--zy-r-pill, 999px);
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--zy-grad-ai, linear-gradient(135deg, #2f6bff 0%, #4f46e5 100%));
+    border-radius: var(--zy-r-pill, 999px);
+    transition: width 600ms var(--zy-ease-spring, cubic-bezier(.34,1.38,.44,1));
+  }
+  @media (max-width: 640px) {
+    .progress-steps { flex-direction: column; align-items: stretch; gap: 12px; }
+    .progress-connector { display: none; }
+    .progress-step { width: 100%; }
+  }
+</style>
 </head>
 <body data-page="f4">
 <a class="skip-link" href="#main">跳到主要内容</a>
@@ -149,6 +286,57 @@
 <script src="../js/pages-api-config.js"></script>
 <script src="../js/data-bridge.js"></script>
 <script>
+// ── F1-F3 完成进度追踪器 ──────────────────────────────
+(function () {
+  function checkProgress() {
+    var DB = window.DataBridge;
+    if (!DB || !DB._cache) return { f1: false, f2: false, f3: false };
+
+    var f1Done = !!DB._cache.get('resumeProfile');
+    var f2Done = !!DB._cache.get('matchResult');
+    var f3Done = !!DB._cache.get('interviewReport') || !!DB._cache.get('sessionId');
+
+    return { f1: f1Done, f2: f2Done, f3: f3Done };
+  }
+
+  function renderProgress() {
+    var p = checkProgress();
+    var count = (p.f1 ? 1 : 0) + (p.f2 ? 1 : 0) + (p.f3 ? 1 : 0);
+    var pct = (count / 3) * 100;
+
+    document.getElementById('progressSummary').textContent = count + ' / 3 步完成';
+    document.getElementById('progressBarFill').style.width = pct + '%';
+
+    var steps = document.querySelectorAll('.progress-step');
+    steps.forEach(function (s) {
+      var step = s.getAttribute('data-step');
+      s.classList.toggle('done', !!p[step]);
+      var statusEl = s.querySelector('.step-status');
+      if (statusEl) statusEl.textContent = p[step] ? '已完成' : '未完成';
+    });
+
+    document.getElementById('connector1').classList.toggle('active', p.f1 && p.f2);
+    document.getElementById('connector2').classList.toggle('active', p.f2 && p.f3);
+  }
+
+  function bindStepLinks() {
+    document.querySelectorAll('.step-link').forEach(function (link) {
+      link.addEventListener('click', function () {
+        var href = this.getAttribute('data-href');
+        if (href) window.location.href = href;
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    renderProgress();
+    bindStepLinks();
+  });
+
+  // 暴露给外部以便其他页面完成后通知刷新
+  window.ProgressTracker = { render: renderProgress, check: checkProgress };
+})();
+
 function renderPlan(elId, plan) {
   document.getElementById(elId).innerHTML = plan.map(function (p) {
     return '<div class="plan-day"><div class="d">第 ' + p.day + " 天</div><div style=\"font-size:14px\">" + p.focus + '</div><div class="m">⏱ ' + p.minutes + " 分钟 ｜ 成果物：" + p.artifact + "</div></div>";

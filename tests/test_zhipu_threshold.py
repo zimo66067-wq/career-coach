@@ -7,6 +7,8 @@ import sys
 import time
 import math
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 
 import match_requirements as mr

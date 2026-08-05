@@ -54,10 +54,11 @@ def test_normal_flow():
     assert check["accepted"] is True, "高置信度应被接受"
     assert check["needs_confirmation"] is False, "高置信度无需确认"
 
-    return VoiceTestResult(
+    _r = VoiceTestResult(
         "normal_flow", True,
         "confidence=0.92, accepted=True, no confirmation needed"
     )
+    assert _r.passed is True, _r.detail
 
 
 def test_mic_denied():
@@ -72,10 +73,11 @@ def test_mic_denied():
     assert fallback["fallback"]["mode"] == "text_input", "回退模式应为 text_input"
     assert fallback["should_retry"] is False, "麦克风拒绝不应重试"
 
-    return VoiceTestResult(
+    _r = VoiceTestResult(
         "mic_denied", True,
         "error=mic_denied, fallback=text_input, retry=False"
     )
+    assert _r.passed is True, _r.detail
 
 
 def test_network_error():
@@ -89,10 +91,11 @@ def test_network_error():
     assert fallback["fallback"]["mode"] == "text_input"
     assert fallback["should_retry"] is False
 
-    return VoiceTestResult(
+    _r = VoiceTestResult(
         "network_error", True,
         "error=network_error, fallback=text_input, retry=False"
     )
+    assert _r.passed is True, _r.detail
 
 
 def test_low_confidence():
@@ -107,10 +110,11 @@ def test_low_confidence():
     assert check["accepted"] is False, "低置信度不应被直接接受"
     assert check["needs_confirmation"] is True, "低置信度需要用户确认"
 
-    return VoiceTestResult(
+    _r = VoiceTestResult(
         "low_confidence", True,
         "confidence=0.55, accepted=False, needs_confirmation=True"
     )
+    assert _r.passed is True, _r.detail
 
 
 def test_tts_error():
@@ -123,10 +127,11 @@ def test_tts_error():
     assert fallback["fallback"] is None, "TTS 错误不应触发文字回退"
     assert fallback["should_retry"] is False, "TTS 错误不应重试"
 
-    return VoiceTestResult(
+    _r = VoiceTestResult(
         "tts_error_non_blocking", True,
         "error=tts_error, fallback=None, retry=False (non-blocking)"
     )
+    assert _r.passed is True, _r.detail
 
 
 def test_fallback_timer():
@@ -154,10 +159,11 @@ def test_fallback_timer():
     assert fallback["mode"] == "text_input"
     assert fallback["draft"] == "部分转写结果"
 
-    return VoiceTestResult(
+    _r = VoiceTestResult(
         "fallback_timer", True,
         "timeout=2s, fallback triggered with draft text"
     )
+    assert _r.passed is True, _r.detail
 
 
 def test_cancel():
@@ -171,10 +177,11 @@ def test_cancel():
     assert vh._active_turn is None, "取消后 _active_turn 应为 None"
     assert len(vh._timers) == 0, "取消后所有计时器应已清除"
 
-    return VoiceTestResult(
+    _r = VoiceTestResult(
         "cancel_operation", True,
         "cancelled=True, timers cleared"
     )
+    assert _r.passed is True, _r.detail
 
 
 _normal_flow_check = test_normal_flow

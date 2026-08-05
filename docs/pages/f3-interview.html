@@ -184,39 +184,39 @@
       <div id="turns"></div>
       <div style="text-align:center;margin-top:10px"><span class="btn ghost">继续第 4 题</span></div>
     </div>
+  </div>
 
-    <!-- 语音增强工具栏 -->
-    <div class="card">
-      <h3>语音增强（可选）</h3>
-      <p style="font-size:13px;color:var(--zy-ink-2);margin-bottom:10px">语音为增强链路，文字是等价稳定主链路。语音故障时自动切文字输入。</p>
-      <div class="voice-bar">
-        <button class="mic-btn" id="micBtn" title="按住说话（松开提交）">
-          <svg fill="none" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
-          </svg>
-        </button>
-        <div>
-          <div style="font-size:14px;font-weight:600">按住说话</div>
-          <div class="voice-indicator" id="voice-state-indicator">点击麦克风开始</div>
-        </div>
-        <div class="spacer"></div>
-        <label class="tts-toggle">
-          <input type="checkbox" id="ttsToggle" checked>
-          <span>面试官语音播报</span>
-        </label>
+  <!-- 语音增强工具栏（独立于 state-view，始终可见） -->
+  <div class="card" id="voiceCard">
+    <h3>语音增强（可选）</h3>
+    <p style="font-size:13px;color:var(--zy-ink-2);margin-bottom:10px">语音为增强链路，文字是等价稳定主链路。语音故障时自动切文字输入。</p>
+    <div class="voice-bar">
+      <button class="mic-btn" id="micBtn" title="按住说话（松开提交）">
+        <svg fill="none" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
+        </svg>
+      </button>
+      <div>
+        <div style="font-size:14px;font-weight:600">按住说话</div>
+        <div class="voice-indicator" id="voice-state-indicator">点击麦克风开始</div>
       </div>
+      <div class="spacer"></div>
+      <label class="tts-toggle">
+        <input type="checkbox" id="ttsToggle" checked>
+        <span>面试官语音播报</span>
+      </label>
+    </div>
 
-      <!-- 文字回退输入区 -->
-      <div class="voice-fallback-area" id="voice-fallback-area">
-        <label>文字输入（语音回退）</label>
-        <textarea id="voiceTextFallback" placeholder="在此输入你的回答..."></textarea>
-        <div class="actions">
-          <span class="btn" id="voiceTextSubmit">提交回答</span>
-          <span class="btn ghost" id="voiceTextRetryVoice">重试语音</span>
-        </div>
-        <div class="draft-hint" id="draftHint" style="display:none">已填入部分语音识别结果，可继续编辑后提交</div>
+    <!-- 文字回退输入区 -->
+    <div class="voice-fallback-area" id="voice-fallback-area">
+      <label>文字输入（语音回退）</label>
+      <textarea id="voiceTextFallback" placeholder="在此输入你的回答..."></textarea>
+      <div class="actions">
+        <span class="btn" id="voiceTextSubmit">提交回答</span>
+        <span class="btn ghost" id="voiceTextRetryVoice">重试语音</span>
       </div>
+      <div class="draft-hint" id="draftHint" style="display:none">已填入部分语音识别结果，可继续编辑后提交</div>
     </div>
   </div>
 
@@ -252,6 +252,7 @@
 <script src="../js/data-bridge.js"></script>
 <script src="../js/voice.js"></script>
 <script>
+// ── 演示模式：渲染面试记录（仅 ?demo=1&state=success 时执行） ──
 document.addEventListener("DOMContentLoaded", function () {
   if (!window.APP.isDemoMode() || window.APP.getState() !== "success") return;
   // 成功态的合成内容仅用于显式演示模式。
@@ -268,7 +269,7 @@ document.addEventListener("DOMContentLoaded", function () {
     html += '<div class="bubble q"><div class="who">面试官 · 第' + t.turn_id + "题（考察：" + t.targets.join(" / ") + "）</div>" + t.question + "</div>";
     html += '<div class="bubble a"><div class="who">你</div>' + t.answer + "</div>";
     html += '<div class="card" style="margin:4px 0 20px;background:var(--zy-surface-2)"><div style="font-size:13px">';
-    html += '<b>评估依据（引用原文）：</b><div class="quote-block">“' + t.answer_quote + '”</div>';
+    html += '<b>评估依据（引用原文）：</b><div class="quote-block">\u201C' + t.answer_quote + '\u201D</div>';
     if (t.missing_elements.length) {
       html += "<b>STAR 缺口：</b>" + t.missing_elements.map(function (m) { return '<span class="chip">' + (star[m] || m) + "</span>"; }).join("") + "<br>";
     } else {
@@ -282,8 +283,10 @@ document.addEventListener("DOMContentLoaded", function () {
     html += "</div></div>";
   });
   document.getElementById("turns").innerHTML = html;
+});
 
-  // ── 语音增强初始化 ──────────────────────────────────
+// ── 语音增强初始化（生产+演示均执行，不受 demo 门控限制） ──
+document.addEventListener("DOMContentLoaded", function () {
   var micBtn = document.getElementById('micBtn');
   var ttsToggle = document.getElementById('ttsToggle');
   var indicator = document.getElementById('voice-state-indicator');
@@ -292,6 +295,8 @@ document.addEventListener("DOMContentLoaded", function () {
   var fallbackSubmit = document.getElementById('voiceTextSubmit');
   var retryVoiceBtn = document.getElementById('voiceTextRetryVoice');
   var draftHint = document.getElementById('draftHint');
+
+  if (!micBtn || !window.VoiceHandler) return;
 
   // 浏览器支持检测
   var asrOK = window.VoiceHandler.isASRSupported();
@@ -335,9 +340,6 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // 播报第一题
-  speakQuestion(interviews[0].question);
-
   // 麦克风按钮: 按住说话
   var isRecording = false;
 
@@ -367,7 +369,6 @@ document.addEventListener("DOMContentLoaded", function () {
         isRecording = false;
         micBtn.classList.remove('recording');
         updateIndicator();
-        // 如果有识别结果，模拟提交
         if (draft && draft.trim().length > 0) {
           console.log('[F3] ASR 最终结果:', draft);
           indicator.textContent = '识别完成: ' + draft.slice(0, 20) + (draft.length > 20 ? '...' : '');
@@ -409,7 +410,6 @@ document.addEventListener("DOMContentLoaded", function () {
     var text = fallbackText.value.trim();
     if (!text) return;
     console.log('[F3] 文字回退提交:', text);
-    // 这里调用 DataBridge.submitAnswer
     if (window.DataBridge) {
       window.DataBridge.submitAnswer('demo_session', text).then(function (res) {
         console.log('[F3] 回答已提交', res);
