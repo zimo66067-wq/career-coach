@@ -19,11 +19,11 @@
   "version": "1.0",
   "pii_removed": true,
   "subscores": {
-    "structure": {"score": 0, "rationale": "原文判断", "source_spans": [{"doc": "resume", "quote": "原文片段", "start": 0, "end": 4}]},
-    "clarity": {"score": 0, "rationale": "原文判断", "source_spans": [{"doc": "resume", "quote": "原文片段", "start": 0, "end": 4}]},
-    "achievement_evidence": {"score": 0, "rationale": "原文判断", "source_spans": [{"doc": "resume", "quote": "原文片段", "start": 0, "end": 4}]},
-    "skill_evidence": {"score": 0, "rationale": "原文判断", "source_spans": [{"doc": "resume", "quote": "原文片段", "start": 0, "end": 4}]},
-    "ats_readability": {"score": 0, "rationale": "原文判断", "source_spans": [{"doc": "resume", "quote": "原文片段", "start": 0, "end": 4}]}
+    "structure": {"score": 80, "rationale": "原文判断", "source_spans": [{"doc": "resume", "quote": "原文片段", "start": 0, "end": 4}]},
+    "clarity": {"score": 75, "rationale": "原文判断", "source_spans": [{"doc": "resume", "quote": "原文片段", "start": 0, "end": 4}]},
+    "achievement_evidence": {"score": 60, "rationale": "原文判断", "source_spans": [{"doc": "resume", "quote": "原文片段", "start": 0, "end": 4}]},
+    "skill_evidence": {"score": 70, "rationale": "原文判断", "source_spans": [{"doc": "resume", "quote": "原文片段", "start": 0, "end": 4}]},
+    "ats_readability": {"score": 85, "rationale": "原文判断", "source_spans": [{"doc": "resume", "quote": "原文片段", "start": 0, "end": 4}]}
   },
   "suggestions": [{
     "id": "suggestion-1",
@@ -36,6 +36,7 @@
 }
 ```
 - subscores 必须包含 structure / clarity / achievement_evidence / skill_evidence / ats_readability 五项；每项是对象，score 为 0-100。
+- 示例 JSON 中的 score 与 start/end 只是格式占位，禁止照抄：score 必须根据简历证据给出 0-100 的真实值，start/end 必须是输入文本的真实字符偏移。
 - suggestions 至少一项，severity 只能为 P0 / P1 / P2。
 - 每个 source_span 都必须同时有 doc / quote / start / end；doc 固定 "resume"，quote 必须逐字摘自输入，end 是 quote 结束后的字符偏移。
 - 某项完全无证据时：score 给保守分并在 rationale 注明「证据不足」。
