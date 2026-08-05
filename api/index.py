@@ -90,7 +90,7 @@ def origin_allowed(origin):
     if normalized in configured_origins():
         return True
     if os.environ.get("APP_ENV", "production").lower() != "production":
-        return bool(re.fullmatch(r"http://(?:localhost|127\\.0\\.0\\.1)(?::\\d+)?", normalized))
+        return bool(re.fullmatch(r"http://(?:localhost|127\.0\.0\.1)(?::\d+)?", normalized))
     return False
 
 

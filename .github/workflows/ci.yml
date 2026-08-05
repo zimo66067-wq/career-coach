@@ -99,7 +99,7 @@ jobs:
           from pathlib import Path
           import re
 
-          allowed_suffixes = {".py", ".js", ".html", ".md", ".json", ".yml", ".yaml", ".txt"}
+          allowed_suffixes = {".py", ".js", ".html", ".md", ".json", ".yml", ".yaml", ".txt", ".sh"}
           ignored_paths = {".env.example", ".gitignore", "SECURITY.md", ".github/workflows/ci.yml", "docs/observability.md"}
           ignored_dirs = {".git", "node_modules", ".venv", "venv"}
           placeholders = re.compile(r"your_|example|placeholder|here|xxx|todo|change|replace|<", re.I)
@@ -109,6 +109,7 @@ jobs:
               "literal password": re.compile(r"(?:password|passwd|pwd)\s*[=:]\s*['\"][^'\"]{4,}['\"]", re.I),
               "Bearer token": re.compile(r"Bearer\s+[A-Za-z0-9._-]{16,}"),
               "sk-prefixed key": re.compile(r"sk-[A-Za-z0-9]{16,}"),
+              "GitHub PAT": re.compile(r"ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}"),
           }
           findings = []
           for path in Path('.').rglob('*'):

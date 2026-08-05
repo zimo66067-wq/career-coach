@@ -255,8 +255,12 @@
     renderSubscores(profile);
     renderReasons(profile, result.diagnosis.suggestions);
     if (window.EVIDENCE && typeof window.EVIDENCE.renderDoc === "function") {
-      window.EVIDENCE.renderDoc("resumeDoc", resumeText);
-      if (typeof window.EVIDENCE.bindReasons === "function") window.EVIDENCE.bindReasons();
+      var highlight = window.EVIDENCE.renderDoc("resumeDoc", resumeText);
+      if (typeof window.EVIDENCE.bindReasons === "function") {
+        window.EVIDENCE.bindReasons(".reason-item", highlight, function (item) {
+          return decodeURIComponent(item.getAttribute("data-quote"));
+        });
+      }
     }
   }
 

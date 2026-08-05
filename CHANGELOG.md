@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### Fixed - 2026-08-05 全量代码审计（AUDIT-01）
+- 安全：移除 scripts/push-head-api.sh 中硬编码的 GitHub 令牌，改为必须由 GITHUB_TOKEN 或显式参数传入；CI 敏感信息扫描扩展至 .sh 文件并新增 ghp_/github_pat_ 泄露模式
+- 修复 api/index.py 本地来源 CORS 正则（127.0.0.1 字面点号匹配错误，开发环境本地来源会被误拒）
+- 修复 tools/interview_engine.py：current_main 未递增导致主问题永远达不到 5 题上限；_current_question/_current_targets/_current_followup 未持久化导致回合 question/targets 为空（违反 InterviewTurn 合同）
+- 修复 public/js/resume-upload.js 证据对照 bindReasons() 无参调用导致真实诊断成功后抛错（docs/ 镜像同步）
+- 修复 scripts/_wf04_inline.py 硬编码本机绝对路径，改为按仓库根解析 fixture
+
 ### Changed - 前端视觉改版 v2（职跃AI 设计系统，基于 DuMate 最新主链路重放）
 - ui/prototype 全站升级「温润近白 + 深石墨 + 电光蓝→靛青」视觉语言：新增 css/tokens.css，重写 main.css / states.css
 - 四页新增 AI 可解释性元素：分析阶段步进器、呼吸光、语义流动线、面试官语音波形；F4 C0 数字递增动画

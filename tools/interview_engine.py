@@ -233,6 +233,12 @@ class InterviewEngine:
         if gap:
             session["used_gaps"].append(gap["id"])
 
+        # 主问题计数与本轮上下文必须持久化：否则状态机永远不会到达
+        # MAX_MAIN_QUESTIONS 上限，且后续回合无法回填 question/targets
+        # （InterviewTurn 合同要求 question 非空）。
+        session["current_main"] += 1
+        session["_current_question"] = question_text
+        session["_current_targets"] = targets
         session["current_followup_count"] = 0
         return {
             "question": question_text,
@@ -283,6 +289,7 @@ class InterviewEngine:
         if (missing_elements
                 and session["current_followup_count"] < MAX_FOLLOWUPS_PER_QUESTION):
             follow_up = self._generate_followup(answer, missing_elements)
+        session["_current_followup"] = follow_up["question"] if follow_up else ""
 
         turn = {
             "turn_id": turn_id,
