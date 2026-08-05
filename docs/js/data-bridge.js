@@ -89,7 +89,13 @@
     options = options || {};
     var traceId = options._traceId || genTraceId();
     var url = API_BASE + endpoint;
-    var headers = options.headers || {};
+    var headers = Object.assign({}, options.headers || {});
+    // Only the server-issued, short-lived token is sent.  Source material and
+    // consent wording remain out of headers and server-side storage.
+    if (endpoint !== ENDPOINTS.consent) {
+      var consentToken = getCache('consentToken');
+      if (consentToken) headers['X-Consent-Token'] = consentToken;
+    }
     headers['X-Trace-Id'] = traceId;
 
     var body = options.body;
@@ -202,7 +208,8 @@
       // 缓存结果
       setCache('resumeText', res.resumeText);
       setCache('resumeProfile', res.resumeProfile);
-      return { resumeText: res.resumeText, resumeProfile: res.resumeProfile, trace_id: res.trace_id || traceId };
+      setCache('sessionId', res.session_id || traceId);
+      return { resumeText: res.resumeText, resumeProfile: res.resumeProfile, trace_id: res.trace_id || traceId, session_id: res.session_id || traceId };
     }
 
     // 新上传的简历绝不能在接口失败时回退到上一份会话缓存；否则会把旧结果
@@ -223,8 +230,9 @@
   // 诊断简历 -> {resumeProfile, score_R, suggestions, trace_id}
   async function diagnoseResume(resumeText) {
     var traceId = genTraceId();
+    var sessionId = getCache('sessionId') || traceId;
     var res = await request(ENDPOINTS.diagnoseResume, {
-      body: { resumeText: resumeText },
+      body: { resumeText: resumeText, session_id: sessionId },
       _traceId: traceId
     });
 
@@ -233,11 +241,13 @@
       var normalizedResult = Object.assign({}, res, { resumeProfile: normalized });
       setCache('resumeProfile', normalized);
       setCache('diagnoseResult', normalizedResult);
+      setCache('sessionId', res.session_id || traceId);
       return {
         resumeProfile: normalized,
         score_R: res.score_R !== undefined ? res.score_R : (res.resumeProfile ? res.resumeProfile.score_R : null),
         suggestions: res.suggestions || (res.resumeProfile ? res.resumeProfile.suggestions : []),
-        trace_id: res.trace_id || traceId
+        trace_id: res.trace_id || traceId,
+        session_id: res.session_id || traceId
       };
     }
 
@@ -506,7 +516,14 @@
     });
 
     if (!res.error) {
-      return { consent_id: res.consent_id, status: res.status || 'ACCEPTED', trace_id: res.trace_id || traceId };
+      if (res.consent_token) setCache('consentToken', res.consent_token);
+      return {
+        consent_id: res.consent_id,
+        consent_token: res.consent_token,
+        status: res.status || 'ACCEPTED',
+        expires_in_seconds: res.expires_in_seconds,
+        trace_id: res.trace_id || traceId
+      };
     }
 
     if (!isDemoMode()) return unavailable(traceId, res.error);

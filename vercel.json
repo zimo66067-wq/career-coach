@@ -7,12 +7,48 @@
   },
   "rewrites": [
     {
+      "source": "/api/wf01/consent",
+      "destination": "/api?_route=wf01/consent"
+    },
+    {
       "source": "/api/wf01/upload",
       "destination": "/api?_route=wf01/upload"
     },
     {
       "source": "/api/wf02/diagnose",
       "destination": "/api?_route=wf02/diagnose"
+    },
+    {
+      "source": "/api/wf03/upload",
+      "destination": "/api?_route=wf03/upload"
+    },
+    {
+      "source": "/api/wf03/jd",
+      "destination": "/api?_route=wf03/jd"
+    },
+    {
+      "source": "/api/wf03/match",
+      "destination": "/api?_route=wf03/match"
+    },
+    {
+      "source": "/api/wf04/start",
+      "destination": "/api?_route=wf04/start"
+    },
+    {
+      "source": "/api/wf04/answer",
+      "destination": "/api?_route=wf04/answer"
+    },
+    {
+      "source": "/api/wf04/end",
+      "destination": "/api?_route=wf04/end"
+    },
+    {
+      "source": "/api/wf05/ability",
+      "destination": "/api?_route=wf05/ability"
+    },
+    {
+      "source": "/api/wf06/delete",
+      "destination": "/api?_route=wf06/delete"
     },
     {
       "source": "/api/health",

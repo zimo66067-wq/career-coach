@@ -44,12 +44,17 @@ jobs:
       # --- 步骤4: 运行 pytest 测试套件 ---
       - name: Run pytest
         run: |
-          # Public upload/diagnosis API is a release gate; failures must fail CI.
-          python -m pytest tests/test_api.py -q --tb=short
-          python -m pytest tests/ -v --tb=long --junitxml=pytest-results.xml || true
-          echo "=== pytest exit code: $? ==="
-          # 如果 pytest 失败，列出具体失败的测试
-          python -m pytest tests/ --co -q 2>&1 | tail -20
+          # 全量测试为发布门禁：任一失败即 CI 失败。
+          python -m pytest tests/ -q --tb=short --junitxml=pytest-results.xml
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run browser contract tests
+        run: |
+          node --test tests/test_public_page_states.js tests/test_resume_upload.js tests/test_job_upload.js tests/test_publish_mirror.js
 
       # --- 步骤5: Schema 校验（对所有 fixtures 执行 validate_schema） ---
       - name: Schema validation

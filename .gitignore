@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+.pytest_tmp/
 
 # 环境变量（含密钥，绝不入库）
 .env

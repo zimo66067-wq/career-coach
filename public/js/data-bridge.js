@@ -89,7 +89,13 @@
     options = options || {};
     var traceId = options._traceId || genTraceId();
     var url = API_BASE + endpoint;
-    var headers = options.headers || {};
+    var headers = Object.assign({}, options.headers || {});
+    // Only the server-issued, short-lived token is sent.  Source material and
+    // consent wording remain out of headers and server-side storage.
+    if (endpoint !== ENDPOINTS.consent) {
+      var consentToken = getCache('consentToken');
+      if (consentToken) headers['X-Consent-Token'] = consentToken;
+    }
     headers['X-Trace-Id'] = traceId;
 
     var body = options.body;
@@ -510,7 +516,14 @@
     });
 
     if (!res.error) {
-      return { consent_id: res.consent_id, status: res.status || 'ACCEPTED', trace_id: res.trace_id || traceId };
+      if (res.consent_token) setCache('consentToken', res.consent_token);
+      return {
+        consent_id: res.consent_id,
+        consent_token: res.consent_token,
+        status: res.status || 'ACCEPTED',
+        expires_in_seconds: res.expires_in_seconds,
+        trace_id: res.trace_id || traceId
+      };
     }
 
     if (!isDemoMode()) return unavailable(traceId, res.error);

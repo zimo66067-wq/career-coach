@@ -229,6 +229,10 @@ class InterviewEngine:
         if not targets:
             targets = [gap["id"]] if gap else ["generic"]
 
+        # Persist the emitted question for turn recording and follow-up review.
+        session["_current_question"] = question_text
+        session["_current_targets"] = targets
+
         # 记录已用 gap
         if gap:
             session["used_gaps"].append(gap["id"])
@@ -283,6 +287,8 @@ class InterviewEngine:
         if (missing_elements
                 and session["current_followup_count"] < MAX_FOLLOWUPS_PER_QUESTION):
             follow_up = self._generate_followup(answer, missing_elements)
+            if follow_up:
+                session["_current_followup"] = follow_up["question"]
 
         turn = {
             "turn_id": turn_id,

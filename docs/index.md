@@ -15,5 +15,7 @@
 | p0-02-automation-alternatives.md | 方案 | P0-02 自动化方案分析 |
 | remaining-items.md | 项目管理 | 剩余未完成任务 |
 | remaining-items-2026-08-02-fixed.md | 项目管理 | 已修复问题清单 |
+| design-and-tech-path.md | 设计与技术 | 设计路径与技术路径汇总（PRD/架构/隐私/审查恢复版） |
+| test-report.md | 测试报告 | 对照设计与 GitHub 仓库的完整性测试报告 |
 
 > 新增文件请按 `主题_类型.md` 命名，并更新本索引。

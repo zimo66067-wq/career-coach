@@ -11,7 +11,11 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-_DB_PATH = Path(os.environ.get("RESUME_DB_PATH", "/tmp/resumes.db"))
+
+def db_path():
+    """Resolve the DB path from the environment on each call (test-friendly)."""
+    return Path(os.environ.get("RESUME_DB_PATH", "/tmp/resumes.db"))
+
 _INIT_SQL = """
 CREATE TABLE IF NOT EXISTS resumes (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,6 +32,36 @@ CREATE TABLE IF NOT EXISTS resumes (
 
 CREATE INDEX IF NOT EXISTS idx_resumes_session ON resumes(session_id);
 CREATE INDEX IF NOT EXISTS idx_resumes_created ON resumes(created_at);
+
+CREATE TABLE IF NOT EXISTS matches (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id  TEXT NOT NULL UNIQUE,
+    match_json  TEXT NOT NULL,
+    score_m     REAL,
+    created_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_matches_session ON matches(session_id);
+
+CREATE TABLE IF NOT EXISTS interview_sessions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id  TEXT NOT NULL UNIQUE,
+    state       TEXT NOT NULL,
+    payload     TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_session ON interview_sessions(session_id);
+
+CREATE TABLE IF NOT EXISTS abilities (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id  TEXT NOT NULL UNIQUE,
+    ability_json TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_abilities_session ON abilities(session_id);
 
 CREATE TABLE IF NOT EXISTS diagnoses (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +83,12 @@ def _utc_iso():
 
 def _get_conn():
     """Return a connection; parent dirs are guaranteed to exist in /tmp."""
-    conn = sqlite3.connect(str(_DB_PATH), timeout=5, isolation_level=None)
+    path = db_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    conn = sqlite3.connect(str(path), timeout=5, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=3000")
@@ -58,10 +97,6 @@ def _get_conn():
 
 def init_db():
     """Create tables and indexes if they do not exist."""
-    try:
-        _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        pass
     conn = _get_conn()
     try:
         conn.executescript(_INIT_SQL)
@@ -209,7 +244,7 @@ def export_all():
             "resumes": [dict(r) for r in resumes],
             "diagnoses": [dict(d) for d in diagnoses],
             "exported_at": _utc_iso(),
-            "db_path": str(_DB_PATH),
+            "db_path": str(db_path()),
         }
     finally:
         conn.close()
@@ -227,3 +262,156 @@ def admin_password_ok(password):
     for a, b in zip(password, expected):
         result |= ord(a) ^ ord(b)
     return result == 0
+
+
+# ------------------------------------------------------------------ #
+# F2/F3/F4/F5 session-level persistence
+# ------------------------------------------------------------------ #
+
+def save_match(session_id, match_json, score_m):
+    """Persist a JD match result for a session (upsert)."""
+    init_db()
+    conn = _get_conn()
+    try:
+        conn.execute(
+            """
+            INSERT INTO matches (session_id, match_json, score_m, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(session_id) DO UPDATE SET
+                match_json=excluded.match_json,
+                score_m=excluded.score_m
+            """,
+            (session_id, json.dumps(match_json, ensure_ascii=False)[:500000],
+             score_m, _utc_iso()),
+        )
+        return True
+    finally:
+        conn.close()
+
+
+def load_match(session_id):
+    """Return the latest match payload for a session, or None."""
+    init_db()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT match_json, score_m FROM matches WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        if not row:
+            return None
+        try:
+            payload = json.loads(row["match_json"])
+        except (TypeError, ValueError):
+            payload = {}
+        payload.setdefault("score_M", row["score_m"])
+        return payload
+    finally:
+        conn.close()
+
+
+def save_session(session_id, state, payload):
+    """Create or replace an interview session record."""
+    init_db()
+    conn = _get_conn()
+    now = _utc_iso()
+    try:
+        conn.execute(
+            """
+            INSERT INTO interview_sessions (session_id, state, payload, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(session_id) DO UPDATE SET
+                state=excluded.state, payload=excluded.payload, updated_at=excluded.updated_at
+            """,
+            (session_id, state, json.dumps(payload, ensure_ascii=False), now, now),
+        )
+        return True
+    finally:
+        conn.close()
+
+
+def load_session(session_id):
+    """Return (state, payload) for an interview session, or (None, None)."""
+    init_db()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT state, payload FROM interview_sessions WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        if not row:
+            return None, None
+        try:
+            payload = json.loads(row["payload"])
+        except (TypeError, ValueError):
+            payload = {}
+        return row["state"], payload
+    finally:
+        conn.close()
+
+
+def update_session(session_id, state, payload):
+    """Update an existing interview session record."""
+    return save_session(session_id, state, payload)
+
+
+def save_ability(session_id, ability_json):
+    """Persist an AbilityProfile for a session (upsert)."""
+    init_db()
+    conn = _get_conn()
+    try:
+        conn.execute(
+            """
+            INSERT INTO abilities (session_id, ability_json, created_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(session_id) DO UPDATE SET ability_json=excluded.ability_json
+            """,
+            (session_id, json.dumps(ability_json, ensure_ascii=False), _utc_iso()),
+        )
+        return True
+    finally:
+        conn.close()
+
+
+def load_ability(session_id):
+    """Return the AbilityProfile for a session, or None."""
+    init_db()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT ability_json FROM abilities WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        if not row:
+            return None
+        try:
+            return json.loads(row["ability_json"])
+        except (TypeError, ValueError):
+            return None
+    finally:
+        conn.close()
+
+
+def delete_session_data(session_id):
+    """WF-06: remove all session data (resume, diagnosis, match, interview, ability)."""
+    init_db()
+    conn = _get_conn()
+    try:
+        resume_row = conn.execute(
+            "SELECT id FROM resumes WHERE session_id = ?", (session_id,)
+        ).fetchone()
+        if resume_row:
+            conn.execute(
+                "DELETE FROM diagnoses WHERE resume_id = ?", (resume_row["id"],)
+            )
+            conn.execute(
+                "DELETE FROM resumes WHERE id = ?", (resume_row["id"],)
+            )
+        conn.execute("DELETE FROM matches WHERE session_id = ?", (session_id,))
+        conn.execute(
+            "DELETE FROM interview_sessions WHERE session_id = ?", (session_id,)
+        )
+        conn.execute("DELETE FROM abilities WHERE session_id = ?", (session_id,))
+        return True
+    finally:
+        conn.close()
