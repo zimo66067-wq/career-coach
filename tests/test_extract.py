@@ -47,14 +47,14 @@ def _make_pdf(path, text):
 
 def test_extract_txt(tmp_path, resume_txts):
     src = tmp_path / "r.txt"
-    text = list(resume_txts.values())[0]
+    text = resume_txts["resume-01-swe.txt"]
     src.write_text(text, encoding="utf-8")
     out = extract_text.extract_txt(str(src))
     assert "订单" in out and len(out) > 100
 
 
 def test_extract_docx_roundtrip(tmp_path, resume_txts):
-    text = list(resume_txts.values())[0]
+    text = resume_txts["resume-01-swe.txt"]
     docx_path = tmp_path / "r.docx"
     _make_docx(docx_path, text)
     out = extract_text.extract_docx(str(docx_path))
@@ -63,7 +63,7 @@ def test_extract_docx_roundtrip(tmp_path, resume_txts):
 
 
 def test_extract_docx_zip_fallback(tmp_path, resume_txts):
-    text = list(resume_txts.values())[0]
+    text = resume_txts["resume-01-swe.txt"]
     docx_path = tmp_path / "r.docx"
     _make_docx(docx_path, text)
     out = extract_text.extract_docx_zip(str(docx_path))
