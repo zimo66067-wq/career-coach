@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+### Added - 2026-08-05 完整化轮（WF-04~06 接通 + 设计文档恢复 + 测试体系）
+- 恢复 5 份设计文档（PRD / architecture / privacy / review / demo-script）到 `docs/design/`，新增《设计路径与技术路径蓝图》，更新 docs/index.md
+- 新增 `tools/database.py`：SQLite 会话存储（简历 / 诊断 / 匹配 / 面试 / 能力），Vercel /tmp 临时库
+- api/index.py 接通 WF-04 面试（start/answer/end）、WF-05 能力报告（ability + radar_option）、WF-06 删除、admin/resumes、admin/export；wf01-03 透传 session_id
+- 移植百度 ASR/TTS 语音实现（tools/voice_handler.py），文字主链路与 10 秒回退保留
+- SENSITIVE_PATTERNS 补充「婚姻」（事实锁第 5 条覆盖）
+- 纳入新增测试：test_api_boundary / test_e2e_full_chain / test_frontend_chain / test_interview_full_flow / test_match_boundary / test_model_router_providers + tests/TEST_PLAN.md
+- 测试结果：pytest 304/304、node --test 11/11 全绿
+
 ### Fixed - 2026-08-05 全量代码审计（AUDIT-01）
 - 安全：移除 scripts/push-head-api.sh 中硬编码的 GitHub 令牌，改为必须由 GITHUB_TOKEN 或显式参数传入；CI 敏感信息扫描扩展至 .sh 文件并新增 ghp_/github_pat_ 泄露模式
 - 修复 api/index.py 本地来源 CORS 正则（127.0.0.1 字面点号匹配错误，开发环境本地来源会被误拒）

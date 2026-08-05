@@ -17,3 +17,7 @@ jieba==0.42.1
 
 # Flask for Vercel serverless
 Flask>=3.0,<4.0
+itsdangerous>=2.2,<3.0
+
+# Optional model provider enabled by ZHIPU_API_KEY
+zhipuai>=2.0,<3.0

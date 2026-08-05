@@ -458,6 +458,33 @@ def test_privacy_closed_loop(verbose=False):
 # 主入口
 # ────────────────────────────────────────────────────────────────── #
 
+_full_pipeline_check = test_full_pipeline
+_degraded_closed_loop_check = test_degraded_closed_loop
+_data_bridge_degradation_check = test_data_bridge_degradation
+_privacy_closed_loop_check = test_privacy_closed_loop
+
+
+def _assert_closed_loop_result(result):
+    """Adapt the reporting helpers into real pytest assertions."""
+    assert result.success, json.dumps(result.summary(), ensure_ascii=False)
+
+
+def test_full_pipeline():
+    _assert_closed_loop_result(_full_pipeline_check())
+
+
+def test_degraded_closed_loop():
+    _assert_closed_loop_result(_degraded_closed_loop_check())
+
+
+def test_data_bridge_degradation():
+    _assert_closed_loop_result(_data_bridge_degradation_check())
+
+
+def test_privacy_closed_loop():
+    _assert_closed_loop_result(_privacy_closed_loop_check())
+
+
 def run_all_tests(resume_path=None, job_path=None, verbose=False):
     """运行全部端到端闭环测试"""
     all_results = []
@@ -470,25 +497,25 @@ def run_all_tests(resume_path=None, job_path=None, verbose=False):
     # 1. 全链路冒烟
     if verbose:
         print("\n[1/4] Full Pipeline Smoke Test")
-    r = test_full_pipeline(resume_path, job_path, verbose)
+    r = _full_pipeline_check(resume_path, job_path, verbose)
     all_results.append(("full_pipeline", r))
 
     # 2. 降级闭环
     if verbose:
         print("\n[2/4] Degraded Closed Loop Test")
-    r = test_degraded_closed_loop(verbose)
+    r = _degraded_closed_loop_check(verbose)
     all_results.append(("degraded_loop", r))
 
     # 3. DataBridge 降级
     if verbose:
         print("\n[3/4] DataBridge Degradation Test")
-    r = test_data_bridge_degradation(verbose)
+    r = _data_bridge_degradation_check(verbose)
     all_results.append(("data_bridge", r))
 
     # 4. 隐私闭环
     if verbose:
         print("\n[4/4] Privacy Closed Loop Test")
-    r = test_privacy_closed_loop(verbose)
+    r = _privacy_closed_loop_check(verbose)
     all_results.append(("privacy_loop", r))
 
     # 汇总

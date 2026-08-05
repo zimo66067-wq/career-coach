@@ -177,16 +177,58 @@ def test_cancel():
     )
 
 
+_normal_flow_check = test_normal_flow
+_mic_denied_check = test_mic_denied
+_network_error_check = test_network_error
+_low_confidence_check = test_low_confidence
+_tts_error_check = test_tts_error
+_fallback_timer_check = test_fallback_timer
+_cancel_check = test_cancel
+
+
+def _assert_voice_result(result):
+    """Adapt the reporting helpers into real pytest assertions."""
+    assert result.passed, result.detail
+
+
+def test_normal_flow():
+    _assert_voice_result(_normal_flow_check())
+
+
+def test_mic_denied():
+    _assert_voice_result(_mic_denied_check())
+
+
+def test_network_error():
+    _assert_voice_result(_network_error_check())
+
+
+def test_low_confidence():
+    _assert_voice_result(_low_confidence_check())
+
+
+def test_tts_error():
+    _assert_voice_result(_tts_error_check())
+
+
+def test_fallback_timer():
+    _assert_voice_result(_fallback_timer_check())
+
+
+def test_cancel():
+    _assert_voice_result(_cancel_check())
+
+
 def run_all_tests(verbose=False):
     """运行全部语音测试"""
     tests = [
-        test_normal_flow,
-        test_mic_denied,
-        test_network_error,
-        test_low_confidence,
-        test_tts_error,
-        test_fallback_timer,
-        test_cancel,
+        _normal_flow_check,
+        _mic_denied_check,
+        _network_error_check,
+        _low_confidence_check,
+        _tts_error_check,
+        _fallback_timer_check,
+        _cancel_check,
     ]
 
     results = []

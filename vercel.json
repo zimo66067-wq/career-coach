@@ -53,6 +53,14 @@
     {
       "source": "/api/health",
       "destination": "/api?_route=health"
+    },
+    {
+      "source": "/api/admin/resumes",
+      "destination": "/api?_route=admin/resumes"
+    },
+    {
+      "source": "/api/admin/export",
+      "destination": "/api?_route=admin/export"
     }
   ]
 }

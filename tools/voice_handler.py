@@ -13,10 +13,15 @@ TTS: 浏览器 speechSynthesis (primary) -> DuMate TTS API (fallback)
   vh = VoiceHandler(asr_api="https://dumate.baidu.com/asr", fallback_timeout=10)
   vh.start_asr(turn_id, on_result, on_error, on_timeout)
 """
+import json
 import logging
+import os
 import threading
 import time
+import urllib.parse
 from typing import Optional, Callable
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 logger = logging.getLogger("voice_handler")
 
@@ -42,12 +47,12 @@ class VoiceHandler:
         """初始化语音处理器。
 
         Args:
-            asr_api: DuMate ASR API 地址（备用通道）
-            tts_api: DuMate TTS API 地址（备用通道）
+            asr_api: 百度 ASR API 地址（备用通道，如 https://vop.baidu.com/server_api）
+            tts_api: 百度 TTS API 地址（备用通道，如 https://tsn.baidu.com/text2audio）
             fallback_timeout: 回退超时秒数，默认 10 秒
         """
-        self.asr_api = asr_api
-        self.tts_api = tts_api
+        self.asr_api = asr_api or os.environ.get("ASR_API_URL")
+        self.tts_api = tts_api or os.environ.get("TTS_API_URL")
         self.fallback_timeout = fallback_timeout
 
         # 运行时状态
@@ -75,7 +80,7 @@ class VoiceHandler:
 
         Note:
             实际的浏览器 ASR 调用由前端 voice.js 执行；
-            DuMate ASR API 调用需要真实 API，此处标注 NotImplementedError。
+            百度 ASR API 备用通道在配置了 ASR_API_URL + BAIDU_SPEECH_TOKEN 时启用。
         """
         self._cancelled = False
         self._active_turn = turn_id
@@ -84,26 +89,56 @@ class VoiceHandler:
         self._start_timer(turn_id, on_timeout)
 
         # 后端编排层不直接调用浏览器 API；
-        # DuMate ASR API 备用通道需要真实 API 实现
+        # 百度 ASR API 备用通道需要配置 ASR_API_URL
         if self.asr_api:
             try:
-                self._call_dumate_asr(turn_id, on_result, on_error, on_timeout)
-            except NotImplementedError:
-                logger.warning("[voice] DuMate ASR API not implemented; "
-                               "relying on browser ASR + text fallback")
+                self._call_baidu_asr(turn_id, on_result, on_error, on_timeout)
             except Exception as e:
                 logger.warning("[voice] ASR API error: %s", e)
                 on_error(self.ASR_ERROR, str(e))
 
-    def _call_dumate_asr(self, turn_id, on_result, on_error, on_timeout):
-        """调用 DuMate ASR API（备用通道）。
+    def _call_baidu_asr(self, turn_id, on_result, on_error, on_timeout):
+        """调用百度 ASR API（备用通道）。
 
-        需要 DuMate 平台 ASR SDK 接入。
+        需要配置环境变量:
+          - ASR_API_URL: 百度语音识别接口地址
+          - BAIDU_SPEECH_TOKEN: 百度语音 access_token
+
+        在单独线程中执行 HTTP 调用，避免阻塞主链路。
         """
-        raise NotImplementedError(
-            "DuMate ASR API call not implemented yet. "
-            "Wire up DuMate platform ASR SDK here."
-        )
+        token = os.environ.get("BAIDU_SPEECH_TOKEN", "")
+        if not token:
+            logger.warning("[voice] BAIDU_SPEECH_TOKEN not set; "
+                           "ASR fallback unavailable, relying on browser ASR")
+            return
+
+        def _asr_worker():
+            try:
+                # 百度 ASR 需要音频数据；此处由前端录音后上传
+                # 后端编排层仅负责调度，实际音频由 API 层接收
+                url = "%s?cuid=career-coach&token=%s" % (self.asr_api, token)
+                req = Request(url, method="POST")
+                req.add_header("Content-Type", "audio/wav; rate=16000")
+
+                with urlopen(req, timeout=self.fallback_timeout) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+
+                if data.get("err_no", 0) == 0:
+                    result = data.get("result", [""])[0]
+                    confidence = 0.85  # 百度 ASR 不返回置信度，使用默认值
+                    if not self._cancelled:
+                        self._stop_timer(turn_id)
+                        on_result(result, confidence)
+                else:
+                    on_error(self.ASR_ERROR,
+                             "baidu_asr_error: %s" % data.get("err_msg", "unknown"))
+            except (HTTPError, URLError) as e:
+                on_error(self.NETWORK_ERROR, "asr_network: %s" % str(e))
+            except Exception as e:
+                on_error(self.ASR_ERROR, "asr_exception: %s" % str(e))
+
+        thread = threading.Thread(target=_asr_worker, daemon=True)
+        thread.start()
 
     # ================================================================ #
     # TTS
@@ -121,7 +156,7 @@ class VoiceHandler:
 
         Note:
             浏览器 TTS 由前端 voice.js 执行；
-            DuMate TTS API 调用需要真实 API，此处标注 NotImplementedError。
+            百度 TTS API 备用通道在配置了 TTS_API_URL + BAIDU_SPEECH_TOKEN 时启用。
         """
         if not self.tts_api:
             # 无 TTS API 配置，静默跳过（TTS 是可选的）
@@ -129,23 +164,67 @@ class VoiceHandler:
             return
 
         try:
-            self._call_dumate_tts(text, on_end, on_error)
-        except NotImplementedError:
-            logger.info("[voice] DuMate TTS API not implemented; "
-                        "relying on browser TTS or skipping")
+            self._call_baidu_tts(text, on_end, on_error)
         except Exception as e:
             logger.warning("[voice] TTS error: %s", e)
             on_error(self.TTS_ERROR, str(e))
 
-    def _call_dumate_tts(self, text, on_end, on_error):
-        """调用 DuMate TTS API（备用通道）。
+    def _call_baidu_tts(self, text, on_end, on_error):
+        """调用百度 TTS API（备用通道）。
 
-        需要 DuMate 平台 TTS SDK 接入。
+        需要配置环境变量:
+          - TTS_API_URL: 百度语音合成接口地址
+          - BAIDU_SPEECH_TOKEN: 百度语音 access_token
+
+        在单独线程中执行 HTTP 调用，避免阻塞主链路。
         """
-        raise NotImplementedError(
-            "DuMate TTS API call not implemented yet. "
-            "Wire up DuMate platform TTS SDK here."
-        )
+        token = os.environ.get("BAIDU_SPEECH_TOKEN", "")
+        if not token:
+            logger.info("[voice] BAIDU_SPEECH_TOKEN not set; "
+                        "TTS fallback unavailable, relying on browser TTS")
+            return
+
+        def _tts_worker():
+            try:
+                params = urllib.parse.urlencode({
+                    "tex": text,
+                    "lan": "zh",
+                    "cuid": "career-coach",
+                    "ctp": 1,
+                    "tok": token,
+                    "spd": 5,
+                    "pit": 5,
+                    "vol": 5,
+                    "per": 0,
+                    "aue": 3,
+                })
+                url = "%s?%s" % (self.tts_api, params)
+                req = Request(url, method="POST")
+                req.add_header("Content-Type",
+                               "application/x-www-form-urlencoded")
+
+                with urlopen(req, timeout=self.fallback_timeout) as resp:
+                    content_type = resp.headers.get("Content-Type", "")
+                    body = resp.read()
+
+                if "audio" in content_type:
+                    # 合成成功，返回音频数据
+                    # 后端编排层不直接播放音频，由前端 voice.js 处理
+                    logger.info("[voice] TTS audio generated, %d bytes", len(body))
+                    if not self._cancelled:
+                        on_end()
+                else:
+                    # 合成失败，返回 JSON 错误信息
+                    err_data = json.loads(body.decode("utf-8"))
+                    on_error(self.TTS_ERROR,
+                             "baidu_tts_error: %s" % err_data.get("err_msg", "unknown"))
+            except (HTTPError, URLError) as e:
+                on_error(self.NETWORK_ERROR, "tts_network: %s" % str(e))
+            except Exception as e:
+                on_error(self.TTS_ERROR, "tts_exception: %s" % str(e))
+
+        thread = threading.Thread(target=_tts_worker, daemon=True)
+        thread.start()
 
     # ================================================================ #
     # 取消

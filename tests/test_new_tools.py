@@ -24,6 +24,7 @@ from interview_engine import (
 from model_router import (
     ModelRouter, QianfanModelRouter, TASK_PROMPTS, MODEL_PARAMS, DEGRADED_OUTPUTS,
 )
+from match_requirements import QianfanEmbedder
 from voice_handler import VoiceHandler
 from privacy_lifecycle import ConsentManager, DataLifecycle, PIIScanner
 
@@ -202,6 +203,22 @@ class TestDegradedQuestionBank:
         assert q["question"] is not None
         assert session["degraded"] is True
 
+    def test_router_failure_is_recorded_before_safe_fallback(self):
+        class FailingRouter:
+            def call(self, *args, **kwargs):
+                raise RuntimeError("provider unavailable")
+
+        engine = InterviewEngine(model_router=FailingRouter())
+        session = engine.start(
+            {"requirements": [{"id": "R1", "type": "hard", "text": "Go"}]},
+            {},
+            [{"id": "R1", "type": "hard", "text": "Go", "status": "weak"}],
+        )
+        question = engine.next_question(session)
+        assert question["question"] is not None
+        assert session["degraded"] is True
+        assert session["router_error"] == "RuntimeError"
+
 
 # =====================================================================
 # 2. ModelRouter 测试
@@ -264,6 +281,23 @@ class TestModelRouterRouting:
         assert request.get_header("Authorization") == "Bearer test-key"
         assert result["status"] == "success"
         assert result["output"]["question"] == "请举例"
+
+    def test_qianfan_requires_api_key(self, monkeypatch):
+        monkeypatch.delenv("QIANFAN_API_KEY", raising=False)
+        with pytest.raises(ValueError, match="QIANFAN_API_KEY"):
+            QianfanModelRouter(primary_model="test-model", enable_log=False)
+
+    def test_qianfan_embedding_does_not_reuse_chat_api_key(self, monkeypatch):
+        monkeypatch.setenv("QIANFAN_API_KEY", "chat-only-key")
+        for name in (
+            "QIANFAN_EMBEDDING_AK",
+            "QIANFAN_EMBEDDING_SK",
+            "QIANFAN_AK",
+            "QIANFAN_SK",
+        ):
+            monkeypatch.delenv(name, raising=False)
+        with pytest.raises(NotImplementedError, match="QIANFAN_EMBEDDING_AK"):
+            QianfanEmbedder()
 
     def test_dynamic_interview_uses_router_output(self):
         """动态成功时不得错误标记为题库降级。"""

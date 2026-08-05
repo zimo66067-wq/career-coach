@@ -9,15 +9,10 @@ import math
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 
-from zhipuai import ZhipuAI
 import match_requirements as mr
 import deidentify
 
-API_KEY = os.environ.get("ZHIPU_API_KEY")
-if not API_KEY:
-    raise EnvironmentError(
-        "ZHIPU_API_KEY not set; please export ZHIPU_API_KEY=<your_key>"
-    )
+API_KEY = os.environ.get("ZHIPU_API_KEY", "")
 FIX = os.path.join(os.path.dirname(__file__), "fixtures-synthetic")
 
 def load_text(path):
@@ -35,6 +30,11 @@ def cos_sim(a, b):
     return dot / (na * nb) if na*nb > 0 else 0.0
 
 def main():
+    if not API_KEY:
+        print("缺少 ZHIPU_API_KEY；此手工外部联调未执行。")
+        return 2
+    from zhipuai import ZhipuAI
+
     client = ZhipuAI(api_key=API_KEY)
     
     resume_dir = os.path.join(FIX, "resumes")
@@ -177,4 +177,4 @@ def main():
     print(f"\n结果已保存: {out_path}")
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

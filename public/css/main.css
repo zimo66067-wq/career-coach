@@ -192,6 +192,11 @@ a.card:hover, .card.hoverable:hover {
 }
 .resume-text-entry textarea:focus { outline: none; border-color: var(--zy-primary); box-shadow: var(--zy-shadow-focus); }
 .resume-text-help { margin-top: 8px !important; max-width: none !important; font-size: 12.5px; color: var(--zy-ink-3) !important; }
+.data-consent {
+  display: flex; align-items: flex-start; gap: 9px; max-width: 640px; margin: 16px auto 0;
+  text-align: left; color: var(--zy-ink-2); font-size: 13px; line-height: 1.55; cursor: pointer;
+}
+.data-consent input { flex: 0 0 auto; width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--zy-primary); }
 
 /* ---- F2 岗位描述输入：与 F1 采用同一文件接收规范，并补充术语解释 ---- */
 .job-upload-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 310px); gap: 18px; align-items: stretch; }
@@ -211,6 +216,16 @@ a.card:hover, .card.hoverable:hover {
 .match-notice { margin-top: 18px; }
 .match-notice[hidden] { display: none; }
 .error-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.job-confirm-card { max-width: 840px; margin: 0 auto; }
+.job-confirm-card > p { margin: 12px 0 0; color: var(--zy-ink-2); }
+.job-requirements-preview {
+  margin-top: 18px; padding: 18px; border: 1px solid var(--zy-line); border-radius: var(--zy-r-md);
+  background: var(--zy-bg-cool);
+}
+.job-profile-title { margin: 0 0 12px; font-size: 18px; }
+.job-requirements-list { display: grid; gap: 10px; margin: 0; padding-left: 24px; }
+.job-requirement-item { padding-left: 4px; color: var(--zy-ink-2); line-height: 1.55; }
+.job-requirement-item .req-type { display: inline-block; margin-right: 8px; color: var(--zy-primary); font-size: 12px; font-weight: 700; }
 
 /* ---- 状态徽章 ---- */
 .badge {

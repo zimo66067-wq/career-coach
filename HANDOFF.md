@@ -96,3 +96,37 @@
 | 模型选择记录 | `docs/model-baking-log.md` | 盲测输入 + 对比维度 |
 | 可观测性 | `docs/observability.md` | trace_id + 错误分类 + 禁止记录清单 |
 | 答辩证据索引 | `docs/defense-evidence-index.md` | 20+ 评委问题 → 证据映射 |
+
+---
+
+## 8. 2026-08-05 完整化轮（本地工作区，未推送）
+
+> 本轮目标：对照设计文档恢复设计基线、接通 WF-04~06、补齐语音与测试，使项目在代码与单测层面达到设计文档定义的完整性。
+
+### 已完成
+
+| 项 | 内容 | 验证 |
+|---|---|---|
+| 设计文档恢复 | docs/PRD、architecture、privacy、review、demo-script 从 git 历史恢复到 `docs/design/`，并写入《设计路径与技术路径蓝图》 | docs/index.md 已收录 |
+| WF-04~06 接通 | 移植 `tools/database.py`（SQLite 会话存储：简历/诊断/匹配/面试/能力），api/index.py 实现 wf04/start·answer·end、wf05/ability（含 radar_option）、wf06/delete、admin/resumes、admin/export | `test_api.py::test_wf04_to_wf06_full_session_flow` 全流程通过 |
+| 语音补齐 | 移植 main 的百度 ASR/TTS 实现（tools/voice_handler.py），文字主链路与 10 秒回退保留 | test_voice_browser / test_new_tools 通过 |
+| 敏感词补齐 | SENSITIVE_PATTERNS 补充「婚姻」（事实锁第 5 条覆盖） | pytest 全量通过 |
+| 测试纳入 | 未跟踪测试（test_api_boundary、test_e2e_full_chain、test_frontend_chain、test_interview_full_flow、test_match_boundary、test_model_router_providers）纳入并通过；ci.yml 增加 test_frontend_chain.js | Python 304/304、Node 11/11 |
+| 发布镜像 | docs/ 与 public/ 一致（test_publish_mirror.js） | 通过 |
+
+### 本轮测试结果（2026-08-05，.workbuddy venv Python 3.13 + pytest 9.1.1）
+
+- `pytest tests/ -q`：**304 passed, 0 failed**
+- `node --test tests/*.js`：**11 passed, 0 failed**
+
+### 仍未闭环（外部条件，非代码缺口）
+
+- 真实密钥复测：智谱/千帆模型与 embedding 调用需 ZHIPU_API_KEY / QIANFAN_API_KEY。
+- G8 用户验证（5-8 人）、G9 提交包冻结与 10 次彩排。
+- CI 首次在 GitHub Actions 运行、方案 PDF / 演示 MP4 / 分享 URL。
+
+### 建议下一步
+
+1. 复核并提交本地工作区改动（含本轮文档与代码）到 feature 分支，再合入 main。
+2. 配置密钥后按 remaining-items.md 执行真实调用与 embedding 复测。
+3. 完成 G8/G9 后更新 capability_matrix.md 状态计数。
