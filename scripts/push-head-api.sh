@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # Push local HEAD to GitHub via REST API (bypass schannel TLS timeout)
 # Usage: ./push-head-api.sh [owner] [repo] [branch] [token]
+# The token must come from GITHUB_TOKEN or an explicit argument. Never
+# hard-code a credential in this repository; CI scans for leaked tokens.
 set -euo pipefail
 
 OWNER="${1:-zimo66067-wq}"
 REPO="${2:-career-coach}"
 BRANCH="${3:-main}"
 TOKEN="${4:-${GITHUB_TOKEN:-}}"
+if [[ -z "$TOKEN" ]]; then
+    echo "error: GitHub token missing; set GITHUB_TOKEN or pass it as the 4th argument" >&2
+    exit 2
+fi
 BASE="https://api.github.com/repos/${OWNER}/${REPO}"
 
 api() {

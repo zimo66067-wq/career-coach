@@ -1,7 +1,7 @@
 /* app.js · 公共逻辑：生产默认空态；演示需 ?demo=1&state= */
 (function () {
-  var STATES = ["empty", "processing", "success", "error", "degraded"];
-  var LABELS = { empty: "空态", processing: "处理中", success: "成功", error: "失败", degraded: "降级" };
+  var STATES = ["empty", "confirmation", "processing", "success", "error", "degraded"];
+  var LABELS = { empty: "空态", confirmation: "确认", processing: "处理中", success: "成功", error: "失败", degraded: "降级" };
 
   function isDemoMode() {
     return /[?&]demo=1(?:&|$)/.test(location.search);

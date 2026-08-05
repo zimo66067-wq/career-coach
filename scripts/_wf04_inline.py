@@ -1,12 +1,15 @@
 
 import sys, json
+from pathlib import Path
 sys.path.insert(0, "tools")
 from interview_engine import InterviewEngine
 
+FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures-synthetic"
+
 # 加载 fixture 数据
-with open("C:/Users/Administrator/.qianfan/workspace/0b7e60340f7b430a9ac875e89ec35d46/career-coach-github/tests/fixtures-synthetic/jobs/job-01-swe.expected.json", encoding="utf-8") as f:
+with open(FIXTURES / "jobs" / "job-01-swe.expected.json", encoding="utf-8") as f:
     job_profile = json.load(f)
-with open("C:/Users/Administrator/.qianfan/workspace/0b7e60340f7b430a9ac875e89ec35d46/career-coach-github/tests/fixtures-synthetic/resumes/resume-01-swe.expected.json", encoding="utf-8") as f:
+with open(FIXTURES / "resumes" / "resume-01-swe.expected.json", encoding="utf-8") as f:
     resume_profile = json.load(f)
 
 # 从 WF-03 匹配结果中提取缺口

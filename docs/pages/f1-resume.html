@@ -38,6 +38,10 @@
         <button class="btn" type="button" id="startResumeDiagnosis" hidden disabled>开始诊断</button>
         <button class="btn ghost" type="button" id="openResumeText">直接粘贴文本</button>
       </div>
+      <label class="data-consent" for="resumeConsent">
+        <input id="resumeConsent" type="checkbox">
+        <span>我已阅读并同意仅为本次诊断处理我提交的简历内容。</span>
+      </label>
       <form class="resume-text-entry" id="resumeTextEntry" hidden>
         <label for="resumeTextInput">粘贴简历正文</label>
         <textarea id="resumeTextInput" rows="9" maxlength="200000" placeholder="请粘贴简历正文；确认后将直接进入诊断。"></textarea>

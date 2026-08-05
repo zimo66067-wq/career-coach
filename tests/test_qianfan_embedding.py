@@ -1,161 +1,148 @@
 # -*- coding: utf-8 -*-
-"""test_qianfan_embedding.py · 千帆 Embedding 连通性 + 召回率验证
+"""千帆 Embedding 连通性与小样本召回率的手工联调脚本。
 
-用法:
-  QIANFAN_AK=xxx QIANFAN_SK=yyy python test_qianfan_embedding.py
+该文件保留在 ``tests`` 目录是为了复用合成样本，但它依赖真实的外部
+服务和用户凭据，不能在 pytest 收集或 CI 中自动执行。请显式运行：
 
-输出:
-  - 连通性: 单条 embedding 调用
-  - 召回率: 抽样 5 简历 × 5 JD，统计 covered+weak / total 比例
+    QIANFAN_AK=... QIANFAN_SK=... python tests/test_qianfan_embedding.py
 """
+
+from __future__ import annotations
+
 import io
 import json
 import math
 import os
-import sys
 import time
+from pathlib import Path
 
-import pytest
-
-# ---- 环境变量读取 ----
-# 注意：千帆应用 API Key 与智能云 IAM Access Key 不同！
-# 请从千帆控制台「应用管理」中获取，而非 IAM 安全认证。
-AK = os.environ.get("QIANFAN_AK", "")
-SK = os.environ.get("QIANFAN_SK", "")
-if not AK or not SK:
-    pytest.skip("QIANFAN_AK 和 QIANFAN_SK 未设置，跳过千帆 Embedding 测试", allow_module_level=True)
 
 COVERED_TH = 0.55
 WEAK_TH = 0.30
+SAMPLE_RESUMES = [
+    "resume-01-swe",
+    "resume-05-fresh",
+    "resume-10-devops",
+    "resume-15-bigdata",
+    "resume-20-fresh-general",
+]
+SAMPLE_JOBS = ["job-01-swe", "job-02-fe", "job-07-pm", "job-09-algo", "job-10-bigdata"]
 
 
-def embed(texts, model="embedding-v1"):
+def embed(texts: list[str], access_key: str, secret_key: str, model: str = "embedding-v1") -> list[list[float]]:
+    """Call the documented Qianfan embedding endpoint for a small manual check."""
     import requests
-    # 千帆 Bearer token: bce-v3/ALTAK-xxx/yyy
-    bearer = AK + "/" + SK
-    
-    headers = {
-        "Authorization": "Bearer " + bearer,
-        "Content-Type": "application/json",
-    }
-    payload = {"input": texts, "model": model}
-    
-    # 千帆 v2 endpoint
-    url = "https://qianfan.baidubce.com/v2/embeddings"
-    resp = requests.post(url, headers=headers, json=payload, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
-    
-    if "error" in data:
-        raise RuntimeError("千帆错误: %s" % data.get("error", {}).get("message", str(data)))
-    
-    # 返回格式: {"data": [{"embedding": [...], "index": 0}, ...]}
-    return [item["embedding"] for item in data.get("data", [])]
+
+    response = requests.post(
+        "https://qianfan.baidubce.com/v2/embeddings",
+        headers={
+            "Authorization": f"Bearer {access_key}/{secret_key}",
+            "Content-Type": "application/json",
+        },
+        json={"input": texts, "model": model},
+        timeout=30,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if "error" in payload:
+        raise RuntimeError(f"千帆返回错误：{payload['error'].get('message', payload['error'])}")
+    return [item["embedding"] for item in payload.get("data", [])]
 
 
-def cosine_similarity(a, b):
-    dot = sum(x * y for x, y in zip(a, b))
-    na = math.sqrt(sum(x * x for x in a))
-    nb = math.sqrt(sum(x * x for x in b))
-    if na == 0 or nb == 0:
-        return 0.0
-    return dot / (na * nb)
+def cosine_similarity(left: list[float], right: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(left, right))
+    left_norm = math.sqrt(sum(x * x for x in left))
+    right_norm = math.sqrt(sum(x * x for x in right))
+    return dot / (left_norm * right_norm) if left_norm and right_norm else 0.0
 
 
-def load_text(path):
-    with io.open(path, encoding="utf-8") as f:
-        return f.read()
+def load_text(path: Path) -> str:
+    with io.open(path, encoding="utf-8") as handle:
+        return handle.read()
 
 
-def load_requirements(path):
-    with io.open(path, encoding="utf-8") as f:
-        data = json.load(f)
-    return data["requirements"]
+def load_requirements(path: Path) -> list[dict]:
+    with io.open(path, encoding="utf-8") as handle:
+        return json.load(handle)["requirements"]
 
 
-# ---- 主流程 ----
-print("=" * 60)
-print("千帆 Embedding API 连通性测试")
-print("=" * 60)
+def run_sample_recall_check(access_key: str, secret_key: str) -> dict:
+    """Run the bounded 5×5 sample only; this intentionally performs remote requests."""
+    fixture_root = Path(__file__).parent / "fixtures-synthetic"
+    total_requirements = 0
+    hit_requirements = 0
+    details: list[dict] = []
 
-# 1. 连通性
-print("\n[1/2] 发送 embedding 请求 ...")
-try:
-    vec = embed(["测试文本"])
-    print("  ✓ Embedding 返回成功，维度 = %d" % len(vec[0]))
-except Exception as e:
-    print("  ✗ Embedding 调用失败:", e)
-    sys.exit(1)
+    for resume_slug in SAMPLE_RESUMES:
+        resume_text = load_text(fixture_root / "resumes" / f"{resume_slug}.txt")
+        resume_sentences = [line.strip() for line in resume_text.splitlines() if len(line.strip()) >= 4]
+        for job_slug in SAMPLE_JOBS:
+            requirements = load_requirements(fixture_root / "jobs" / f"{job_slug}.expected.json")
+            vectors = embed(
+                [item["text"] for item in requirements] + resume_sentences[:10],
+                access_key,
+                secret_key,
+            )
+            requirement_vectors = vectors[: len(requirements)]
+            sentence_vectors = vectors[len(requirements) :]
+            for index, requirement in enumerate(requirements):
+                total_requirements += 1
+                confidence = max(
+                    (cosine_similarity(requirement_vectors[index], vector) for vector in sentence_vectors),
+                    default=0.0,
+                )
+                status = "covered" if confidence >= COVERED_TH else "weak" if confidence >= WEAK_TH else "missing"
+                if status != "missing":
+                    hit_requirements += 1
+                details.append(
+                    {
+                        "resume": resume_slug,
+                        "job": job_slug,
+                        "requirement": requirement["id"],
+                        "status": status,
+                        "confidence": round(confidence, 3),
+                    }
+                )
+            time.sleep(2)
 
-# 2. 召回率验证（抽样）
-print("\n[2/2] 召回率验证（抽样 5 简历 × 5 JD）...")
-BASE = os.path.join(os.path.dirname(__file__), "fixtures-synthetic")
-
-resume_slugs = ["resume-01-swe", "resume-05-fresh", "resume-10-devops", "resume-15-bigdata", "resume-20-fresh-general"]
-job_slugs = ["job-01-swe", "job-02-fe", "job-07-pm", "job-09-algo", "job-10-bigdata"]
-
-total_reqs = 0
-hit_reqs = 0
-results_detail = []
-
-for rslug in resume_slugs:
-    resume_text = load_text(os.path.join(BASE, "resumes", rslug + ".txt"))
-    resume_sents = [s.strip() for s in resume_text.splitlines() if len(s.strip()) >= 4]
-
-    for jslug in job_slugs:
-        reqs = load_requirements(os.path.join(BASE, "jobs", jslug + ".expected.json"))
-        # 批量：把该JD的所有要求和简历句子合并到一个请求中
-        all_texts = [r["text"] for r in reqs] + resume_sents[:10]
-        try:
-            vecs = embed(all_texts)
-            req_vecs = vecs[:len(reqs)]
-            sent_vecs = vecs[len(reqs):]
-            for idx, req in enumerate(reqs):
-                total_reqs += 1
-                best_conf = 0.0
-                for sv in sent_vecs:
-                    conf = cosine_similarity(req_vecs[idx], sv)
-                    if conf > best_conf:
-                        best_conf = conf
-                status = "covered" if best_conf >= COVERED_TH else ("weak" if best_conf >= WEAK_TH else "missing")
-                if status in ("covered", "weak"):
-                    hit_reqs += 1
-                results_detail.append({
-                    "resume": rslug, "job": jslug, "req": req["id"],
-                    "status": status, "confidence": round(best_conf, 3)
-                })
-        except Exception as e:
-            print("  ! API 异常 (%s × %s): %s" % (rslug, jslug, e))
-        # 每对简历×JD 之间间隔 2 秒，避免触发频率限制
-        time.sleep(2)
-
-recall = hit_reqs / total_reqs if total_reqs else 0
-print("  总要求数: %d" % total_reqs)
-print("  命中数(covered+weak): %d" % hit_reqs)
-print("  召回率: %.1f%%" % (recall * 100))
-
-# 3. 输出摘要
-print("\n" + "=" * 60)
-print("结果摘要")
-print("=" * 60)
-print("API 连通性: 通过")
-print("Embedding 维度: %d" % len(vec[0]))
-print("抽样召回率: %.1f%% (%s)" % (recall * 100, "达标" if recall >= 0.85 else "未达标(目标≥85%)"))
-
-# 输出详细结果到文件（供人工复核）
-out_path = os.path.join(os.path.dirname(__file__), "qianfan_embedding_test_result.json")
-with io.open(out_path, "w", encoding="utf-8") as f:
-    json.dump({
+    recall_rate = hit_requirements / total_requirements if total_requirements else 0.0
+    return {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "api_status": "ok",
-        "embedding_dim": len(vec[0]),
-        "recall_rate": round(recall, 4),
-        "total_requirements": total_reqs,
-        "hit_requirements": hit_reqs,
+        "recall_rate": round(recall_rate, 4),
+        "total_requirements": total_requirements,
+        "hit_requirements": hit_requirements,
         "thresholds": {"covered": COVERED_TH, "weak": WEAK_TH},
-        "samples": resume_slugs,
-        "jobs": job_slugs,
-        "details": results_detail,
-    }, f, ensure_ascii=False, indent=2)
-print("\n详细结果已写入: %s" % out_path)
-print("\n如需全量 20×10 验证，请将脚本中的 resume_slugs / job_slugs 扩展为完整列表。")
+        "samples": SAMPLE_RESUMES,
+        "jobs": SAMPLE_JOBS,
+        "details": details,
+    }
+
+
+def main() -> int:
+    access_key = os.environ.get("QIANFAN_AK", "")
+    secret_key = os.environ.get("QIANFAN_SK", "")
+    if not access_key or not secret_key:
+        print("缺少 QIANFAN_AK 或 QIANFAN_SK；此手工外部联调未执行。")
+        return 2
+
+    try:
+        probe = embed(["连通性测试文本"], access_key, secret_key)
+        if not probe:
+            raise RuntimeError("Embedding 接口返回空向量")
+        result = run_sample_recall_check(access_key, secret_key)
+    except Exception as exc:  # The command is a diagnostic utility and must return a clear nonzero status.
+        print(f"千帆 Embedding 联调失败：{exc}")
+        return 1
+
+    result["embedding_dimension"] = len(probe[0])
+    output_path = Path(__file__).with_name("qianfan_embedding_test_result.json")
+    with io.open(output_path, "w", encoding="utf-8") as handle:
+        json.dump(result, handle, ensure_ascii=False, indent=2)
+    print(f"千帆 Embedding 联调通过，维度={len(probe[0])}，召回率={result['recall_rate']:.1%}")
+    print(f"结果已写入：{output_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,94 +1,120 @@
-# career-coach · AI求职面试教练
+# DuMate AI 求职面试教练
 
-> **项目状态：WorkBuddy 工具阶段通过（42/42 测试绿），六工作流自动化已验证（16/16 PASS），提交包已冻结。**
->
-> - ✅ 数据合同冻结（4 Schema + scoring.md）
-> - ✅ 工具链 8/8 已实现并测试通过
-> - ✅ 提示词 7/7 已完成
-> - ✅ 公开静态入口默认空态，未提交材料不展示合成诊断结果
-> - ✅ 静态原型 6 页面完整
-> - ✅ 六工作流自动化证据已生成（含降级路径）
-> - ✅ 语音链路验证通过（18/18 PASS）
-> - ✅ 官方链接核验完成（6/9 可达）
-> - ⬜ P0-01 真实模型复测（待 API key）
-> - ⬜ P0-03 端到端真实数据闭环（依赖 P0-01）
-> - ⬜ G8 用户验证（模板就绪，待执行）
-> - ✅ G9 提交包已冻结（tag: v1.0.0-g9-freeze）
+> iCAN 无代码开发挑战赛项目｜面向求职者的简历诊断、岗位匹配、模拟面试与能力成长辅助工具。
 
-iCAN 无代码开发挑战赛（DuMate 方向）参赛项目。
-本仓库是**唯一事实源**：DuMate（百度搭子）做主产品，WorkBuddy 做分工开发，双方通过 git commit + HANDOFF 异步接力。
+## 项目简介与定位
 
-## MVP 四项（严格冻结）
+DuMate AI 求职面试教练把求职准备拆成可连续使用的四个功能闭环，帮助用户从材料整理走到面试复盘。它提供的是**可追溯的求职准备建议**，不代替招聘方决策，也不承诺录用结果或能力预测。
 
-| 编号 | 功能 | 产出合同 |
-|---|---|---|
-| F1 | 简历 AI 诊断打分 + 逐条修改建议 | ResumeProfile |
-| F2 | 简历-JD 匹配度 + 关键词缺口 | JobProfile + 四态匹配 |
-| F3 | 文字 AI 模拟面试（会追问，结束出表现报告） | InterviewTurn 序列 |
-| F4 | 能力雷达图 + 七天竞争力情景推演 | AbilityProfile |
+| 功能 | 用户要完成的事 | 主要产出 |
+| --- | --- | --- |
+| F1 简历诊断 | 在明确同意数据处理说明后上传简历 | 结构化诊断、问题说明、可核对的原文证据片段与修改建议 |
+| F2 岗位匹配 | 上传/粘贴简历和职位描述（JD） | 岗位要求匹配项、待补充项和针对性优化建议 |
+| F3 模拟面试 | 选择岗位情境并进行多轮问答 | 面试问题、追问与本轮回答复盘 |
+| F4 能力成长 | 汇总练习和诊断结果 | 能力雷达、优先改进方向与 7 天行动计划 |
 
-> 产品基线：**模型做语义，规则做分数，验证器做事实。** 所有关键节点均有降级路径。
-> 口径注意：F4 的七天结果统一称「七天竞争力情景推演」，不得称「预测」。
+## 在线链接
 
-## 目录导航
+- [项目源码与版本记录](https://github.com/zimo66067-wq/career-coach)
+- [静态演示入口（GitHub Pages）](https://zimo66067-wq.github.io/career-coach/)
 
-```
-career-coach/
-├── docs/            # PRD / 架构 / 隐私 / 演示脚本 / 审查报告
-├── contracts/       # 4 个 JSON Schema + scoring.md 评分公式（冻结层，禁止擅改）
-├── workflows/       # WF-01~06 工作流定义（DuMate 负责实现）
-├── prompts/         # resume / match / interview / plan 提示词模块
-├── ui/              # prototype/ 静态高保真原型 + assets/
-├── tools/           # WorkBuddy 交付的 8 个 Python 工具
-├── tests/           # fixtures-synthetic 合成样本 + pytest 契约/故障注入测试
-├── tasks/           # 任务看板规则
-├── handoffs/        # HANDOFF-001~003 交接文件
-└── deliverables/    # 最终提交包（DuMate 阶段产出）
+静态页面以仓库的 `docs/` 目录为发布源；生产 API 通过 Vercel Functions 提供。提交前应在浏览器打开演示入口完成一次可访问性检查。本机在 2026-08-04 的网络环境无法连通 GitHub Pages，因此上述地址是项目的发布地址，而不是本次由本机实时验证后的可用性声明。
+
+## 启动方式与环境变量
+
+### 1. 仅查看静态界面
+
+静态界面不需要构建工具。进入项目根目录后，使用任一静态服务器发布 `docs/`：
+
+```powershell
+python -m http.server 8000 --directory docs
 ```
 
-## 快速开始
+随后访问 `http://localhost:8000`。用于界面验收的合成演示数据可通过页面约定的 `?demo=1` 参数启用；它只用于演示，不应被当成真实 AI 结果。
 
-**看公开入口**：GitHub Pages 从 `docs/` 发布；本地可双击打开 `ui/prototype/index.html`。功能页默认均为等待用户材料的空态，普通 `?state=...` 参数不会展示诊断结果。
+### 2. 本地联调 API
 
-**内部 QA 演示**：仅限显式使用 `?demo=1&state=empty|processing|success|error|degraded`；该入口不在公开导航中，合成数据不得作为用户诊断结果使用。
+完整联调需要 Python 3.10+、Vercel CLI，以及可用的模型服务密钥。
 
-> 上线边界：当前仓库仍处于真实上传、AI 调用及 DuMate 工作流集成阶段。公开静态页只提供前端入口；没有经过用户提交、服务端处理和证据校验的材料，页面不得展示评分、建议或匹配结论。
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
 
-要让公开页完成真实上传与诊断，部署方必须在加载 `data-bridge.js` 前配置 `window.DUMATE_API_BASE`，并提供可从 Pages 域名访问的 `POST /api/wf01/upload` 与 `POST /api/wf02/diagnose` 服务。未接入时页面会明确显示失败状态，不会使用旧缓存或合成诊断代替用户结果。
+# 在当前 PowerShell 会话中设置变量；不要把真实密钥提交到仓库。
+$env:APP_ENV = "development"
+$env:ZHIPU_API_KEY = "替换为你的密钥"
+$env:DUMATE_CONSENT_SECRET = "替换为随机长字符串"
 
-### 生产 API 部署（Vercel）
-
-仓库已包含 `api/index.py` 和 `vercel.json`，用于在 Vercel 部署真实上传与诊断服务。Vercel 项目需配置以下环境变量，所有密钥只能保存在 Vercel，不能写入 GitHub Pages 或仓库：
-
-```text
-ZHIPU_API_KEY=...
-DUMATE_MODEL=glm-4.7-flash
-# 可选：ZHIPU_FALLBACK_MODEL=...（备用智谱 Chat 模型）
-DUMATE_ALLOWED_ORIGINS=https://zimo66067-wq.github.io
-APP_ENV=production
+vercel dev
 ```
 
-当前 F1 简历诊断只调用智谱 Chat，因此不需要单独的 Embedding 密钥；F2 语义 Embedding 接入时再按对应实现增加配置。`DUMATE_MODEL` 必须填写该智谱账号已开通的模型标识。
+`vercel dev` 会读取 [vercel.json](vercel.json) 的路由配置并同时代理前端与 `/api/wf01` 至 `/api/wf06` 接口。以 CLI 实际输出的本地地址为准。
 
-部署完成后，将 Vercel 的 HTTPS 生产地址写入 `docs/js/pages-api-config.js` 的 `window.DUMATE_API_BASE`，并确保该脚本在 `data-bridge.js` 之前加载。API 会仅对 `DUMATE_ALLOWED_ORIGINS` 白名单来源返回 CORS 响应；文件原件只写入请求临时目录并在响应前删除。
+### 3. 环境变量说明
 
-**跑测试**（Windows）：
+环境变量模板见 [.env.example](.env.example)。生产环境请在 Vercel 项目设置中配置，避免在前端代码、截图、提交记录或仓库文件中暴露密钥。
 
-```bat
-cd /d <本仓库目录>
-set PY=C:\Users\Administrator\.workbuddy\binaries\python\envs\default\Scripts\python.exe
-%PY% -m pip install -r tools\requirements.txt
-%PY% -m pytest tests\ -v
+| 变量 | 是否必需 | 用途 |
+| --- | --- | --- |
+| `ZHIPU_API_KEY` | 真实 AI 调用必需 | 服务端调用当前接入的智谱模型；缺失时不应伪造 AI 结果。 |
+| `DUMATE_CONSENT_SECRET` | 生产环境必需 | 签发短时效的数据处理同意令牌，保护上传与分析接口。 |
+| `DUMATE_MODEL` | 可选 | 指定主模型；未设置时使用服务端默认模型。 |
+| `ZHIPU_FALLBACK_MODEL` | 可选 | 主模型不可用时的服务端回退模型。 |
+| `DUMATE_ALLOWED_ORIGINS` | 生产环境建议配置 | 以逗号分隔的前端来源白名单，用于 CORS 控制。 |
+| `APP_ENV` | 建议配置 | `development` 放开本地来源；`production` 启用生产边界。 |
+| `QIANFAN_API_KEY`、`QIANFAN_BASE_URL` | 按需配置 | 仅在启用百度千帆相关模型/嵌入能力时使用。 |
+
+## 核心使用流程与 AI 介入流程
+
+### 用户流程
+
+1. 用户阅读数据处理说明并主动确认同意；服务端签发有时效的同意令牌。
+2. 用户上传简历或输入 JD，系统完成文件解析、长度/格式校验和文本规范化。
+3. 用户选择 F1-F4 中的目标任务：诊断简历、匹配岗位、模拟面试或查看成长计划。
+4. 系统返回结构化结果，用户可依据证据片段、建议和练习反馈迭代材料与表达。
+5. 用户可通过删除接口清理会话数据；日志与仓库均不应保存真实简历原文。
+
+### AI 在哪里介入
+
+| 环节 | AI/规则处理 | 输出与边界 |
+| --- | --- | --- |
+| F1 简历诊断 | 服务端将经过校验的简历文本发送给模型进行结构化分析，并由规则层校验字段与原文引用。 | 输出分项问题、建议和 `source_spans` 原文证据；无效引用会被拒绝或降级，而非编造证据。 |
+| F2 JD 匹配 | 对简历与 JD 的职责、技能、经验等要求做语义对齐，并保留规则化匹配结果。 | 输出匹配/缺口/建议，供用户修改简历；不是岗位录用概率。 |
+| F3 模拟面试 | 根据岗位情境和上一轮回答生成追问，并结合预设评价维度给出复盘。 | 输出练习问题与改进方向；不将模拟成绩表述为真实面试结论。 |
+| F4 成长规划 | 汇总前序可用结果，形成能力维度和短期行动计划。 | 输出能力雷达与 7 天计划；不采集或推断与求职无关的个人敏感结论。 |
+
+当模型密钥缺失、模型请求失败或返回不符合结构约束的数据时，系统应显式返回错误或使用已配置的服务端回退模型；不会以模拟数据冒充真实 AI 输出。接口路由、同意校验和证据片段归一化逻辑可在 [api/index.py](api/index.py) 中核对。
+
+## 技术栈
+
+| 层级 | 技术 | 作用 |
+| --- | --- | --- |
+| 前端 | 原生 HTML、CSS、JavaScript | 轻量化多页面界面、上传交互、状态展示与前端数据桥接。 |
+| 可视化 | ECharts（含降级展示） | 呈现能力雷达等图表。 |
+| 后端 | Python、Flask、Vercel Functions | 提供同意、上传、诊断、匹配、面试、成长计划和删除接口。 |
+| AI 能力 | 智谱模型服务；按配置接入千帆相关能力 | 完成受服务端控制的结构化文本分析、问答与语义处理。 |
+| 文档解析与校验 | `pypdf`、`python-docx`、JSON Schema | 解析简历文件、限制输入并校验模型输出结构。 |
+| 测试 | `pytest`、Playwright | 覆盖 API、工具逻辑与关键端到端闭环。 |
+| 部署 | GitHub Pages、Vercel | 分别托管静态前端与 Python API 路由。 |
+
+## 验收与目录导航
+
+```powershell
+# 安装测试依赖后，运行项目测试
+python -m pytest tests -q
 ```
 
-## 双 Agent 分工与文件所有权
+| 路径 | 说明 |
+| --- | --- |
+| [docs/](docs/) | 可公开发布的静态前端与演示说明。 |
+| [public/](public/) | 前端页面、样式与交互脚本源文件。 |
+| [api/index.py](api/index.py) | Vercel/Flask API 入口、同意校验与工作流路由。 |
+| [tools/](tools/) | 匹配、面试、模型路由等可复用工具逻辑。 |
+| [tests/](tests/) | 合成数据与自动化验证用例。 |
 
-| 角色 | 拥有目录 | 说明 |
-|---|---|---|
-| Product Agent | docs/ + contracts/ | 已冻结，改动须走变更流程 |
-| Frontend Agent (WorkBuddy) | ui/ + prompts/ | 静态原型与提示词 |
-| QA/Tool Agent (WorkBuddy) | tools/ + tests/ | 校验器、复算器、契约测试 |
-| Workflow Agent (DuMate) | workflows/ + deliverables/ | 六个工作流与提交包 |
-| Integration Agent | 合并 + 版本冻结 | 单一负责人 |
+## 数据与使用边界
 
-规则：两个 Agent 不得同时修改同一文件；交接必须先 commit 再写 HANDOFF；审查 Agent 只输出 review 报告。
+- 真实简历、JD、密钥和日志不得提交到 Git 仓库；测试仅使用 `tests/fixtures-synthetic/` 中的合成数据。
+- 调用模型前必须由用户主动确认数据处理说明；同意令牌具有有限有效期。
+- 产品输出用于求职准备辅助。用户应自行核验事实、措辞和最终投递材料。

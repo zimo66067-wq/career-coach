@@ -192,6 +192,40 @@ a.card:hover, .card.hoverable:hover {
 }
 .resume-text-entry textarea:focus { outline: none; border-color: var(--zy-primary); box-shadow: var(--zy-shadow-focus); }
 .resume-text-help { margin-top: 8px !important; max-width: none !important; font-size: 12.5px; color: var(--zy-ink-3) !important; }
+.data-consent {
+  display: flex; align-items: flex-start; gap: 9px; max-width: 640px; margin: 16px auto 0;
+  text-align: left; color: var(--zy-ink-2); font-size: 13px; line-height: 1.55; cursor: pointer;
+}
+.data-consent input { flex: 0 0 auto; width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--zy-primary); }
+
+/* ---- F2 岗位描述输入：与 F1 采用同一文件接收规范，并补充术语解释 ---- */
+.job-upload-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 310px); gap: 18px; align-items: stretch; }
+.job-upload-layout .card { margin-bottom: 0; }
+.job-help-card { padding: 24px; background: linear-gradient(160deg, var(--zy-surface), var(--zy-bg-cool)); }
+.job-help-label { display: inline-flex; padding: 4px 9px; border-radius: var(--zy-r-pill); background: var(--zy-primary-soft); color: var(--zy-primary); font-size: 12px; font-weight: 700; }
+.job-help-card h3 { margin: 13px 0 8px; }
+.job-help-card p { font-size: 13.5px; line-height: 1.65; color: var(--zy-ink-2); }
+.job-help-card em { font-style: normal; color: var(--zy-ink); }
+.job-help-list { margin: 16px 0; padding: 13px 0 13px 19px; border-top: 1px solid var(--zy-line); border-bottom: 1px solid var(--zy-line); color: var(--zy-ink-2); font-size: 13px; line-height: 1.65; }
+.job-help-list li + li { margin-top: 7px; }
+.job-help-list b { color: var(--zy-ink); }
+.job-format-note { padding: 10px 12px; border-radius: var(--zy-r-md); background: rgba(47, 107, 255, .07); border: 1px solid rgba(47, 107, 255, .16); }
+.job-format-note b { color: var(--zy-ink); }
+.job-help-link { display: inline-block; margin-top: 12px; color: var(--zy-primary); font-size: 13px; font-weight: 650; text-decoration: none; }
+.job-help-link:hover { text-decoration: underline; }
+.match-notice { margin-top: 18px; }
+.match-notice[hidden] { display: none; }
+.error-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.job-confirm-card { max-width: 840px; margin: 0 auto; }
+.job-confirm-card > p { margin: 12px 0 0; color: var(--zy-ink-2); }
+.job-requirements-preview {
+  margin-top: 18px; padding: 18px; border: 1px solid var(--zy-line); border-radius: var(--zy-r-md);
+  background: var(--zy-bg-cool);
+}
+.job-profile-title { margin: 0 0 12px; font-size: 18px; }
+.job-requirements-list { display: grid; gap: 10px; margin: 0; padding-left: 24px; }
+.job-requirement-item { padding-left: 4px; color: var(--zy-ink-2); line-height: 1.55; }
+.job-requirement-item .req-type { display: inline-block; margin-right: 8px; color: var(--zy-primary); font-size: 12px; font-weight: 700; }
 
 /* ---- 状态徽章 ---- */
 .badge {
@@ -437,6 +471,38 @@ table.dim th { background: var(--zy-bg-cool); font-weight: 650; }
 .state-matrix a { color: var(--zy-primary); text-decoration: none; font-size: 13px; }
 .state-matrix a:hover { text-decoration: underline; }
 
+/* ---- F4 前置任务进度图 ---- */
+.journey-progress { margin-bottom: var(--zy-s4); }
+.journey-progress-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+.journey-progress h2 { margin: 0; font-size: 18px; }
+.journey-eyebrow { margin: 0 0 5px; color: var(--zy-primary); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+.journey-progress-count { margin: 0; color: var(--zy-ink-2); font-size: 13px; white-space: nowrap; }
+.journey-progress-count strong { color: var(--zy-primary); font-family: var(--zy-font-num); font-size: 24px; line-height: 1; }
+.journey-map { position: relative; min-height: 220px; isolation: isolate; }
+.journey-links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; z-index: -1; }
+.journey-link { fill: none; stroke: #d7dce8; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 4 6; transition: stroke var(--zy-d-fast) var(--zy-ease); }
+.journey-f1-complete .journey-link-f1, .journey-f2-complete .journey-link-f2, .journey-f3-complete .journey-link-f3 { stroke: var(--zy-covered); }
+.journey-node { position: absolute; display: flex; flex-direction: column; gap: 4px; width: 27%; min-width: 174px; padding: 13px 15px; color: var(--zy-ink); text-decoration: none; background: var(--zy-surface); border: 1px solid var(--zy-line); border-radius: var(--zy-r-md); box-shadow: var(--zy-shadow-1); transition: border-color var(--zy-d-fast) var(--zy-ease), box-shadow var(--zy-d-fast) var(--zy-ease), transform var(--zy-d-fast) var(--zy-ease); }
+.journey-node:hover { border-color: rgba(47, 107, 255, .5); box-shadow: var(--zy-shadow-2); transform: translateY(-2px); }
+.journey-node:focus-visible { outline: 3px solid rgba(47, 107, 255, .35); outline-offset: 3px; }
+.journey-node-f1 { top: 18px; left: 2%; }
+.journey-node-f2 { top: 18px; right: 2%; }
+.journey-node-f3 { bottom: 2px; left: 50%; transform: translateX(-50%); }
+.journey-node-f3:hover { transform: translateX(-50%) translateY(-2px); }
+.journey-node-code { color: var(--zy-primary); font-family: var(--zy-font-num); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+.journey-node strong { font-size: 14px; }
+.journey-node-state { color: var(--zy-ink-3); font-size: 12px; }
+.journey-node-state::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #b8c0cf; }
+.journey-node.is-complete { border-color: rgba(21, 128, 61, .32); background: linear-gradient(135deg, var(--zy-surface), var(--zy-covered-bg)); }
+.journey-node.is-complete .journey-node-code, .journey-node.is-complete .journey-node-state { color: var(--zy-covered); }
+.journey-node.is-complete .journey-node-state::before { background: var(--zy-covered); }
+.journey-hub { position: absolute; top: 84px; left: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100px; height: 100px; transform: translateX(-50%); color: var(--zy-ink-2); background: var(--zy-bg-cool); border: 1px solid var(--zy-line); border-radius: 50%; box-shadow: var(--zy-shadow-1); }
+.journey-hub span { color: var(--zy-primary); font-family: var(--zy-font-num); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+.journey-hub strong { margin-top: 3px; font-size: 14px; }
+.journey-hub.is-ready { color: #fff; background: var(--zy-grad-ai); border-color: transparent; box-shadow: 0 10px 24px rgba(47, 107, 255, .28); }
+.journey-hub.is-ready span { color: rgba(255, 255, 255, .82); }
+.journey-description { margin: 10px 0 0; color: var(--zy-ink-3); font-size: 12px; }
+
 /* ---- 响应式 ---- */
 @media (max-width: 1023px) {
   .evidence-grid { grid-template-columns: 1fr; }
@@ -452,8 +518,15 @@ table.dim th { background: var(--zy-bg-cool); font-weight: 650; }
   .score-ring .inner { width: 90px; height: 90px; }
   .score-ring .num { font-size: 27px; }
   .resume-upload-card { padding: 30px 18px; }
+  .job-upload-layout { grid-template-columns: 1fr; }
   .resume-upload-actions .btn { flex: 1 1 160px; justify-content: center; }
   .demo-notice { top: 72px; max-width: calc(100vw - 28px); white-space: normal; text-align: center; }
+  .journey-progress-head { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .journey-map { display: grid; grid-template-columns: 1fr; gap: 10px; min-height: 0; }
+  .journey-links { display: none; }
+  .journey-node { position: static; width: auto; min-width: 0; transform: none; }
+  .journey-node:hover, .journey-node-f3:hover { transform: translateY(-2px); }
+  .journey-hub { position: static; order: -1; width: 82px; height: 82px; margin: 2px auto 6px; transform: none; }
 }
 
 /* ---- 减少动态偏好（WCAG 2.3.3 / 规范要求） ---- */

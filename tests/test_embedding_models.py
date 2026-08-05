@@ -24,13 +24,10 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 
-from zhipuai import ZhipuAI
 import match_requirements as mr
 import deidentify
 
-API_KEY = os.environ.get("ZHIPU_API_KEY")
-if not API_KEY:
-    pytest.skip("ZHIPU_API_KEY not set, skipping embedding model tests", allow_module_level=True)
+API_KEY = os.environ.get("ZHIPU_API_KEY", "")
 FIX = os.path.join(os.path.dirname(__file__), "fixtures-synthetic")
 
 def load_text(path):
@@ -53,6 +50,10 @@ def split_sentences(text):
 
 class EmbeddingTester:
     def __init__(self, model_name, strategy="document"):
+        if not API_KEY:
+            raise RuntimeError("ZHIPU_API_KEY not set; this manual integration check cannot run")
+        from zhipuai import ZhipuAI
+
         self.client = ZhipuAI(api_key=API_KEY)
         # 映射: zhipu-embedding-2 -> embedding-2
         self.model = model_name.replace("zhipu-", "")

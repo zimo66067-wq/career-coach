@@ -1,5 +1,5 @@
 /* ============================================================
-   states.css · 五状态样式 v2：empty / processing / success / error / degraded
+   states.css · 六状态样式 v3：empty / confirmation / processing / success / error / degraded
    依赖 tokens.css + main.css；DOM 契约不变。
    ============================================================ */
 
@@ -59,6 +59,7 @@
 /* 状态容器切换：默认只显示 success（契约不变） */
 [data-state-view] { display: none; }
 body[data-state="empty"] [data-state-view="empty"],
+body[data-state="confirmation"] [data-state-view="confirmation"],
 body[data-state="processing"] [data-state-view="processing"],
 body[data-state="success"] [data-state-view="success"],
 body[data-state="error"] [data-state-view="error"],

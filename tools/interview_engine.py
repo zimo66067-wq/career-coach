@@ -29,7 +29,7 @@ SENSITIVE_PATTERNS = [
     r"宗教|信仰|政治面貌|党派|党员",
     r"残疾|残疾证|健康状况|疾病|病历|体检",
     r"性取向|性别认同|同性恋",
-    r"家庭收入|父母职业|配偶|结婚|单身|离婚",
+    r"家庭收入|父母职业|配偶|结婚|单身|离婚|婚姻",
     r"身高|体重|外貌|相貌|长相",
     r"债务|贷款|征信|欠款",
     r"违法犯罪|犯罪记录|案底|前科|拘留",
@@ -174,6 +174,7 @@ class InterviewEngine:
             "question_type_index": 0,
             "used_gaps": [],
             "degraded": False,
+            "router_error": None,
         }
         session["state"] = "ASK"
         return session
@@ -211,8 +212,10 @@ class InterviewEngine:
                     elif isinstance(output, dict):
                         question_text = output.get("question", "").strip()
                         targets = output.get("targets", [])
-            except Exception:
-                pass  # 降级
+            except Exception as exc:
+                # Keep the safe question-bank fallback, but retain a non-sensitive
+                # diagnostic marker instead of silently swallowing provider errors.
+                session["router_error"] = type(exc).__name__
 
         # 降级: 岗位题库
         if not question_text:
@@ -233,6 +236,12 @@ class InterviewEngine:
         if gap:
             session["used_gaps"].append(gap["id"])
 
+        # 主问题计数与本轮上下文必须持久化：否则状态机永远不会到达
+        # MAX_MAIN_QUESTIONS 上限，且后续回合无法回填 question/targets
+        # （InterviewTurn 合同要求 question 非空）。
+        session["current_main"] += 1
+        session["_current_question"] = question_text
+        session["_current_targets"] = targets
         session["current_followup_count"] = 0
         return {
             "question": question_text,
@@ -283,6 +292,7 @@ class InterviewEngine:
         if (missing_elements
                 and session["current_followup_count"] < MAX_FOLLOWUPS_PER_QUESTION):
             follow_up = self._generate_followup(answer, missing_elements)
+        session["_current_followup"] = follow_up["question"] if follow_up else ""
 
         turn = {
             "turn_id": turn_id,
@@ -676,6 +686,8 @@ class InterviewEngine:
             lines.append("  - %s: %s" % (k, val))
         if session.get("degraded"):
             lines.append("\n> Note: interview ran in degraded mode (question bank fallback).")
+        if session.get("router_error"):
+            lines.append("> Model-router error category: %s" % session["router_error"])
         lines.append("")
 
         # 逐轮复盘

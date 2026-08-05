@@ -11,6 +11,7 @@
   var API_BASE = String(window.DUMATE_API_BASE || '').replace(/\/+$/, '');
   var ENDPOINTS = {
     uploadResume:    '/api/wf01/upload',
+    uploadJD:        '/api/wf03/upload',
     diagnoseResume:  '/api/wf02/diagnose',
     submitJD:        '/api/wf03/jd',
     matchJD:         '/api/wf03/match',
@@ -89,7 +90,13 @@
     options = options || {};
     var traceId = options._traceId || genTraceId();
     var url = API_BASE + endpoint;
-    var headers = options.headers || {};
+    var headers = Object.assign({}, options.headers || {});
+    // Only the server-issued, short-lived token is sent.  Source material and
+    // consent wording remain out of headers and server-side storage.
+    if (endpoint !== ENDPOINTS.consent) {
+      var consentToken = getCache('consentToken');
+      if (consentToken) headers['X-Consent-Token'] = consentToken;
+    }
     headers['X-Trace-Id'] = traceId;
 
     var body = options.body;
@@ -142,7 +149,7 @@
           clearTimeout(timer);
           if (timedOut) return; // 已由 timer 处理
           console.warn('[DataBridge] 请求失败: ' + endpoint, err);
-          resolve({ error: 'network', message: err.message || '网络错误', trace_id: traceId, degraded: true });
+          resolve(unavailable(traceId, 'network'));
         });
     });
   }
@@ -202,7 +209,8 @@
       // 缓存结果
       setCache('resumeText', res.resumeText);
       setCache('resumeProfile', res.resumeProfile);
-      return { resumeText: res.resumeText, resumeProfile: res.resumeProfile, trace_id: res.trace_id || traceId };
+      setCache('sessionId', res.session_id || traceId);
+      return { resumeText: res.resumeText, resumeProfile: res.resumeProfile, trace_id: res.trace_id || traceId, session_id: res.session_id || traceId };
     }
 
     // 新上传的简历绝不能在接口失败时回退到上一份会话缓存；否则会把旧结果
@@ -223,8 +231,9 @@
   // 诊断简历 -> {resumeProfile, score_R, suggestions, trace_id}
   async function diagnoseResume(resumeText) {
     var traceId = genTraceId();
+    var sessionId = getCache('sessionId') || traceId;
     var res = await request(ENDPOINTS.diagnoseResume, {
-      body: { resumeText: resumeText },
+      body: { resumeText: resumeText, session_id: sessionId },
       _traceId: traceId
     });
 
@@ -233,11 +242,13 @@
       var normalizedResult = Object.assign({}, res, { resumeProfile: normalized });
       setCache('resumeProfile', normalized);
       setCache('diagnoseResult', normalizedResult);
+      setCache('sessionId', res.session_id || traceId);
       return {
         resumeProfile: normalized,
         score_R: res.score_R !== undefined ? res.score_R : (res.resumeProfile ? res.resumeProfile.score_R : null),
         suggestions: res.suggestions || (res.resumeProfile ? res.resumeProfile.suggestions : []),
-        trace_id: res.trace_id || traceId
+        trace_id: res.trace_id || traceId,
+        session_id: res.session_id || traceId
       };
     }
 
@@ -261,6 +272,23 @@
   //  F2: JD 匹配
   // ============================================================
 
+  // 上传 JD 文件 -> {jdText, trace_id}
+  async function uploadJD(file) {
+    var traceId = genTraceId();
+    var formData = new FormData();
+    formData.append('file', file);
+    var res = await request(ENDPOINTS.uploadJD, {
+      body: formData,
+      _traceId: traceId
+    });
+
+    // JD 与简历一样不能在当前文件上传失败时复用旧会话内容，
+    // 否则可能把上一份岗位要求错配给用户的新职位。
+    if (res.error) return res;
+    setCache('jobText', res.jdText);
+    return { jdText: res.jdText, trace_id: res.trace_id || traceId };
+  }
+
   // 提交 JD -> {jobProfile, trace_id}
   async function submitJD(jdText) {
     var traceId = genTraceId();
@@ -274,53 +302,26 @@
       return { jobProfile: res.jobProfile, trace_id: res.trace_id || traceId };
     }
 
-    // 缓存
-    var cached = getCache('jobProfile');
-    if (cached) {
-      console.warn('[DataBridge] 使用缓存数据: jobProfile');
-      return { jobProfile: cached, degraded: true, degraded_reason: 'cached', trace_id: traceId };
-    }
-
-    // 降级: 返回结构化 JD（从 JD 文本提取基础结构）
-    console.warn('[DataBridge] 降级到本地 JD 解析');
-    var jobProfile = {
-      source: jdText,
-      requirements: [],
-      degraded: true,
-      degraded_reason: 'local_parse'
-    };
-    return { jobProfile: jobProfile, degraded: true, degraded_reason: 'local_parse', trace_id: traceId };
+    // 岗位要求是本次输入的直接依据；失败时必须明确失败，不能使用旧 JD
+    // 或伪造空的本地解析结果继续匹配。
+    return res;
   }
 
   // 匹配 JD -> {matchResult, trace_id}
-  async function matchJD(resumeProfile, jobProfile) {
+  async function matchJD(resumeText, jobProfile) {
     var traceId = genTraceId();
     var res = await request(ENDPOINTS.matchJD, {
-      body: { resumeProfile: resumeProfile, jobProfile: jobProfile },
+      body: { resumeText: resumeText, jobProfile: jobProfile },
       _traceId: traceId
     });
 
     if (!res.error) {
-      setCache('matchResult', res.matchResult);
-      return { matchResult: res.matchResult, trace_id: res.trace_id || traceId };
+      setCache('matchResult', res);
+      return { matchResult: res, trace_id: res.trace_id || traceId };
     }
 
-    // 缓存
-    var cached = getCache('matchResult');
-    if (cached) {
-      console.warn('[DataBridge] 使用缓存数据: matchResult');
-      return { matchResult: cached, degraded: true, degraded_reason: 'cached', trace_id: traceId };
-    }
-
-    var demo = demoData('matchResult', traceId, res.error);
-    if (demo.error) return demo;
-    return {
-      matchResult: demo.data,
-      degraded: true,
-      degraded_reason: 'demo_mock',
-      demo_data: true,
-      trace_id: traceId
-    };
+    // 当前简历和 JD 的组合发生变化时，不允许复用旧匹配结果。
+    return res;
   }
 
   // ============================================================
@@ -497,19 +498,26 @@
   //  WF-06: 隐私
   // ============================================================
 
-  // 提交同意书 -> {consent_id, status}
+  // 提交同意书 -> {status, consent_token}
   async function submitConsent(consentText) {
     var traceId = genTraceId();
     var res = await request(ENDPOINTS.consent, {
-      body: { consent_text: consentText },
+      body: { accepted: true, consent_version: '1' },
       _traceId: traceId
     });
 
-    if (!res.error) {
-      return { consent_id: res.consent_id, status: res.status || 'ACCEPTED', trace_id: res.trace_id || traceId };
+    if (!res.error && res.consent_token) {
+      setCache('consentToken', res.consent_token);
+      sessionStorage.removeItem('cb_session_deleted');
+      return {
+        status: res.status || 'ACCEPTED',
+        consent_token: res.consent_token,
+        expires_in_seconds: res.expires_in_seconds,
+        trace_id: res.trace_id || traceId
+      };
     }
 
-    if (!isDemoMode()) return unavailable(traceId, res.error);
+    if (!isDemoMode()) return res.error ? res : unavailable(traceId, 'invalid_consent_response');
     console.warn('[DataBridge] 演示模式：使用合成 consent 结果');
     return {
       consent_id: 'demo_consent_' + traceId,
@@ -521,7 +529,7 @@
     };
   }
 
-  // 删除全部数据 -> {status: 'DELETED', deleted_at}
+  // 删除全部数据 -> {status: 'DELETED' | 'LOCAL_DELETED', deleted_at}
   async function deleteAllData(sessionId) {
     var traceId = genTraceId();
 
@@ -544,14 +552,15 @@
       return { status: 'DELETED', deleted_at: res.deleted_at || new Date().toISOString(), trace_id: res.trace_id || traceId };
     }
 
-    // 降级: 本地标记删除
-    console.warn('[DataBridge] 降级: 本地标记删除');
+    // 没有可删除的服务端存储时，不能把浏览器缓存清除表述为服务端删除。
+    console.warn('[DataBridge] 仅完成本地会话删除');
     markDeleted();
     return {
-      status: 'DELETED',
+      status: 'LOCAL_DELETED',
       deleted_at: new Date().toISOString(),
       degraded: true,
-      degraded_reason: 'local_delete',
+      degraded_reason: 'server_delete_unavailable',
+      message: '已清除当前浏览器会话；服务端删除功能尚未配置。',
       trace_id: traceId
     };
   }
@@ -564,6 +573,7 @@
   // ── 暴露接口 ──────────────────────────────────────────
   window.DataBridge = {
     uploadResume: uploadResume,
+    uploadJD: uploadJD,
     diagnoseResume: diagnoseResume,
     submitJD: submitJD,
     matchJD: matchJD,
