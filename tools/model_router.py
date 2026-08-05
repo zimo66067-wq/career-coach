@@ -39,6 +39,28 @@ TASK_PROMPTS = {
     "seven_day_plan": "prompts/plan/seven-day.md",
 }
 
+
+def extract_system_prompt(content):
+    """Extract only the ``## 系统提示`` section of a prompt file.
+
+    Prompt files contain a title, a usage note, the system prompt, and
+    template sections such as ``## 用户输入`` / ``## 失败处理``.  Feeding
+    the whole file as the system message confuses models: the usage note and
+    template placeholders get treated as instructions, which produces
+    conversational or skeleton output instead of the contract JSON.
+    """
+    if not content:
+        return ""
+    marker = "## 系统提示"
+    start = content.find(marker)
+    if start < 0:
+        return content.strip()
+    start += len(marker)
+    next_heading = content.find("\n## ", start)
+    section = content[start:next_heading] if next_heading >= 0 else content[start:]
+    return section.strip()
+
+
 # ------------------------------------------------------------------ #
 # 冻结参数（temperature / max_tokens / timeout）
 # ------------------------------------------------------------------ #
@@ -227,7 +249,7 @@ class ModelRouter:
         full = os.path.join(base, rel_path)
         try:
             with open(full, encoding="utf-8") as f:
-                return f.read()
+                return extract_system_prompt(f.read())
         except (OSError, IOError):
             logger.warning("[router] prompt file not found: %s", full)
             return ""
