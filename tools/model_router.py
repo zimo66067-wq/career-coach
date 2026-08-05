@@ -43,7 +43,7 @@ TASK_PROMPTS = {
 # 冻结参数（temperature / max_tokens / timeout）
 # ------------------------------------------------------------------ #
 MODEL_PARAMS = {
-    "resume_diagnosis":     {"temperature": 0.1, "max_tokens": 2048, "timeout": 25},
+    "resume_diagnosis":     {"temperature": 0.1, "max_tokens": 2048, "timeout": 50},
     "resume_report":        {"temperature": 0.3, "max_tokens": 4096, "timeout": 30},
     "jd_extract":           {"temperature": 0.1, "max_tokens": 2048, "timeout": 20},
     "jd_match_explain":     {"temperature": 0.3, "max_tokens": 2048, "timeout": 20},
