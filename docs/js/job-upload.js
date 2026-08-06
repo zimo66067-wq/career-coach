@@ -231,7 +231,6 @@
 
   function renderMatchResult(result) {
     if (!result || typeof document === 'undefined') return;
-    var score = Math.max(0, Math.min(100, Number(result.score_M) || 0));
     var scoreRing = document.getElementById('matchScoreRing');
     var scoreNode = document.getElementById('matchScore');
     var subbars = document.getElementById('matchSubbars');
@@ -242,12 +241,18 @@
     var requirements = Array.isArray(result.requirements) ? result.requirements : [];
     var subscores = result.subscores || {};
     var statusCounts = { covered: 0, weak: 0, missing: 0, unknown: 0 };
+    var hasScore = typeof result.score_M === 'number' && isFinite(result.score_M);
+    var score = hasScore ? Math.max(0, Math.min(100, Math.round(result.score_M))) : null;
+    var insufficient = result.insufficient_evidence === true || !hasScore;
 
     if (scoreRing) {
-      scoreRing.style.setProperty('--pct', score + '%');
-      scoreRing.setAttribute('aria-label', '岗位匹配分 ' + score);
+      scoreRing.hidden = insufficient;
+      if (hasScore) {
+        scoreRing.style.setProperty('--pct', score + '%');
+        scoreRing.setAttribute('aria-label', '岗位匹配分 ' + score);
+      }
     }
-    if (scoreNode) scoreNode.textContent = String(Math.round(score));
+    if (scoreNode) scoreNode.textContent = hasScore ? String(score) : '—';
 
     if (subbars) {
       subbars.replaceChildren();
@@ -273,6 +278,30 @@
       var noticeBody = notice.querySelector ? notice.querySelector('p') : null;
       if (noticeBody) noticeBody.textContent = noticeText;
       else notice.textContent = noticeText;
+    }
+
+    var lowCard = document.getElementById('lowScoreCard');
+    var lowSummary = document.getElementById('lowScoreSummary');
+    var lowDims = document.getElementById('lowScoreDims');
+    var lowAdvice = document.getElementById('lowScoreAdvice');
+    var analysis = result.low_score_analysis;
+    if (lowCard) {
+      if (analysis && lowSummary && lowDims && lowAdvice) {
+        lowSummary.textContent = analysis.summary || '';
+        lowDims.replaceChildren();
+        (analysis.dimensions || []).forEach(function (dim) {
+          var item = makeElement('article', 'low-dim');
+          item.append(makeElement('span', 'badge ' + String(dim.level || 'P2').toLowerCase(), dim.level || 'P2'));
+          item.append(makeElement('strong', '', dim.angle || ''));
+          item.append(makeElement('p', '', dim.finding || ''));
+          if (dim.advice) item.append(makeElement('p', 'low-advice', '建议：' + dim.advice));
+          lowDims.append(item);
+        });
+        lowAdvice.textContent = analysis.suggestion || '';
+        lowCard.hidden = false;
+      } else {
+        lowCard.hidden = true;
+      }
     }
 
     requirements.forEach(function (item) {

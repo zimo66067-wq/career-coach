@@ -539,3 +539,20 @@ table.dim th { background: var(--zy-bg-cool); font-weight: 650; }
   }
   .flow-line::after, .ai-orb::after, .wave i { animation: none !important; }
 }
+
+/* ---- 低分/材料不足分析面板（F2 匹配结果） ---- */
+.low-dim {
+  border: 1px solid var(--zy-line);
+  border-radius: var(--zy-r-md);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: var(--zy-surface-2);
+}
+.low-dim strong { display: inline-block; margin-left: 8px; font-size: 14px; }
+.low-dim p { font-size: 13px; color: var(--zy-ink-2); margin-top: 8px; line-height: 1.65; }
+.low-dim .low-advice { color: var(--zy-info); }
+#lowScoreSummary { font-size: 13.5px; color: var(--zy-ink-2); line-height: 1.7; margin-bottom: 14px; }
+#lowScoreAdvice {
+  margin-top: 14px; padding: 12px 14px; border-radius: var(--zy-r-md);
+  background: var(--zy-primary-soft); color: var(--zy-ink); font-size: 13.5px; line-height: 1.7;
+}
