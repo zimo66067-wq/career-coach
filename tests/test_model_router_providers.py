@@ -14,6 +14,7 @@ from model_router import (
     ModelRouter,
     QianfanModelRouter,
     ZhipuModelRouter,
+    extract_system_prompt,
     parse_model_output,
 )
 
@@ -153,6 +154,24 @@ def test_prompt_file_loaded_with_fact_lock():
     prompt = router._load_prompt("resume_diagnosis")
     assert "事实锁" in prompt
     assert router._load_prompt("") == ""
+
+
+def test_prompt_only_contains_system_section():
+    """回归：系统提示不得包含文件标题、用法说明或模板占位符，
+    否则模型会把元说明当指令，输出闲聊文本而非合同 JSON。"""
+    router = ModelRouter()
+    prompt = router._load_prompt("resume_diagnosis")
+    assert prompt.startswith("你是简历诊断抽取器")
+    assert "# prompts/" not in prompt
+    assert "## 系统提示" not in prompt
+    assert "## 用户输入" not in prompt
+    assert "{deidentified_resume_text}" not in prompt
+
+
+def test_extract_system_prompt_edge_cases():
+    assert extract_system_prompt("") == ""
+    assert extract_system_prompt("没有标记的纯文本") == "没有标记的纯文本"
+    assert extract_system_prompt("## 系统提示\n\n系统正文\n\n## 用户输入\n{x}") == "系统正文"
 
 
 def test_fallback_model_success_is_degraded():

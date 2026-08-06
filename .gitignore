@@ -41,3 +41,6 @@ Thumbs.db
 .DS_Store
 ~$*
 deliverables/career-coach-push.bundle
+
+.vercel
+.env*
