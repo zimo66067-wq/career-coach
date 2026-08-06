@@ -23,7 +23,7 @@ async function run() {
   vm.runInContext(apiConfigSource, configuredApi, { filename: apiConfigPath });
   assert.strictEqual(
     configuredApi.window.DUMATE_API_BASE,
-    'https://career-coach-o7eu.vercel.app',
+    'https://career-coach-omega-three.vercel.app',
     'GitHub Pages must target the Vercel production API by default'
   );
 

@@ -64,7 +64,8 @@
 | BM25 | 有匹配证据句 | 空句子返回 (0.0,-1) | — |
 | JD 加载 | JSON/文本/兜底三来源 | — | 格式缺失走句子兜底 |
 | Embedding | 批量路径 | 逐条降级路径 | 后端抛错按 0 处理 |
-| 全 unknown | — | — | API 返回 0 分（scoring.md 契约要求 insufficient_evidence，见第 8 节） |
+| 全 unknown | — | — | 返回 insufficient_evidence（score_M=null），绝不输出 0 分 |
+| 低分/过短 | 高分匹配不触发分析 | 分数 <50 或简历 <200 字时返回 4 角度分析 | — |
 
 ### 4.3 面试引擎（test_interview_full_flow.py）
 
@@ -125,7 +126,8 @@
 
 ## 8. 已知问题与待决策
 
-1. **契约偏差（待修）**：`match_job_profile` 在全部要求为 unknown 时返回 `score_M=0`，而 `contracts/scoring.md` 规定应为 `insufficient_evidence` 且不计算 C0。测试已固化当前行为（`test_api_match_all_unknown_returns_zero`），是否对齐契约需产品确认。
+1. **契约偏差（已修复）**：`match_job_profile` 在全部要求为 unknown 时返回 `score_M=0` 的问题已修复——现在返回 `insufficient_evidence=true` 且 `score_M=null`，与 `contracts/scoring.md` 对齐；对应测试为 `test_api_match_all_unknown_returns_insufficient`。
+2. **低分/材料不足引导（已实现）**：当匹配分低于 50 或简历过短（<200 字）时，接口返回 `low_score_analysis`（summary + 至少 3 个角度的中长文本 + 委婉建议），前端在结果栏以分析卡片展示，避免用户只看到一个刺眼的低分数字。
 2. **存储边界**：SQLite 默认在 `/tmp`，Vercel 冷启动后数据丢失；已提供 `admin/resumes`、`admin/export` 供人工导出，测试覆盖其鉴权与列表行为。
 3. **会话安全**：`session_id` 由前端持有且无服务端身份绑定，属当前 MVP 边界。
 4. **外部联调**：智谱/千帆 embedding、语音 ASR/TTS 等真实密钥联调脚本（`test_embedding_*.py`、`test_zhipu_*.py`、`test_voice_browser.py` 的手工模式）需要密钥，不作为无密钥 CI 的必跑项。

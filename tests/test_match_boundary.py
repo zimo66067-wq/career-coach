@@ -158,10 +158,8 @@ def test_calc_m_all_unknown_is_insufficient_evidence():
     assert cat["hard"] is None
 
 
-def test_api_match_all_unknown_returns_zero():
-    """已知偏差：api.match_job_profile 在全部 unknown 时返回 0 分，
-    而非 scoring.md 规定的 insufficient_evidence。此测试固化当前行为，
-    用于防止回归；契约对齐需在后续修改中处理（记录于 TEST_PLAN.md）。"""
+def test_api_match_all_unknown_returns_insufficient():
+    """契约：全部要求 unknown 时返回 insufficient_evidence，绝不输出 0 分。"""
     job_profile = {
         "user_confirmed": True,
         "requirements": [{
@@ -173,4 +171,56 @@ def test_api_match_all_unknown_returns_zero():
     }
     result = api_module.match_job_profile("技能：无任何相关关键词。", job_profile)
     assert result["requirements"][0]["status"] == "unknown"
-    assert result["score_M"] == 0
+    assert result["insufficient_evidence"] is True
+    assert result["score_M"] is None
+    assert result["low_score_analysis"] is None
+    assert "不足" in result["match_notice"]
+
+
+def job_profile_for_analysis():
+    return {
+        "user_confirmed": True,
+        "requirements": [
+            {"id": "J1", "type": "hard", "text": "熟悉 Python 与 SQL"},
+            {"id": "J2", "type": "hard", "text": "本科及以上学历"},
+            {"id": "J3", "type": "hard", "text": "熟悉 Java 或 Go"},
+            {"id": "R1", "type": "responsibility", "text": "负责接口开发"},
+            {"id": "T1", "type": "terminology", "text": "Python、Flask、Redis"},
+        ],
+    }
+
+
+def test_resume_too_short_flags_and_analysis():
+    result = api_module.match_job_profile("项目：负责接口开发。技能：Python。", job_profile_for_analysis())
+    assert result["resume_too_short"] is True
+    assert result["score_M"] is not None
+    analysis = result["low_score_analysis"]
+    assert analysis is not None
+    assert len(analysis["dimensions"]) >= 3
+    assert analysis["suggestion"]
+    assert "较短" in result["match_notice"] or "不足" in result["match_notice"]
+
+
+def test_low_score_analysis_present_below_50():
+    weak_resume = "教育经历：某某大学市场营销专业。实习：负责社群运营与活动策划。技能：Excel、Python。"
+    result = api_module.match_job_profile(weak_resume, job_profile_for_analysis())
+    assert result["score_M"] is not None and result["score_M"] < 50
+    analysis = result["low_score_analysis"]
+    assert analysis is not None
+    assert len(analysis["dimensions"]) >= 3
+    assert ("50" in analysis["summary"]) or ("低" in analysis["summary"])
+
+
+def test_low_score_analysis_absent_when_strong_match():
+    strong_resume = (
+        "教育经历：某某大学计算机本科。项目经历：负责订单服务接口开发，"
+        "使用 Python、Flask、SQL 与 Redis，将响应从 800ms 优化到 220ms，性能提升显著。"
+        "技能：Python、Flask、SQL、Redis、分布式系统。"
+        "课外习惯阅读官方文档与源码，参与开源社区讨论并维护技术博客；"
+        "课程设计涉及数据库设计与接口联调，能够独立完成模块开发与问题定位。"
+        "曾参与一次线上性能专项，负责压测数据整理与结果分析，并输出改进报告。"
+    )
+    result = api_module.match_job_profile(strong_resume, job_profile_for_analysis())
+    assert result["resume_too_short"] is False
+    assert result["score_M"] is not None and result["score_M"] >= 50
+    assert result["low_score_analysis"] is None
