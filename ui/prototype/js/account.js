@@ -286,4 +286,13 @@
   } else {
     init();
   }
+
+  window.ZY_ACCOUNT = {
+    addHistory: function (item) {
+      var h = history();
+      h.unshift(item);
+      save(KEY_HISTORY, h.slice(0, 50));
+      renderHistory();
+    }
+  };
 })();
