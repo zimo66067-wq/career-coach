@@ -61,6 +61,30 @@
     {
       "source": "/api/admin/export",
       "destination": "/api?_route=admin/export"
+    },
+    {
+      "source": "/api/f2/health",
+      "destination": "/api/f2_major?_route=health"
+    },
+    {
+      "source": "/api/f2/majors/tree",
+      "destination": "/api/f2_major?_route=majors/tree"
+    },
+    {
+      "source": "/api/f2/majors/search",
+      "destination": "/api/f2_major?_route=majors/search"
+    },
+    {
+      "source": "/api/f2/majors/(.*)",
+      "destination": "/api/f2_major?_route=majors/$1"
+    },
+    {
+      "source": "/api/f2/match",
+      "destination": "/api/f2_major?_route=match"
+    },
+    {
+      "source": "/api/f2/intent",
+      "destination": "/api/f2_major?_route=intent"
     }
   ]
 }

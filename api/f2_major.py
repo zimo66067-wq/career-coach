@@ -275,7 +275,7 @@ def mode_b_result(profile, resume_text, jd_text):
     }
 
 
-def route_api():
+def route_api(**kwargs):
     route = request.args.get("_route") or request.path
     if route.startswith("/api/f2/"):
         route = route[len("/api/f2/") :]
@@ -327,23 +327,36 @@ def route_api():
         profile = PROFILE_INDEX.get(major_code)
         resume_tokens = tokenize(resume_text)
         if jd_text:
-            result = mode_b_result(profile or {}, resume_text, jd_text)
-            result["mode"] = "B"
-            result["mode_notice"] = "模式B：JD 精准匹配（四态 + 专业契合度）。"
+            mode_result = mode_b_result(profile or {}, resume_text, jd_text)
+            mode_name = "B"
+            mode_notice = "模式B：JD 精准匹配（四态 + 专业契合度）。"
         else:
             if profile is None:
                 return api_err("该专业画像建设中，请补充 JD 后使用模式B，或稍后再试。", 422, "profile_building")
-            result = mode_a_result(profile, resume_text, resume_tokens)
-            result["mode"] = "A"
-            result["mode_notice"] = "模式A：专业画像匹配（无 JD，按对口/衍生岗位画像推荐方向）。"
-        result["major"] = {"code": major_code, "name": MAJOR_INDEX[major_code]["name"], "path": f"{MAJOR_INDEX[major_code]['category_name']} / {MAJOR_INDEX[major_code]['class_name']}"}
-        result["profile_status"] = "ready" if profile else "building"
-        result["scores"] = {
-            "major_fit": result.get("major_fit"),
-            "coverage": result.get("coverage"),
-            "overall": result.get("overall"),
-        }
-        return api_ok(result)
+            mode_result = mode_a_result(profile, resume_text, resume_tokens)
+            mode_name = "A"
+            mode_notice = "模式A：专业画像匹配（无 JD，按对口/衍生岗位画像推荐方向）。"
+        major_info = MAJOR_INDEX[major_code]
+        return api_ok(
+            {
+                "mode": mode_name,
+                "mode_notice": mode_notice,
+                "modeA": mode_result if mode_name == "A" else None,
+                "modeB": mode_result if mode_name == "B" else None,
+                "major": {
+                    "code": major_code,
+                    "name": major_info["name"],
+                    "path": f"{major_info['category_name']} / {major_info['class_name']}",
+                },
+                "profile_status": "ready" if profile else "building",
+                "scores": {
+                    "major_fit": mode_result.get("major_fit"),
+                    "coverage": mode_result.get("coverage"),
+                    "overall": mode_result.get("overall"),
+                    "major_fit_notice": mode_result.get("major_fit_notice", ""),
+                },
+            }
+        )
     if route == "intent" and request.method == "GET":
         q = (request.args.get("q") or "").strip().lower()
         if not q:
