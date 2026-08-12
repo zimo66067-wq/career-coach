@@ -1,20 +1,45 @@
-"""Resume database layer.
+"""Database layer for the career-coach service.
 
-Lightweight SQLite persistence for anonymized resume submissions and diagnosis
-results.  Designed for serverless environments (Vercel) where the DB lives on
-/tmp and is ephemeral across cold starts.
+Supports two dialects:
+- SQLite (local development / tests), path from RESUME_DB_PATH.
+- PostgreSQL (production, e.g. Neon on Vercel), connection string from
+  DATABASE_URL.  Session data is therefore persistent across cold starts.
 """
 import json
 import os
 import sqlite3
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 def db_path():
-    """Resolve the DB path from the environment on each call (test-friendly)."""
+    """Resolve the SQLite DB path from the environment on each call."""
     return Path(os.environ.get("RESUME_DB_PATH", "/tmp/resumes.db"))
+
+
+def dialect():
+    """Return 'postgres' when DATABASE_URL is configured, else 'sqlite'."""
+    return "postgres" if os.environ.get("DATABASE_URL", "").strip() else "sqlite"
+
+
+def _render(sql):
+    """Translate SQLite placeholders to psycopg placeholders."""
+    if dialect() == "postgres":
+        return sql.replace("?", "%s")
+    return sql
+
+
+class _PsycopgConnection:
+    """Minimal psycopg wrapper exposing the sqlite3-style API used here."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, sql, params=None):
+        return self._conn.execute(_render(sql), params)
+
+    def close(self):
+        self._conn.close()
 
 _INIT_SQL = """
 CREATE TABLE IF NOT EXISTS resumes (
@@ -74,6 +99,130 @@ CREATE TABLE IF NOT EXISTS diagnoses (
     created_at      TEXT NOT NULL,
     FOREIGN KEY (resume_id) REFERENCES resumes(id)
 );
+
+CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone         TEXT UNIQUE NOT NULL,
+    email         TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    display_name  TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'user',
+    created_at    TEXT NOT NULL,
+    last_login_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id         TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS history_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    session_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    title      TEXT NOT NULL,
+    status     TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_history_user ON history_events(user_id, created_at DESC);
+"""
+
+_INIT_SQL_PG = """
+CREATE TABLE IF NOT EXISTS resumes (
+    id          BIGSERIAL PRIMARY KEY,
+    session_id  TEXT NOT NULL UNIQUE,
+    client_ip   TEXT,
+    user_agent  TEXT,
+    filename    TEXT,
+    file_type   TEXT,
+    file_size   INTEGER,
+    resume_text TEXT,
+    created_at  TEXT NOT NULL,
+    has_diagnosis INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_resumes_session ON resumes(session_id);
+CREATE INDEX IF NOT EXISTS idx_resumes_created ON resumes(created_at);
+
+CREATE TABLE IF NOT EXISTS matches (
+    id          BIGSERIAL PRIMARY KEY,
+    session_id  TEXT NOT NULL UNIQUE,
+    match_json  TEXT NOT NULL,
+    score_m     REAL,
+    created_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_matches_session ON matches(session_id);
+
+CREATE TABLE IF NOT EXISTS interview_sessions (
+    id          BIGSERIAL PRIMARY KEY,
+    session_id  TEXT NOT NULL UNIQUE,
+    state       TEXT NOT NULL,
+    payload     TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_session ON interview_sessions(session_id);
+
+CREATE TABLE IF NOT EXISTS abilities (
+    id          BIGSERIAL PRIMARY KEY,
+    session_id  TEXT NOT NULL UNIQUE,
+    ability_json TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_abilities_session ON abilities(session_id);
+
+CREATE TABLE IF NOT EXISTS diagnoses (
+    id              BIGSERIAL PRIMARY KEY,
+    resume_id       BIGINT NOT NULL,
+    score_r         REAL,
+    diagnosis_mode  TEXT,
+    diagnosis_notice TEXT,
+    model_trace_id  TEXT,
+    diagnosis_json  TEXT,
+    created_at      TEXT NOT NULL,
+    FOREIGN KEY (resume_id) REFERENCES resumes(id)
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id            BIGSERIAL PRIMARY KEY,
+    phone         TEXT UNIQUE NOT NULL,
+    email         TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    display_name  TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'user',
+    created_at    TEXT NOT NULL,
+    last_login_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id         TEXT PRIMARY KEY,
+    user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS history_events (
+    id         BIGSERIAL PRIMARY KEY,
+    user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    session_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    title      TEXT NOT NULL,
+    status     TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_history_user ON history_events(user_id, created_at DESC);
 """
 
 
@@ -82,7 +231,16 @@ def _utc_iso():
 
 
 def _get_conn():
-    """Return a connection; parent dirs are guaranteed to exist in /tmp."""
+    """Return a connection in the configured dialect."""
+    if dialect() == "postgres":
+        import psycopg
+        from psycopg.rows import dict_row
+
+        raw = psycopg.connect(
+            os.environ["DATABASE_URL"], autocommit=True, row_factory=dict_row
+        )
+        return _PsycopgConnection(raw)
+
     path = db_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,7 +257,12 @@ def init_db():
     """Create tables and indexes if they do not exist."""
     conn = _get_conn()
     try:
-        conn.executescript(_INIT_SQL)
+        if dialect() == "postgres":
+            for statement in _INIT_SQL_PG.split(";"):
+                if statement.strip():
+                    conn.execute(statement.strip())
+        else:
+            conn.executescript(_INIT_SQL)
     finally:
         conn.close()
 
@@ -413,5 +576,194 @@ def delete_session_data(session_id):
         )
         conn.execute("DELETE FROM abilities WHERE session_id = ?", (session_id,))
         return True
+    finally:
+        conn.close()
+
+
+# ------------------------------------------------------------------ #
+# Account & history persistence (users / sessions / history_events)
+# ------------------------------------------------------------------ #
+
+def create_user(phone, email, password_hash, display_name, role="user"):
+    """Insert a new user.  Raises on duplicate phone/email."""
+    init_db()
+    conn = _get_conn()
+    try:
+        cur = conn.execute(
+            """
+            INSERT INTO users (phone, email, password_hash, display_name,
+                               role, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (phone, email, password_hash, display_name, role, _utc_iso()),
+        )
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def get_user_by_identifier(identifier):
+    """Return a user by phone or email, or None."""
+    init_db()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM users WHERE phone = ? OR email = ? LIMIT 1",
+            (identifier, identifier),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def get_user_by_id(user_id):
+    init_db()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def touch_last_login(user_id):
+    init_db()
+    conn = _get_conn()
+    try:
+        conn.execute(
+            "UPDATE users SET last_login_at = ? WHERE id = ?",
+            (_utc_iso(), user_id),
+        )
+    finally:
+        conn.close()
+
+
+def create_session_row(token_hash, user_id, expires_at):
+    init_db()
+    conn = _get_conn()
+    try:
+        conn.execute(
+            """
+            INSERT INTO sessions (id, user_id, created_at, expires_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (token_hash, user_id, _utc_iso(), expires_at),
+        )
+    finally:
+        conn.close()
+
+
+def get_session_user_id(token_hash):
+    """Return user_id for a live session token, or None."""
+    init_db()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT user_id FROM sessions WHERE id = ? AND expires_at > ?",
+            (token_hash, _utc_iso()),
+        ).fetchone()
+        return row["user_id"] if row else None
+    finally:
+        conn.close()
+
+
+def delete_session_row(token_hash):
+    init_db()
+    conn = _get_conn()
+    try:
+        conn.execute("DELETE FROM sessions WHERE id = ?", (token_hash,))
+    finally:
+        conn.close()
+
+
+def add_history_event(user_id, session_id, event_type, title, status):
+    init_db()
+    conn = _get_conn()
+    try:
+        cur = conn.execute(
+            """
+            INSERT INTO history_events (user_id, session_id, event_type,
+                                        title, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (user_id, session_id, event_type, title, status, _utc_iso()),
+        )
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def get_history_event(event_id, user_id):
+    init_db()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM history_events WHERE id = ? AND user_id = ?",
+            (event_id, user_id),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def list_history_events(user_id, limit=50, offset=0, event_type=None):
+    init_db()
+    conn = _get_conn()
+    try:
+        if event_type:
+            rows = conn.execute(
+                """
+                SELECT * FROM history_events
+                WHERE user_id = ? AND event_type = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ? OFFSET ?
+                """,
+                (user_id, event_type, limit, offset),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT * FROM history_events
+                WHERE user_id = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ? OFFSET ?
+                """,
+                (user_id, limit, offset),
+            ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def count_history_events(user_id, event_type=None):
+    init_db()
+    conn = _get_conn()
+    try:
+        if event_type:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM history_events WHERE user_id = ? AND event_type = ?",
+                (user_id, event_type),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM history_events WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        return row["c"] if row else 0
+    finally:
+        conn.close()
+
+
+def delete_history_event(event_id, user_id):
+    init_db()
+    conn = _get_conn()
+    try:
+        cur = conn.execute(
+            "DELETE FROM history_events WHERE id = ? AND user_id = ?",
+            (event_id, user_id),
+        )
+        return getattr(cur, "rowcount", 1) or 0
     finally:
         conn.close()

@@ -84,6 +84,20 @@
     return 't' + Date.now() + Math.random().toString(36).substr(2, 6);
   }
 
+  // 历史记录钩子：登录用户检测完成后自动落库；失败不影响主流程。
+  function recordHistory(eventType, title, sessionId, status) {
+    try {
+      if (window.ZY_ACCOUNT && typeof window.ZY_ACCOUNT.addHistory === 'function') {
+        window.ZY_ACCOUNT.addHistory({
+          event_type: eventType,
+          title: title,
+          session_id: sessionId || genTraceId(),
+          status: status || 'done'
+        });
+      }
+    } catch (e) { /* ignore */ }
+  }
+
   // ── 通用请求方法（fetch + timeout + trace_id） ─────────
   function request(endpoint, options) {
     options = options || {};
@@ -242,6 +256,12 @@
       setCache('resumeProfile', normalized);
       setCache('diagnoseResult', normalizedResult);
       setCache('sessionId', res.session_id || traceId);
+      recordHistory(
+        'F1',
+        '简历诊断 · R' + (res.score_R !== undefined ? res.score_R : ''),
+        res.session_id || traceId,
+        'done'
+      );
       return {
         resumeProfile: normalized,
         score_R: res.score_R !== undefined ? res.score_R : (res.resumeProfile ? res.resumeProfile.score_R : null),
@@ -256,6 +276,7 @@
     var demo = demoData('resumeProfile', traceId, res.error);
     if (demo.error) return demo;
     var profile = normalizeResumeProfile(demo.data);
+    recordHistory('F1', '简历诊断（演示模式）', traceId, 'partial');
     return {
       resumeProfile: profile,
       score_R: profile.score_R,
@@ -312,6 +333,12 @@
 
     if (!res.error) {
       setCache('matchResult', res.matchResult);
+      recordHistory(
+        'F2',
+        '岗位匹配 · M' + (res.matchResult && res.matchResult.score_M !== undefined ? res.matchResult.score_M : ''),
+        res.session_id || getCache('sessionId') || traceId,
+        'done'
+      );
       return { matchResult: res.matchResult, trace_id: res.trace_id || traceId };
     }
 
@@ -319,11 +346,13 @@
     var cached = getCache('matchResult');
     if (cached) {
       console.warn('[DataBridge] 使用缓存数据: matchResult');
+      recordHistory('F2', '岗位匹配（缓存）', getCache('sessionId') || traceId, 'partial');
       return { matchResult: cached, degraded: true, degraded_reason: 'cached', trace_id: traceId };
     }
 
     var demo = demoData('matchResult', traceId, res.error);
     if (demo.error) return demo;
+    recordHistory('F2', '岗位匹配（演示模式）', traceId, 'partial');
     return {
       matchResult: demo.data,
       degraded: true,
@@ -432,6 +461,7 @@
 
     if (!res.error) {
       setCache('interviewReport', res);
+      recordHistory('F3', '模拟面试 · 已完成', sessionId || traceId, 'done');
       return {
         report: res.report,
         score_I: res.score_I,
@@ -444,6 +474,7 @@
     var cached = getCache('interviewReport');
     if (cached) {
       console.warn('[DataBridge] 使用缓存数据: interviewReport');
+      recordHistory('F3', '模拟面试（缓存）', sessionId || traceId, 'partial');
       return {
         report: cached.report,
         score_I: cached.score_I,
@@ -457,6 +488,7 @@
     var demoInterviews = demoData('interviews', traceId, res.error);
     var demoScore = demoData('score_I', traceId, res.error);
     if (demoInterviews.error || demoScore.error) return demoInterviews.error ? demoInterviews : demoScore;
+    recordHistory('F3', '模拟面试（演示模式）', sessionId || traceId, 'partial');
     return {
       report: demoInterviews.data,
       score_I: demoScore.data,
@@ -482,6 +514,12 @@
 
     if (!res.error) {
       setCache('ability', res.ability);
+      recordHistory(
+        'F4',
+        '能力报告 · C0=' + (res.ability && res.ability.baseline !== undefined ? res.ability.baseline : ''),
+        sessionId || traceId,
+        'done'
+      );
       return { ability: res.ability, trace_id: res.trace_id || traceId };
     }
 
@@ -489,11 +527,13 @@
     var cached = getCache('ability');
     if (cached) {
       console.warn('[DataBridge] 使用缓存数据: ability');
+      recordHistory('F4', '能力报告（缓存）', sessionId || traceId, 'partial');
       return { ability: cached, degraded: true, degraded_reason: 'cached', trace_id: traceId };
     }
 
     var demo = demoData('ability', traceId, res.error);
     if (demo.error) return demo;
+    recordHistory('F4', '能力报告（演示模式）', sessionId || traceId, 'partial');
     return {
       ability: demo.data,
       degraded: true,

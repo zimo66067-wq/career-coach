@@ -40,6 +40,19 @@ from tools.database import (  # noqa: E402
     save_session,
     update_session,
 )
+from tools.account import (  # noqa: E402
+    AccountError,
+    add_history,
+    authenticate,
+    check_rate,
+    create_session,
+    delete_history,
+    end_session,
+    list_history,
+    public_user,
+    register_user,
+    session_user,
+)
 from tools.deidentify import deidentify  # noqa: E402
 from tools.extract_text import extract_docx, extract_pdf, extract_txt  # noqa: E402
 from tools.interview_engine import InterviewEngine  # noqa: E402
@@ -125,15 +138,63 @@ def apply_cors(response):
     origin = request.headers.get("Origin", "")
     if origin_allowed(origin):
         response.headers["Access-Control-Allow-Origin"] = origin.rstrip("/")
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, X-Trace-Id, X-Consent-Token"
+            "Content-Type, X-Trace-Id, X-Consent-Token, Authorization"
         )
+        response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Max-Age"] = "600"
         existing_vary = response.headers.get("Vary", "")
         response.headers["Vary"] = ", ".join(filter(None, [existing_vary, "Origin"]))
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+# ------------------------------------------------------------------ #
+# Account session helpers
+# ------------------------------------------------------------------ #
+
+def current_session():
+    """Return (user, token) from the Authorization header or session cookie."""
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[7:].strip()
+    else:
+        token = ""
+    if not token:
+        token = request.cookies.get("zy_session", "")
+    return session_user(token), token
+
+
+def require_login():
+    user, _token = current_session()
+    if not user:
+        raise ApiError("auth_required", "请先登录。", 401)
+    return user
+
+
+def _session_ttl_days():
+    try:
+        return min(max(int(os.environ.get("SESSION_TTL_DAYS", 30)), 1), 90)
+    except (TypeError, ValueError):
+        return 30
+
+
+def _set_session_cookie(response, token):
+    secure = os.environ.get("APP_ENV", "production").lower() == "production"
+    response.set_cookie(
+        "zy_session",
+        token,
+        max_age=_session_ttl_days() * 86400,
+        httponly=True,
+        secure=secure,
+        samesite="None" if secure else "Lax",
+        path="/",
+    )
+
+
+def _clear_session_cookie(response):
+    response.delete_cookie("zy_session", path="/")
 
 
 @app.errorhandler(ApiError)
@@ -1127,7 +1188,7 @@ def build_ability_profile(session_id):
 # Routing
 # ------------------------------------------------------------------ #
 
-def route_api():
+def route_api(**_ignored):
     route = request_route()
     if request.method == "OPTIONS":
         if route in {
@@ -1136,9 +1197,125 @@ def route_api():
             "wf04/start", "wf04/answer", "wf04/end",
             "wf05/ability", "wf06/delete", "health",
             "admin/resumes", "admin/export",
-        }:
+            "auth/register", "auth/login", "auth/logout", "auth/me",
+            "history",
+        } or route.startswith("history/"):
             return ("", 204)
         raise ApiError("not_found", "接口不存在。", 404)
+
+    if route == "auth/register" and request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        phone = str(body.get("phone") or "").strip()
+        email = str(body.get("email") or "").strip()
+        password = str(body.get("password") or "")
+        name = str(body.get("name") or "").strip()
+        if not re.fullmatch(r"1\d{10}", phone):
+            raise ApiError("invalid_phone", "手机号格式不正确（11 位，1 开头）。", 422)
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            raise ApiError("invalid_email", "邮箱格式不正确。", 422)
+        if len(password) < 8 or not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
+            raise ApiError("weak_password", "密码至少 8 位且需包含字母和数字。", 422)
+        if not (2 <= len(name) <= 16):
+            raise ApiError("invalid_name", "账户名需 2-16 个字符。", 422)
+        try:
+            check_rate("register:" + (request.remote_addr or "anonymous"))
+        except AccountError as err:
+            raise ApiError(err.code, err.message, err.status)
+        try:
+            user = register_user(phone, email, password, name)
+        except AccountError as err:
+            raise ApiError(err.code, err.message, err.status)
+        token, _expires = create_session(user["id"], _session_ttl_days())
+        resp, status = api_response(public_user(user), 201)
+        _set_session_cookie(resp, token)
+        return resp, status
+
+    if route == "auth/login" and request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        identifier = str(body.get("account") or "").strip()
+        password = str(body.get("password") or "")
+        if not identifier or not password:
+            raise ApiError("invalid_request", "请输入手机号/邮箱和密码。", 422)
+        try:
+            check_rate("login:" + (request.remote_addr or "anonymous"))
+        except AccountError as err:
+            raise ApiError(err.code, err.message, err.status)
+        user = authenticate(identifier, password)
+        if not user:
+            raise ApiError("bad_credentials", "手机号/邮箱或密码不正确。", 401)
+        token, _expires = create_session(user["id"], _session_ttl_days())
+        resp, status = api_response(public_user(user))
+        _set_session_cookie(resp, token)
+        return resp, status
+
+    if route == "auth/logout" and request.method == "POST":
+        _user, token = current_session()
+        end_session(token)
+        resp, status = api_response({"status": "LOGGED_OUT"})
+        _clear_session_cookie(resp)
+        return resp, status
+
+    if route == "auth/me" and request.method == "GET":
+        user, _token = current_session()
+        if not user:
+            return api_response({"logged_in": False})
+        return api_response({"logged_in": True, "user": public_user(user)})
+
+    if route == "history" and request.method == "GET":
+        user = require_login()
+        try:
+            limit = min(max(int(request.args.get("limit", 50)), 1), 100)
+            offset = max(int(request.args.get("offset", 0)), 0)
+        except ValueError:
+            limit, offset = 50, 0
+        event_type = (request.args.get("type") or "").strip() or None
+        if event_type and event_type not in ("F1", "F2", "F3", "F4"):
+            raise ApiError("invalid_type", "历史类型仅支持 F1-F4。", 422)
+        items, total = list_history(
+            user["id"],
+            limit=limit,
+            offset=offset,
+            event_type=event_type,
+            role=user["role"],
+        )
+        return api_response({
+            "items": items,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        })
+
+    if route == "history" and request.method == "POST":
+        user = require_login()
+        if not request.is_json:
+            raise ApiError("invalid_content_type", "历史记录请求必须使用 JSON 格式。", 415)
+        body = request.get_json(silent=True) or {}
+        session_id = str(body.get("session_id") or "").strip()
+        event_type = str(body.get("event_type") or "").strip()
+        title = str(body.get("title") or "").strip()
+        status = str(body.get("status") or "done").strip()
+        if not session_id:
+            raise ApiError("session_required", "缺少会话标识。", 422)
+        if event_type not in ("F1", "F2", "F3", "F4"):
+            raise ApiError("invalid_type", "历史类型仅支持 F1-F4。", 422)
+        if status not in ("done", "partial", "failed"):
+            raise ApiError("invalid_status", "状态仅支持 done/partial/failed。", 422)
+        if not (1 <= len(title) <= 200):
+            raise ApiError("invalid_title", "标题长度需在 1-200 字符之间。", 422)
+        history_id = add_history(user["id"], session_id, event_type, title, status)
+        return api_response({"id": history_id, "status": "CREATED"}, 201)
+
+    if route.startswith("history/") and request.method == "DELETE":
+        user = require_login()
+        try:
+            event_id = int(route.split("/", 1)[1])
+        except (IndexError, ValueError):
+            raise ApiError("invalid_id", "历史记录标识无效。", 422)
+        try:
+            delete_history(user["id"], event_id)
+        except AccountError as err:
+            raise ApiError(err.code, err.message, err.status)
+        return api_response({"status": "DELETED"})
 
     if route == "health" and request.method == "GET":
         return api_response({
@@ -1358,6 +1535,8 @@ for _rule in (
     "/api/wf04/start", "/api/wf04/answer", "/api/wf04/end",
     "/api/wf05/ability", "/api/wf06/delete", "/api/health",
     "/api/admin/resumes", "/api/admin/export",
+    "/api/auth/register", "/api/auth/login", "/api/auth/logout", "/api/auth/me",
+    "/api/history", "/api/history/<id>",
 ):
     app.add_url_rule(_rule, endpoint="route_" + _rule.replace("/", "_") or "root", view_func=route_api,
-                     methods=["GET", "POST", "OPTIONS"])
+                     methods=["GET", "POST", "DELETE", "OPTIONS"])

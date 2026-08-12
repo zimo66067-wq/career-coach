@@ -1,0 +1,145 @@
+/* ===== 侧边栏（个人账号 + 历史记录）===== */
+.zy-hidden { display: none !important; }
+
+.zy-sidebar {
+  position: fixed; inset: 58px auto 0 0; z-index: 40;
+  width: 260px; background: var(--zy-surface, #fff);
+  border-right: 1px solid rgba(22, 30, 52, .08);
+  display: flex; flex-direction: column;
+  transition: width .22s var(--zy-ease, ease);
+  box-shadow: 2px 0 14px rgba(22, 30, 52, .04);
+}
+
+.zy-sidebar-head { padding: 14px 12px 10px; border-bottom: 1px solid rgba(22, 30, 52, .06); }
+.zy-user-card { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.zy-avatar {
+  width: 38px; height: 38px; border-radius: 50%; flex: none;
+  background: linear-gradient(135deg, var(--zy-primary, #3b5bff), #7c5cff);
+  color: #fff; font-weight: 700; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.zy-user-meta { min-width: 0; line-height: 1.25; }
+.zy-user-name { font-weight: 600; font-size: 14px; color: var(--zy-ink, #161e34); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zy-user-action {
+  border: 0; background: none; color: var(--zy-primary, #3b5bff);
+  font-size: 12.5px; padding: 0; cursor: pointer; margin-top: 2px;
+}
+.zy-user-action:hover { text-decoration: underline; }
+.zy-user-sub { font-size: 11.5px; color: var(--zy-ink-3, #8b93a7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.zy-history { flex: 1; overflow-y: auto; padding: 10px 8px 16px; }
+.zy-history-title {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; color: var(--zy-ink-3, #8b93a7); font-weight: 600;
+  padding: 2px 6px 8px; letter-spacing: .04em;
+}
+.zy-history-clear { border: 0; background: none; color: var(--zy-ink-3, #8b93a7); font-size: 11.5px; cursor: pointer; }
+.zy-history-clear:hover { color: #d33; }
+.zy-history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.zy-history-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 8px; border-radius: 10px; cursor: pointer;
+  transition: background .15s ease;
+}
+.zy-history-item:hover { background: rgba(22, 30, 52, .05); }
+.zy-history-item.active { background: var(--zy-primary-soft, rgba(59, 91, 255, .08)); }
+.zy-badge {
+  flex: none; width: 34px; height: 24px; border-radius: 7px;
+  font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  background: var(--zy-primary-soft, rgba(59, 91, 255, .12)); color: var(--zy-primary, #3b5bff);
+}
+.zy-history-meta { min-width: 0; flex: 1; line-height: 1.3; }
+.zy-history-title-line { font-size: 13px; color: var(--zy-ink, #161e34); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zy-history-time { font-size: 11px; color: var(--zy-ink-3, #8b93a7); }
+.zy-history-del {
+  border: 0; background: none; color: var(--zy-ink-3, #8b93a7); cursor: pointer;
+  font-size: 14px; padding: 0 4px; opacity: 0; transition: opacity .15s ease;
+}
+.zy-history-item:hover .zy-history-del { opacity: 1; }
+.zy-history-del:hover { color: #d33; }
+.zy-history-empty {
+  text-align: center; color: var(--zy-ink-3, #8b93a7); font-size: 12.5px;
+  padding: 28px 12px; line-height: 1.7;
+}
+.zy-sidebar-demo-note { font-size: 11px; color: var(--zy-ink-3, #8b93a7); padding: 6px 8px 0; text-align: center; }
+.zy-add-record {
+  margin: 10px 8px 0; padding: 8px; border: 1px dashed rgba(59, 91, 255, .35);
+  border-radius: 10px; background: rgba(59, 91, 255, .04); color: var(--zy-primary, #3b5bff);
+  font-size: 12.5px; cursor: pointer; width: calc(100% - 16px);
+}
+.zy-add-record:hover { background: rgba(59, 91, 255, .1); }
+
+/* 收起态（桌面）：只留图标 */
+.zy-sidebar-collapsed .zy-sidebar { width: 64px; }
+.zy-sidebar-collapsed .zy-user-meta,
+.zy-sidebar-collapsed .zy-history-title,
+.zy-sidebar-collapsed .zy-history-item .zy-history-meta,
+.zy-sidebar-collapsed .zy-history-item .zy-history-del,
+.zy-sidebar-collapsed .zy-history-empty,
+.zy-sidebar-collapsed .zy-sidebar-demo-note,
+.zy-sidebar-collapsed .zy-add-record { display: none; }
+.zy-sidebar-collapsed .zy-history-item { justify-content: center; padding: 8px 0; }
+.zy-sidebar-collapsed .zy-user-card { justify-content: center; }
+
+/* 内容区随侧边栏位移 */
+.zy-has-sidebar .wrap { transition: margin-left .22s var(--zy-ease, ease); }
+@media (min-width: 901px) {
+  .zy-has-sidebar .wrap { margin-left: 260px; }
+  .zy-sidebar-collapsed .wrap { margin-left: 64px; }
+}
+
+/* 移动端抽屉 */
+@media (max-width: 900px) {
+  .zy-sidebar { transform: translateX(-100%); transition: transform .24s ease; width: 260px; }
+  .zy-has-sidebar.zy-drawer-open .zy-sidebar { transform: none; box-shadow: 6px 0 28px rgba(22, 30, 52, .16); }
+  .zy-has-sidebar .wrap { margin-left: 0 !important; }
+  .zy-sidebar-backdrop { position: fixed; inset: 58px 0 0 0; background: rgba(22, 30, 52, .32); z-index: 35; opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+  .zy-has-sidebar.zy-drawer-open .zy-sidebar-backdrop { opacity: 1; pointer-events: auto; }
+}
+
+/* 顶栏里的开关按钮 */
+.zy-sidebar-toggle {
+  border: 0; background: none; font-size: 18px; color: var(--zy-ink-2, #5b6272);
+  width: 34px; height: 34px; border-radius: 8px; cursor: pointer; margin-right: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.zy-sidebar-toggle:hover { background: rgba(22, 30, 52, .06); }
+
+/* 账号弹窗 */
+.zy-modal {
+  position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;
+  background: rgba(15, 20, 38, .46); padding: 20px;
+}
+.zy-modal-box {
+  width: 380px; max-width: 100%; background: #fff; border-radius: 16px;
+  padding: 22px 22px 18px; box-shadow: 0 18px 60px rgba(15, 20, 38, .28); position: relative;
+}
+.zy-modal-close { position: absolute; top: 10px; right: 12px; border: 0; background: none; font-size: 20px; color: var(--zy-ink-3, #8b93a7); cursor: pointer; }
+.zy-modal-box h3 { margin: 0 0 12px; font-size: 17px; }
+.zy-tabs { display: flex; gap: 6px; margin-bottom: 14px; background: rgba(22, 30, 52, .05); border-radius: 10px; padding: 4px; }
+.zy-tab { flex: 1; border: 0; background: none; padding: 7px 0; border-radius: 8px; font-size: 13.5px; cursor: pointer; color: var(--zy-ink-2, #5b6272); }
+.zy-tab.active { background: #fff; color: var(--zy-ink, #161e34); font-weight: 600; box-shadow: 0 1px 4px rgba(22, 30, 52, .12); }
+.zy-form { display: flex; flex-direction: column; gap: 10px; }
+.zy-form label { font-size: 12.5px; color: var(--zy-ink-2, #5b6272); display: flex; flex-direction: column; gap: 5px; }
+.zy-form input {
+  border: 1px solid rgba(22, 30, 52, .16); border-radius: 10px; padding: 9px 11px;
+  font-size: 14px; outline: none; transition: border .15s ease;
+}
+.zy-form input:focus { border-color: var(--zy-primary, #3b5bff); }
+.zy-btn {
+  border: 0; background: var(--zy-primary, #3b5bff); color: #fff; border-radius: 10px;
+  padding: 10px 0; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 4px;
+}
+.zy-btn:hover { filter: brightness(1.06); }
+.zy-form-msg { min-height: 16px; font-size: 12.5px; margin: 6px 0 0; }
+.zy-form-msg.ok { color: #1a9c5c; }
+.zy-form-msg.err { color: #d33; }
+.zy-form .zy-hint { font-size: 11.5px; color: var(--zy-ink-3, #8b93a7); margin-top: -4px; }
+
+/* 回看提示条 */
+.zy-recall-bar {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 70;
+  background: #161e34; color: #fff; font-size: 13px; padding: 10px 16px; border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(15, 20, 38, .3); display: flex; gap: 10px; align-items: center;
+}
+.zy-recall-bar button { border: 0; background: rgba(255,255,255,.16); color: #fff; border-radius: 8px; padding: 4px 10px; font-size: 12px; cursor: pointer; }

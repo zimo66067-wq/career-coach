@@ -85,6 +85,30 @@
     {
       "source": "/api/f2/intent",
       "destination": "/api/f2_major?_route=intent"
+    },
+    {
+      "source": "/api/auth/register",
+      "destination": "/api?_route=auth/register"
+    },
+    {
+      "source": "/api/auth/login",
+      "destination": "/api?_route=auth/login"
+    },
+    {
+      "source": "/api/auth/logout",
+      "destination": "/api?_route=auth/logout"
+    },
+    {
+      "source": "/api/auth/me",
+      "destination": "/api?_route=auth/me"
+    },
+    {
+      "source": "/api/history",
+      "destination": "/api?_route=history"
+    },
+    {
+      "source": "/api/history/(.*)",
+      "destination": "/api?_route=history/$1"
     }
   ]
 }

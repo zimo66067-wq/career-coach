@@ -1,12 +1,14 @@
 /* data-bridge.js · 真实数据接口层
- * 三级降级: API -> 缓存 -> MOCK(标注)
- * 不破坏现有 MOCK 接口，MOCK 降级为演示缓存
+ * 生产路径：API -> 当前会话缓存 -> 明确错误；MOCK 仅限显式演示模式。
+ * 不将合成简历、面试或报告伪装成用户结果。
  */
 (function () {
   'use strict';
 
   // ── API 端点配置 ──────────────────────────────────────
-  var API_BASE = window.DUMATE_API_BASE || '';
+  // 生产环境由 pages-api-config.js 注入独立后端的 HTTPS 地址；
+  // 不配置时保持空值，让页面明确显示未接入，而不是尝试调用 Pages 自身。
+  var API_BASE = String(window.DUMATE_API_BASE || '').replace(/\/+$/, '');
   var ENDPOINTS = {
     uploadResume:    '/api/wf01/upload',
     diagnoseResume:  '/api/wf02/diagnose',
@@ -20,7 +22,9 @@
     consent:         '/api/wf01/consent'
   };
 
-  var TIMEOUT_MS = 30000;
+  // 后端会依次尝试主模型与备用模型（Vercel 函数上限为 60 秒）。
+  // 30 秒会在后端完成可用的规则降级前提前中断请求。
+  var TIMEOUT_MS = 55000;
 
   // ── 内存缓存（SessionStorage 持久化） ─────────────────
   var CACHE_PREFIX = 'cb_cache_';
@@ -80,12 +84,32 @@
     return 't' + Date.now() + Math.random().toString(36).substr(2, 6);
   }
 
+  // 历史记录钩子：登录用户检测完成后自动落库；失败不影响主流程。
+  function recordHistory(eventType, title, sessionId, status) {
+    try {
+      if (window.ZY_ACCOUNT && typeof window.ZY_ACCOUNT.addHistory === 'function') {
+        window.ZY_ACCOUNT.addHistory({
+          event_type: eventType,
+          title: title,
+          session_id: sessionId || genTraceId(),
+          status: status || 'done'
+        });
+      }
+    } catch (e) { /* ignore */ }
+  }
+
   // ── 通用请求方法（fetch + timeout + trace_id） ─────────
   function request(endpoint, options) {
     options = options || {};
     var traceId = options._traceId || genTraceId();
     var url = API_BASE + endpoint;
-    var headers = options.headers || {};
+    var headers = Object.assign({}, options.headers || {});
+    // Only the server-issued, short-lived token is sent.  Source material and
+    // consent wording remain out of headers and server-side storage.
+    if (endpoint !== ENDPOINTS.consent) {
+      var consentToken = getCache('consentToken');
+      if (consentToken) headers['X-Consent-Token'] = consentToken;
+    }
     headers['X-Trace-Id'] = traceId;
 
     var body = options.body;
@@ -119,8 +143,13 @@
           clearTimeout(timer);
           if (!res.ok) {
             console.warn('[DataBridge] HTTP ' + res.status + ': ' + endpoint);
-            return res.text().then(function () {
-              resolve({ error: 'http_' + res.status, message: '服务器返回 ' + res.status, trace_id: traceId, degraded: true });
+            return res.json().catch(function () { return {}; }).then(function (json) {
+              resolve({
+                error: json.error || 'http_' + res.status,
+                message: json.message || ('服务器返回 ' + res.status),
+                trace_id: json.trace_id || traceId,
+                degraded: true
+              });
             });
           }
           return res.json().then(function (json) {
@@ -138,15 +167,32 @@
     });
   }
 
-  // ── 降级辅助：返回 MOCK 数据并标注 degraded ───────────
-  function degrade(mockKey, traceId, reason) {
-    console.warn('[DataBridge] 降级到 MOCK 数据: ' + mockKey + (reason ? ' (' + reason + ')' : ''));
+  function isDemoMode() {
+    if (window.APP && typeof window.APP.isDemoMode === 'function') return window.APP.isDemoMode();
+    return /[?&]demo=1(?:&|$)/.test(location.search);
+  }
+
+  function unavailable(traceId, reason) {
+    console.warn('[DataBridge] 服务不可用；不会显示合成数据' + (reason ? ' (' + reason + ')' : ''));
+    return {
+      error: 'service_unavailable',
+      message: '服务暂不可用，请稍后重试。未展示演示数据。',
+      trace_id: traceId,
+      degraded: true,
+      degraded_reason: reason || 'api_unavailable'
+    };
+  }
+
+  // ── 演示辅助：仅 ?demo=1 可返回合成数据 ───────────────
+  function demoData(mockKey, traceId, reason) {
+    if (!isDemoMode()) return unavailable(traceId, reason);
+    console.warn('[DataBridge] 使用演示数据: ' + mockKey + (reason ? ' (' + reason + ')' : ''));
     if (!window.MOCK || !window.MOCK[mockKey]) {
-      return { error: 'no_mock', message: 'MOCK 数据不存在: ' + mockKey, trace_id: traceId, degraded: true };
+      return { error: 'no_demo_data', message: '演示数据不存在: ' + mockKey, trace_id: traceId, degraded: true };
     }
     // 深拷贝避免污染原始 MOCK
     var data = JSON.parse(JSON.stringify(window.MOCK[mockKey]));
-    return { data: data, degraded: true, degraded_reason: reason || 'fallback_to_mock', trace_id: traceId };
+    return { data: data, degraded: true, degraded_reason: reason || 'demo_mock', demo_data: true, trace_id: traceId };
   }
 
   // ── 从降级结果中提取 data ──────────────────────────────
@@ -176,26 +222,21 @@
       // 缓存结果
       setCache('resumeText', res.resumeText);
       setCache('resumeProfile', res.resumeProfile);
-      return { resumeText: res.resumeText, resumeProfile: res.resumeProfile, trace_id: res.trace_id || traceId };
+      setCache('sessionId', res.session_id || traceId);
+      return { resumeText: res.resumeText, resumeProfile: res.resumeProfile, trace_id: res.trace_id || traceId, session_id: res.session_id || traceId };
     }
 
-    // 降级: 缓存 -> MOCK
-    var cached = getCache('resumeText');
-    if (cached) {
-      console.warn('[DataBridge] 使用缓存数据: resumeText');
-      return {
-        resumeText: cached,
-        resumeProfile: getCache('resumeProfile'),
-        degraded: true,
-        degraded_reason: 'cached',
-        trace_id: traceId
-      };
-    }
+    // 新上传的简历绝不能在接口失败时回退到上一份会话缓存；否则会把旧结果
+    // 错配给当前用户材料。生产路径直接返回明确错误，演示模式才允许样本数据。
+    var demoText = demoData('resumeText', traceId, res.error);
+    var demoProfile = demoData('resumeProfile', traceId, res.error);
+    if (demoText.error || demoProfile.error) return demoText.error ? demoText : demoProfile;
     return {
-      resumeText: window.MOCK.resumeText,
-      resumeProfile: window.MOCK.resumeProfile,
+      resumeText: demoText.data,
+      resumeProfile: demoProfile.data,
       degraded: true,
-      degraded_reason: 'fallback_to_mock',
+      degraded_reason: 'demo_mock',
+      demo_data: true,
       trace_id: traceId
     };
   }
@@ -203,8 +244,9 @@
   // 诊断简历 -> {resumeProfile, score_R, suggestions, trace_id}
   async function diagnoseResume(resumeText) {
     var traceId = genTraceId();
+    var sessionId = getCache('sessionId') || traceId;
     var res = await request(ENDPOINTS.diagnoseResume, {
-      body: { resumeText: resumeText },
+      body: { resumeText: resumeText, session_id: sessionId },
       _traceId: traceId
     });
 
@@ -213,36 +255,35 @@
       var normalizedResult = Object.assign({}, res, { resumeProfile: normalized });
       setCache('resumeProfile', normalized);
       setCache('diagnoseResult', normalizedResult);
+      setCache('sessionId', res.session_id || traceId);
+      recordHistory(
+        'F1',
+        '简历诊断 · R' + (res.score_R !== undefined ? res.score_R : ''),
+        res.session_id || traceId,
+        'done'
+      );
       return {
         resumeProfile: normalized,
         score_R: res.score_R !== undefined ? res.score_R : (res.resumeProfile ? res.resumeProfile.score_R : null),
         suggestions: res.suggestions || (res.resumeProfile ? res.resumeProfile.suggestions : []),
-        trace_id: res.trace_id || traceId
+        trace_id: res.trace_id || traceId,
+        session_id: res.session_id || traceId
       };
     }
 
-    // 缓存
-    var cached = getCache('diagnoseResult');
-    if (cached) {
-      console.warn('[DataBridge] 使用缓存数据: diagnoseResult');
-      return {
-        resumeProfile: cached.resumeProfile,
-        score_R: cached.score_R,
-        suggestions: cached.suggestions,
-        degraded: true,
-        degraded_reason: 'cached',
-        trace_id: traceId
-      };
-    }
-
-    // MOCK
-    var profile = normalizeResumeProfile(window.MOCK.resumeProfile);
+    // 对当前提交的材料，失败时不得回退到上一份诊断缓存。
+    // 演示模式才可显示合成诊断。
+    var demo = demoData('resumeProfile', traceId, res.error);
+    if (demo.error) return demo;
+    var profile = normalizeResumeProfile(demo.data);
+    recordHistory('F1', '简历诊断（演示模式）', traceId, 'partial');
     return {
       resumeProfile: profile,
       score_R: profile.score_R,
       suggestions: profile.suggestions,
       degraded: true,
-      degraded_reason: 'fallback_to_mock',
+      degraded_reason: 'demo_mock',
+      demo_data: true,
       trace_id: traceId
     };
   }
@@ -292,6 +333,12 @@
 
     if (!res.error) {
       setCache('matchResult', res.matchResult);
+      recordHistory(
+        'F2',
+        '岗位匹配 · M' + (res.matchResult && res.matchResult.score_M !== undefined ? res.matchResult.score_M : ''),
+        res.session_id || getCache('sessionId') || traceId,
+        'done'
+      );
       return { matchResult: res.matchResult, trace_id: res.trace_id || traceId };
     }
 
@@ -299,12 +346,20 @@
     var cached = getCache('matchResult');
     if (cached) {
       console.warn('[DataBridge] 使用缓存数据: matchResult');
+      recordHistory('F2', '岗位匹配（缓存）', getCache('sessionId') || traceId, 'partial');
       return { matchResult: cached, degraded: true, degraded_reason: 'cached', trace_id: traceId };
     }
 
-    // MOCK
-    var result = degrade('matchResult', traceId, res.error);
-    return { matchResult: result.data, degraded: true, degraded_reason: 'fallback_to_mock', trace_id: traceId };
+    var demo = demoData('matchResult', traceId, res.error);
+    if (demo.error) return demo;
+    recordHistory('F2', '岗位匹配（演示模式）', traceId, 'partial');
+    return {
+      matchResult: demo.data,
+      degraded: true,
+      degraded_reason: 'demo_mock',
+      demo_data: true,
+      trace_id: traceId
+    };
   }
 
   // ============================================================
@@ -325,6 +380,7 @@
 
     if (!res.error) {
       setCache('sessionId', res.session_id);
+      setCache('firstQuestion', res.firstQuestion);
       return {
         session_id: res.session_id,
         firstQuestion: res.firstQuestion,
@@ -334,24 +390,26 @@
 
     // 缓存
     var cachedSid = getCache('sessionId');
-    if (cachedSid) {
-      console.warn('[DataBridge] 使用缓存数据: sessionId');
+    var cachedQuestion = getCache('firstQuestion');
+    if (cachedSid && cachedQuestion) {
+      console.warn('[DataBridge] 使用缓存数据: sessionId / firstQuestion');
       return {
         session_id: cachedSid,
-        firstQuestion: window.MOCK.interviews[0].question,
+        firstQuestion: cachedQuestion,
         degraded: true,
         degraded_reason: 'cached',
         trace_id: traceId
       };
     }
 
-    // MOCK
-    console.warn('[DataBridge] 降级到 MOCK 面试数据');
+    var demo = demoData('interviews', traceId, res.error);
+    if (demo.error) return demo;
     return {
       session_id: 'mock_session_' + traceId,
-      firstQuestion: window.MOCK.interviews[0].question,
+      firstQuestion: demo.data[0].question,
       degraded: true,
-      degraded_reason: 'fallback_to_mock',
+      degraded_reason: 'demo_mock',
+      demo_data: true,
       trace_id: traceId
     };
   }
@@ -376,17 +434,19 @@
       };
     }
 
-    // 缓存: 无缓存策略（每次回答不同），直接 MOCK 轮次
-    console.warn('[DataBridge] 降级到 MOCK 面试轮次');
+    // 每次回答不同，没有可安全复用的缓存；生产态返回明确错误。
+    var demo = demoData('interviews', traceId, res.error);
+    if (demo.error) return demo;
     var turnCount = parseInt(sessionStorage.getItem('cb_mock_turn') || '0', 10);
-    var idx = turnCount % window.MOCK.interviews.length;
+    var idx = turnCount % demo.data.length;
     sessionStorage.setItem('cb_mock_turn', String(turnCount + 1));
-    var mockTurn = window.MOCK.interviews[idx];
+    var mockTurn = demo.data[idx];
     return {
       turn: mockTurn,
       followUp: mockTurn.follow_up,
       degraded: true,
-      degraded_reason: 'fallback_to_mock',
+      degraded_reason: 'demo_mock',
+      demo_data: true,
       trace_id: traceId
     };
   }
@@ -401,6 +461,7 @@
 
     if (!res.error) {
       setCache('interviewReport', res);
+      recordHistory('F3', '模拟面试 · 已完成', sessionId || traceId, 'done');
       return {
         report: res.report,
         score_I: res.score_I,
@@ -413,6 +474,7 @@
     var cached = getCache('interviewReport');
     if (cached) {
       console.warn('[DataBridge] 使用缓存数据: interviewReport');
+      recordHistory('F3', '模拟面试（缓存）', sessionId || traceId, 'partial');
       return {
         report: cached.report,
         score_I: cached.score_I,
@@ -423,14 +485,17 @@
       };
     }
 
-    // MOCK
-    console.warn('[DataBridge] 降级到 MOCK 面试报告');
+    var demoInterviews = demoData('interviews', traceId, res.error);
+    var demoScore = demoData('score_I', traceId, res.error);
+    if (demoInterviews.error || demoScore.error) return demoInterviews.error ? demoInterviews : demoScore;
+    recordHistory('F3', '模拟面试（演示模式）', sessionId || traceId, 'partial');
     return {
-      report: window.MOCK.interviews,
-      score_I: window.MOCK.score_I,
-      turns: window.MOCK.interviews.length,
+      report: demoInterviews.data,
+      score_I: demoScore.data,
+      turns: demoInterviews.data.length,
       degraded: true,
-      degraded_reason: 'fallback_to_mock',
+      degraded_reason: 'demo_mock',
+      demo_data: true,
       trace_id: traceId
     };
   }
@@ -449,6 +514,12 @@
 
     if (!res.error) {
       setCache('ability', res.ability);
+      recordHistory(
+        'F4',
+        '能力报告 · C0=' + (res.ability && res.ability.baseline !== undefined ? res.ability.baseline : ''),
+        sessionId || traceId,
+        'done'
+      );
       return { ability: res.ability, trace_id: res.trace_id || traceId };
     }
 
@@ -456,12 +527,20 @@
     var cached = getCache('ability');
     if (cached) {
       console.warn('[DataBridge] 使用缓存数据: ability');
+      recordHistory('F4', '能力报告（缓存）', sessionId || traceId, 'partial');
       return { ability: cached, degraded: true, degraded_reason: 'cached', trace_id: traceId };
     }
 
-    // MOCK
-    var result = degrade('ability', traceId, res.error);
-    return { ability: result.data, degraded: true, degraded_reason: 'fallback_to_mock', trace_id: traceId };
+    var demo = demoData('ability', traceId, res.error);
+    if (demo.error) return demo;
+    recordHistory('F4', '能力报告（演示模式）', sessionId || traceId, 'partial');
+    return {
+      ability: demo.data,
+      degraded: true,
+      degraded_reason: 'demo_mock',
+      demo_data: true,
+      trace_id: traceId
+    };
   }
 
   // ============================================================
@@ -477,15 +556,24 @@
     });
 
     if (!res.error) {
-      return { consent_id: res.consent_id, status: res.status || 'ACCEPTED', trace_id: res.trace_id || traceId };
+      if (res.consent_token) setCache('consentToken', res.consent_token);
+      return {
+        consent_id: res.consent_id,
+        consent_token: res.consent_token,
+        status: res.status || 'ACCEPTED',
+        expires_in_seconds: res.expires_in_seconds,
+        trace_id: res.trace_id || traceId
+      };
     }
 
-    console.warn('[DataBridge] 降级: consent');
+    if (!isDemoMode()) return unavailable(traceId, res.error);
+    console.warn('[DataBridge] 演示模式：使用合成 consent 结果');
     return {
-      consent_id: 'mock_consent_' + traceId,
+      consent_id: 'demo_consent_' + traceId,
       status: 'ACCEPTED',
       degraded: true,
-      degraded_reason: 'fallback_to_mock',
+      degraded_reason: 'demo_mock',
+      demo_data: true,
       trace_id: traceId
     };
   }
@@ -548,9 +636,13 @@
       return result && result.degraded === true;
     },
 
-    // 获取 MOCK 数据（明确标注为演示缓存）
+    // 获取演示数据（生产路径一律返回 null）
     getMockData: function (key) {
-      console.warn('[DataBridge] 使用 MOCK 数据作为演示缓存');
+      if (!isDemoMode()) {
+        console.warn('[DataBridge] 已阻止在生产路径读取演示数据');
+        return null;
+      }
+      console.warn('[DataBridge] 使用演示数据: ' + key);
       return window.MOCK ? window.MOCK[key] : null;
     },
 

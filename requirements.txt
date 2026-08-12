@@ -17,3 +17,6 @@ jieba==0.42.1
 
 # Flask for Vercel serverless
 Flask>=3.0,<4.0
+
+# Persistent PostgreSQL store (Neon) for accounts/history in production
+psycopg[binary]>=3.1,<4
