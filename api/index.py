@@ -27,6 +27,7 @@ from tools.database import (  # noqa: E402
     admin_password_ok,
     count_resumes,
     delete_session_data,
+    dialect,
     export_all,
     get_resume_detail,
     list_resumes,
@@ -369,6 +370,8 @@ def read_uploaded_document(label, error_code):
     except ApiError:
         raise
     except SystemExit:
+        if extension == ".pdf":
+            raise ApiError("scanned_pdf", "该 PDF 是扫描件/图片型，无法直接提取文字，请改为可复制文字的 PDF、DOCX、TXT 或直接粘贴正文。", 422)
         raise ApiError("unreadable_file", "未能读取该文件，请改为可复制文字的 PDF、DOCX、TXT 或直接粘贴正文。", 422)
     except Exception:
         raise ApiError("unreadable_file", "未能读取该文件，请确认文件未损坏后重试。", 422)
@@ -1457,6 +1460,7 @@ def route_api(**_ignored):
         return api_response({
             "status": "ok",
             "model_configured": bool(os.environ.get("ZHIPU_API_KEY")),
+            "database": dialect(),
             "workflows": {
                 "wf01": "available", "wf02": "available", "wf03": "available",
                 "wf04": "available", "wf05": "available", "wf06": "available",

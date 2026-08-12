@@ -9,7 +9,7 @@
 (function () {
   'use strict';
 
-  var API_BASE = window.DUMATE_API_BASE || 'https://career-coach-o7eu.vercel.app';
+  var API_BASE = window.DUMATE_API_BASE || 'https://career-coach-omega-three.vercel.app';
   var KEY_COLLAPSED = 'zy_sidebar_collapsed';
   var currentUser = null;
 
