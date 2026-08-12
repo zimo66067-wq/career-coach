@@ -66,12 +66,15 @@ ZHIPU_API_KEY=...
 DUMATE_MODEL=glm-4.7-flash
 # 可选：ZHIPU_FALLBACK_MODEL=...（备用智谱 Chat 模型）
 DUMATE_CONSENT_SECRET=...          # 同意令牌签名密钥（生产必需）
-DUMATE_ALLOWED_ORIGINS=https://zimo66067-wq.github.io
+DUMATE_ALLOWED_ORIGINS=https://zimo66067-wq.github.io,https://career-coach-o7eu.vercel.app
 APP_ENV=production
+DATABASE_URL=...              # 生产必需：Neon Postgres 连接串（账号/历史持久化）
+SESSION_TTL_DAYS=30           # 可选：登录会话有效期（1-90 天）
 # 可选：QIANFAN_API_KEY / QIANFAN_BASE_URL（千帆 V2 备用推理）
 # 可选：ASR_API_URL / TTS_API_URL / BAIDU_SPEECH_TOKEN（百度语音备用通道）
 # 可选：ADMIN_PASSWORD（/api/admin/* 管理员接口口令）
-# 可选：RESUME_DB_PATH（SQLite 会话存储路径，Vercel 默认 /tmp，重启即清空）
+# 可选：RESUME_DB_PATH（SQLite 会话存储路径，仅本地/测试；生产配置 DATABASE_URL）
+# 可选：DEV_DEMO（仅管理员演示数据注入，生产保持空）
 ```
 
 API 已实现 WF-01~WF-06 全链路：
@@ -91,11 +94,18 @@ POST /api/wf06/delete      删除会话数据（DELETED 终态）
 GET  /api/health           健康检查
 GET  /api/admin/resumes    管理员：简历/诊断列表（X-Admin-Password）
 GET  /api/admin/export     管理员：全量导出备份
+POST /api/auth/register    注册（手机号+邮箱+密码+账户名）→ HttpOnly 会话 Cookie
+POST /api/auth/login       登录（手机号或邮箱+密码）
+POST /api/auth/logout      登出
+GET  /api/auth/me          当前登录用户
+GET  /api/history          当前用户历史记录（未登录为空）
+POST /api/history          写入一条检测记录
+DELETE /api/history/<id>   删除本人一条记录
 ```
 
 F1/F2 采用规则评分与 BM25 兜底，不依赖 Embedding 密钥也可完整演示；配置智谱/千帆密钥后升级为语义路径。
 
-部署完成后，将 Vercel 的 HTTPS 生产地址写入 `docs/js/pages-api-config.js` 的 `window.DUMATE_API_BASE`，并确保该脚本在 `data-bridge.js` 之前加载。API 会仅对 `DUMATE_ALLOWED_ORIGINS` 白名单来源返回 CORS 响应；文件原件只写入请求临时目录并在响应前删除。
+Vercel 现已通过 `vercel.json` 重写同时托管静态前端（`/`→`/public/index.html`、`/pages/*`、`/js/*`）与 API；GitHub Pages 仍从 `docs/` 发布同一前端。部署完成后，将 Vercel 的 HTTPS 生产地址写入 `docs/js/pages-api-config.js` 的 `window.DUMATE_API_BASE`，并确保该脚本在 `data-bridge.js` 之前加载。API 会仅对 `DUMATE_ALLOWED_ORIGINS` 白名单来源返回 CORS 响应；文件原件只写入请求临时目录并在响应前删除。
 
 **跑测试**（Windows）：
 

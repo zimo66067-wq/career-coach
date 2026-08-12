@@ -6,7 +6,7 @@
       --backend bm25|embedding [--output match.json]
 
 后端:
-  - embedding: 千帆 Embedding-V1（HTTP API；需配置 QIANFAN_API_KEY + QIANFAN_SECRET_KEY）
+  - embedding: 千帆 Embedding-V1（HTTP API；需配置 QIANFAN_EMBEDDING_AK + QIANFAN_EMBEDDING_SK）
   - bm25: 纯 stdlib TF-IDF/BM25 实现（默认，标注「简化匹配」）
 
  输出: 逐条 requirement 的 {status: covered|weak|missing|unknown, evidence}
@@ -283,12 +283,22 @@ class QianfanEmbedder(EmbedderBase):
     EMBED_URL = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenniu/embedding_v1"
 
     def __init__(self, api_key=None, secret_key=None, model="Embedding-V1"):
-        self.api_key = api_key or os.environ.get("QIANFAN_API_KEY")
-        self.secret_key = secret_key or os.environ.get("QIANFAN_SECRET_KEY")
+        # Keep OAuth embedding credentials separate from the V2 chat API key.
+        # QIANFAN_AK/SK remain supported for existing local scripts.
+        self.api_key = (
+            api_key
+            or os.environ.get("QIANFAN_EMBEDDING_AK")
+            or os.environ.get("QIANFAN_AK")
+        )
+        self.secret_key = (
+            secret_key
+            or os.environ.get("QIANFAN_EMBEDDING_SK")
+            or os.environ.get("QIANFAN_SK")
+        )
         self.model = model
         if not self.api_key or not self.secret_key:
             raise NotImplementedError(
-                "千帆 embedding 未配置 QIANFAN_API_KEY/QIANFAN_SECRET_KEY；"
+                "千帆 embedding 未配置 QIANFAN_EMBEDDING_AK/QIANFAN_EMBEDDING_SK；"
                 "请改用 --backend bm25（简化匹配）"
             )
         self._token = None

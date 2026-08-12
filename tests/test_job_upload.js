@@ -114,3 +114,9 @@ test('F2 会在 F1 未完成或服务未配置时阻止匹配并给出明确原�
   const noApiResult = await noApi.submitText('岗位职责：负责后端开发，要求掌握 Python 与 SQL。');
   assert.equal(noApiResult.error_code, 'api_not_configured');
 });
+
+test('F2 结果渲染包含证据不足与低分分析分支', () => {
+  assert.ok(source.includes('insufficient_evidence'), 'must handle insufficient evidence');
+  assert.ok(source.includes('low_score_analysis'), 'must render low-score analysis');
+  assert.ok(source.includes('lowScoreCard'), 'low-score analysis card must exist');
+});

@@ -54,11 +54,10 @@ def test_normal_flow():
     assert check["accepted"] is True, "高置信度应被接受"
     assert check["needs_confirmation"] is False, "高置信度无需确认"
 
-    _r = VoiceTestResult(
+    return VoiceTestResult(
         "normal_flow", True,
         "confidence=0.92, accepted=True, no confirmation needed"
     )
-    assert _r.passed is True, _r.detail
 
 
 def test_mic_denied():
@@ -73,11 +72,10 @@ def test_mic_denied():
     assert fallback["fallback"]["mode"] == "text_input", "回退模式应为 text_input"
     assert fallback["should_retry"] is False, "麦克风拒绝不应重试"
 
-    _r = VoiceTestResult(
+    return VoiceTestResult(
         "mic_denied", True,
         "error=mic_denied, fallback=text_input, retry=False"
     )
-    assert _r.passed is True, _r.detail
 
 
 def test_network_error():
@@ -91,11 +89,10 @@ def test_network_error():
     assert fallback["fallback"]["mode"] == "text_input"
     assert fallback["should_retry"] is False
 
-    _r = VoiceTestResult(
+    return VoiceTestResult(
         "network_error", True,
         "error=network_error, fallback=text_input, retry=False"
     )
-    assert _r.passed is True, _r.detail
 
 
 def test_low_confidence():
@@ -110,11 +107,10 @@ def test_low_confidence():
     assert check["accepted"] is False, "低置信度不应被直接接受"
     assert check["needs_confirmation"] is True, "低置信度需要用户确认"
 
-    _r = VoiceTestResult(
+    return VoiceTestResult(
         "low_confidence", True,
         "confidence=0.55, accepted=False, needs_confirmation=True"
     )
-    assert _r.passed is True, _r.detail
 
 
 def test_tts_error():
@@ -127,11 +123,10 @@ def test_tts_error():
     assert fallback["fallback"] is None, "TTS 错误不应触发文字回退"
     assert fallback["should_retry"] is False, "TTS 错误不应重试"
 
-    _r = VoiceTestResult(
+    return VoiceTestResult(
         "tts_error_non_blocking", True,
         "error=tts_error, fallback=None, retry=False (non-blocking)"
     )
-    assert _r.passed is True, _r.detail
 
 
 def test_fallback_timer():
@@ -159,11 +154,10 @@ def test_fallback_timer():
     assert fallback["mode"] == "text_input"
     assert fallback["draft"] == "部分转写结果"
 
-    _r = VoiceTestResult(
+    return VoiceTestResult(
         "fallback_timer", True,
         "timeout=2s, fallback triggered with draft text"
     )
-    assert _r.passed is True, _r.detail
 
 
 def test_cancel():
@@ -177,23 +171,64 @@ def test_cancel():
     assert vh._active_turn is None, "取消后 _active_turn 应为 None"
     assert len(vh._timers) == 0, "取消后所有计时器应已清除"
 
-    _r = VoiceTestResult(
+    return VoiceTestResult(
         "cancel_operation", True,
         "cancelled=True, timers cleared"
     )
-    assert _r.passed is True, _r.detail
+
+
+_normal_flow_check = test_normal_flow
+_mic_denied_check = test_mic_denied
+_network_error_check = test_network_error
+_low_confidence_check = test_low_confidence
+_tts_error_check = test_tts_error
+_fallback_timer_check = test_fallback_timer
+_cancel_check = test_cancel
+
+
+def _assert_voice_result(result):
+    """Adapt the reporting helpers into real pytest assertions."""
+    assert result.passed, result.detail
+
+
+def test_normal_flow():
+    _assert_voice_result(_normal_flow_check())
+
+
+def test_mic_denied():
+    _assert_voice_result(_mic_denied_check())
+
+
+def test_network_error():
+    _assert_voice_result(_network_error_check())
+
+
+def test_low_confidence():
+    _assert_voice_result(_low_confidence_check())
+
+
+def test_tts_error():
+    _assert_voice_result(_tts_error_check())
+
+
+def test_fallback_timer():
+    _assert_voice_result(_fallback_timer_check())
+
+
+def test_cancel():
+    _assert_voice_result(_cancel_check())
 
 
 def run_all_tests(verbose=False):
     """运行全部语音测试"""
     tests = [
-        test_normal_flow,
-        test_mic_denied,
-        test_network_error,
-        test_low_confidence,
-        test_tts_error,
-        test_fallback_timer,
-        test_cancel,
+        _normal_flow_check,
+        _mic_denied_check,
+        _network_error_check,
+        _low_confidence_check,
+        _tts_error_check,
+        _fallback_timer_check,
+        _cancel_check,
     ]
 
     results = []

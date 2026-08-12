@@ -20,3 +20,8 @@ Flask>=3.0,<4.0
 
 # Persistent PostgreSQL store (Neon) for accounts/history in production
 psycopg[binary]>=3.1,<4
+itsdangerous>=2.2,<3.0
+
+# Optional model provider enabled by ZHIPU_API_KEY
+zhipuai>=2.0,<3.0
+

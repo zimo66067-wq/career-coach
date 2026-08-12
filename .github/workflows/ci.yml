@@ -36,10 +36,8 @@ jobs:
       # --- 步骤3: 安装依赖 ---
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r tools/requirements.txt
-          pip install jsonschema pypdf python-docx pytest
+          python -m pip install -r requirements.txt
+          python -m pip install -r tools/requirements.txt
 
       # --- 步骤4: 运行 pytest 测试套件 ---
       - name: Run pytest
@@ -54,7 +52,7 @@ jobs:
 
       - name: Run browser contract tests
         run: |
-          node --test tests/test_public_page_states.js tests/test_resume_upload.js tests/test_job_upload.js tests/test_publish_mirror.js tests/test_voice_ui.js
+          node --test tests/test_public_page_states.js tests/test_resume_upload.js tests/test_job_upload.js tests/test_publish_mirror.js tests/test_voice_ui.js tests/test_frontend_chain.js
 
       # --- 步骤5: Schema 校验（对所有 fixtures 执行 validate_schema） ---
       - name: Schema validation
@@ -98,62 +96,47 @@ jobs:
       # 用 grep 检查是否有 API key / secret / password 硬编码
       - name: Sensitive info scan
         run: |
-          echo "=== Scanning for hardcoded secrets ==="
-          # 定义白名单文件（这些文件可以包含变量名模式但不包含真实密钥）
-          WHITELIST=".env.example|.gitignore|SECURITY.md|.github/workflows/ci.yml|docs/observability.md"
-          
-          # 扫描 API Key 硬编码（排除占位符和白名单）
-          echo "--- Checking for API_KEY with real values ---"
-          grep -rn --include='*.py' --include='*.md' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.txt' \
-            -E '(api_key|API_KEY|apikey)\s*[=:]\s*["'"'"'][^"'"'"']{8,}["'"'"']' \
-            --exclude-dir=.git --exclude-dir=node_modules . \
-            | grep -vE "$WHITELIST" \
-            | grep -vE '(your_|example|placeholder|here|xxx|TODO|CHANGE|REPLACE|<)' \
-            || echo "No API key leaks found"
-          
-          # 扫描 Secret Key 硬编码
-          echo "--- Checking for SECRET_KEY with real values ---"
-          grep -rn --include='*.py' --include='*.md' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.txt' \
-            -E '(secret|SECRET_KEY|secret_key)\s*[=:]\s*["'"'"'][^"'"'"']{8,}["'"'"']' \
-            --exclude-dir=.git --exclude-dir=node_modules . \
-            | grep -vE "$WHITELIST" \
-            | grep -vE '(your_|example|placeholder|here|xxx|TODO|CHANGE|REPLACE|<)' \
-            || echo "No secret key leaks found"
-          
-          # 扫描密码硬编码
-          echo "--- Checking for password hardcoding ---"
-          grep -rn --include='*.py' --include='*.md' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.txt' \
-            -iE '(password|passwd|pwd)\s*[=:]\s*["'"'"'][^"'"'"']{4,}["'"'"']' \
-            --exclude-dir=.git --exclude-dir=node_modules . \
-            | grep -vE "$WHITELIST" \
-            | grep -vE '(your_|example|placeholder|here|xxx|TODO|CHANGE|REPLACE|<|prompt|enter|input)' \
-            || echo "No password leaks found"
-          
-          # 扫描 Bearer Token
-          echo "--- Checking for Bearer tokens ---"
-          grep -rn --include='*.py' --include='*.md' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.txt' \
-            -E 'Bearer\s+[A-Za-z0-9._-]{16,}' \
-            --exclude-dir=.git --exclude-dir=node_modules . \
-            | grep -vE "$WHITELIST" \
-            || echo "No bearer token leaks found"
-          
-          # 扫描千帆 sk- 前缀密钥
-          echo "--- Checking for sk- prefixed keys ---"
-          grep -rn --include='*.py' --include='*.md' --include='*.json' --include='*.yml' --include='*.yaml' --include='*.txt' \
-            -E 'sk-[A-Za-z0-9]{16,}' \
-            --exclude-dir=.git --exclude-dir=node_modules . \
-            | grep -vE "$WHITELIST" \
-            || echo "No sk- key leaks found"
-          
-          # 扫描 .env 文件是否误入库
-          echo "--- Checking for .env file ---"
-          if [ -f .env ]; then
-            echo "ERROR: .env file found in repository! This file should not be committed."
-            exit 1
-          fi
-          echo "No .env file in repository"
-          
-          echo "=== Sensitive info scan complete ==="
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          allowed_suffixes = {".py", ".js", ".html", ".md", ".json", ".yml", ".yaml", ".txt", ".sh"}
+          ignored_paths = {".env.example", ".gitignore", "SECURITY.md", ".github/workflows/ci.yml", "docs/observability.md"}
+          ignored_dirs = {".git", "node_modules", ".venv", "venv"}
+          placeholders = re.compile(r"your_|example|placeholder|here|xxx|todo|change|replace|替换|<", re.I)
+          patterns = {
+              "literal API key": re.compile(r"(?:api[_-]?key|apikey)\s*[=:]\s*['\"][^'\"]{8,}['\"]", re.I),
+              "literal secret": re.compile(r"(?:secret|secret_key)\s*[=:]\s*['\"][^'\"]{8,}['\"]", re.I),
+              "literal password": re.compile(r"(?:password|passwd|pwd)\s*[=:]\s*['\"][^'\"]{4,}['\"]", re.I),
+              "Bearer token": re.compile(r"Bearer\s+[A-Za-z0-9._-]{16,}"),
+              "sk-prefixed key": re.compile(r"sk-[A-Za-z0-9]{16,}"),
+              "GitHub PAT": re.compile(r"ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}"),
+          }
+          findings = []
+          for path in Path('.').rglob('*'):
+              if not path.is_file() or path.suffix.lower() not in allowed_suffixes:
+                  continue
+              if any(part in ignored_dirs for part in path.parts) or path.as_posix() in ignored_paths:
+                  continue
+              try:
+                  lines = path.read_text(encoding='utf-8').splitlines()
+              except UnicodeDecodeError:
+                  continue
+              for number, line in enumerate(lines, 1):
+                  if placeholders.search(line):
+                      continue
+                  for label, pattern in patterns.items():
+                      if pattern.search(line):
+                          findings.append((label, path.as_posix(), number))
+          if Path('.env').is_file():
+              findings.append(("tracked local .env file", ".env", 1))
+          if findings:
+              print('ERROR: possible sensitive values found (file and line only):')
+              for label, path, number in findings:
+                  print(f'{label}: {path}:{number}')
+              raise SystemExit(1)
+          print('Sensitive information scan passed.')
+          PY
 
       # --- 步骤7: 依赖安全扫描（可选，pip-audit） ---
       - name: Dependency security scan (pip-audit)

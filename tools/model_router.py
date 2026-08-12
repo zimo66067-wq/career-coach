@@ -39,11 +39,33 @@ TASK_PROMPTS = {
     "seven_day_plan": "prompts/plan/seven-day.md",
 }
 
+
+def extract_system_prompt(content):
+    """Extract only the ``## 系统提示`` section of a prompt file.
+
+    Prompt files contain a title, a usage note, the system prompt, and
+    template sections such as ``## 用户输入`` / ``## 失败处理``.  Feeding
+    the whole file as the system message confuses models: the usage note and
+    template placeholders get treated as instructions, which produces
+    conversational or skeleton output instead of the contract JSON.
+    """
+    if not content:
+        return ""
+    marker = "## 系统提示"
+    start = content.find(marker)
+    if start < 0:
+        return content.strip()
+    start += len(marker)
+    next_heading = content.find("\n## ", start)
+    section = content[start:next_heading] if next_heading >= 0 else content[start:]
+    return section.strip()
+
+
 # ------------------------------------------------------------------ #
 # 冻结参数（temperature / max_tokens / timeout）
 # ------------------------------------------------------------------ #
 MODEL_PARAMS = {
-    "resume_diagnosis":     {"temperature": 0.1, "max_tokens": 2048, "timeout": 25},
+    "resume_diagnosis":     {"temperature": 0.1, "max_tokens": 2048, "timeout": 50},
     "resume_report":        {"temperature": 0.3, "max_tokens": 4096, "timeout": 30},
     "jd_extract":           {"temperature": 0.1, "max_tokens": 2048, "timeout": 20},
     "jd_match_explain":     {"temperature": 0.3, "max_tokens": 2048, "timeout": 20},
@@ -227,7 +249,7 @@ class ModelRouter:
         full = os.path.join(base, rel_path)
         try:
             with open(full, encoding="utf-8") as f:
-                return f.read()
+                return extract_system_prompt(f.read())
         except (OSError, IOError):
             logger.warning("[router] prompt file not found: %s", full)
             return ""
@@ -382,54 +404,28 @@ class ZhipuModelRouter(ModelRouter):
 
 
 class QianfanModelRouter(ModelRouter):
-    """千帆模型路由器（支持 V2 HTTP API 和旧版 SDK 双模式）。
+    """千帆 V2 REST 聊天路由器。
 
-    V2 模式: QIANFAN_API_KEY 为非 bce-v3/ 前缀的 API Key，
-             直接通过 HTTP + Bearer 鉴权调用 V2 接口。
-    SDK 模式: QIANFAN_ACCESS_KEY + QIANFAN_SECRET_KEY（IAM），
-              或 QIANFAN_API_KEY（旧版 bce-v3/AK/SK 格式），通过 qianfan SDK 调用。
-
-    环境变量:
-      - QIANFAN_API_KEY（V2 应用 Key，推荐）
-      - QIANFAN_ACCESS_KEY / QIANFAN_SECRET_KEY（IAM，旧版）
-      - QIANFAN_BASE_URL（可选）
+    使用 ``QIANFAN_API_KEY`` 作为 Bearer 凭据调用
+    ``/v2/chat/completions``。嵌入模型的 OAuth AK/SK 凭据独立配置，
+    不在本路由器中接受或复用。
     """
 
     V2_BASE_URL = "https://qianfan.baidubce.com/v2/chat/completions"
 
     def __init__(self, primary_model=None, fallback_model=None, enable_log=True):
         super().__init__(primary_model, fallback_model, enable_log)
-        self.api_key = os.environ.get("QIANFAN_API_KEY", "")
-        self.ak = os.environ.get("QIANFAN_ACCESS_KEY")
-        self.sk = os.environ.get("QIANFAN_SECRET_KEY")
-        self.use_v2 = False
-        self.client = None
+        self.api_key = os.environ.get("QIANFAN_API_KEY", "").strip()
+        self.base_url = os.environ.get(
+            "QIANFAN_BASE_URL", "https://qianfan.baidubce.com/v2"
+        ).rstrip("/")
 
-        # V2 模式: API Key 不以 bce-v3/ 开头 → 直接 HTTP + Bearer
-        if self.api_key and not self.api_key.startswith("bce-v3/"):
-            self.use_v2 = True
-            return
-
-        # SDK 模式: 兼容旧版 bce-v3/AK/SK 格式
-        if not self.ak or not self.sk:
-            if self.api_key.startswith("bce-v3/"):
-                parts = self.api_key.split("/")
-                if len(parts) >= 4:
-                    self.ak = parts[2]
-                    self.sk = "/".join(parts[3:])
-
-        if not self.ak or not self.sk:
-            raise ValueError(
-                "QianfanModelRouter: QIANFAN_API_KEY (V2) or "
-                "QIANFAN_ACCESS_KEY + QIANFAN_SECRET_KEY "
-                "(or QIANFAN_API_KEY in bce-v3/AK/SK format) not set"
-            )
-
-        from qianfan import ChatCompletion
-        self.client = ChatCompletion(ak=self.ak, sk=self.sk)
+        # Fail closed; no alternate credential contract is accepted here.
+        if not self.api_key:
+            raise ValueError("QianfanModelRouter: QIANFAN_API_KEY not set")
 
     def _try_call(self, model, prompt, user_input, params, context):
-        """Call Qianfan chat endpoint (V2 HTTP or SDK)."""
+        """Call Qianfan's V2 chat endpoint with an API key."""
         messages = []
         if prompt:
             messages.append({"role": "system", "content": prompt})
@@ -441,54 +437,37 @@ class QianfanModelRouter(ModelRouter):
             )
         messages.append({"role": "user", "content": content})
 
-        if self.use_v2:
-            return self._try_call_v2(model, messages, params)
-
-        return self._try_call_sdk(model, messages, params)
-
-    def _try_call_v2(self, model, messages, params):
-        """Call Qianfan V2 chat completions via HTTP + Bearer auth."""
-        body = json.dumps({
-            "model": model,
-            "messages": messages,
-            "temperature": params["temperature"],
-            "max_tokens": params["max_tokens"],
-            "stream": False,
-        }).encode("utf-8")
-
-        req = Request(self.V2_BASE_URL, data=body, method="POST")
-        req.add_header("Authorization", "Bearer " + self.api_key)
-        req.add_header("Content-Type", "application/json")
+        payload = json.dumps(
+            {
+                "model": model,
+                "messages": messages,
+                "temperature": params["temperature"],
+                "max_tokens": params["max_tokens"],
+            },
+            ensure_ascii=False,
+        ).encode("utf-8")
+        request = Request(
+            self.base_url + "/chat/completions",
+            data=payload,
+            headers={
+                "Authorization": "Bearer " + self.api_key,
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=params["timeout"]) as response:
+                body = json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            raise RuntimeError("qianfan_http_%s" % exc.code) from exc
+        except URLError as exc:
+            raise RuntimeError("qianfan_network_error") from exc
+        except (TypeError, ValueError) as exc:
+            raise ValueError("qianfan_invalid_response") from exc
 
         try:
-            with urlopen(req, timeout=params.get("timeout", 30)) as resp:
-                raw = resp.read().decode("utf-8")
-        except (HTTPError, URLError) as exc:
-            raise RuntimeError("qianfan_v2_http_error: %s" % type(exc).__name__) from exc
-
-        try:
-            data = json.loads(raw)
-            output = data["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError) as exc:
-            raise ValueError("qianfan_v2_invalid_response") from exc
-        return parse_model_output(output)
-
-    def _try_call_sdk(self, model, messages, params):
-        """Call Qianfan via SDK (auto token management)."""
-        try:
-            resp = self.client.do(
-                model=model,
-                messages=messages,
-                temperature=params["temperature"],
-                max_tokens=params["max_tokens"],
-                stream=False,
-            )
-        except Exception as exc:
-            raise RuntimeError("qianfan_chat_error: %s" % type(exc).__name__) from exc
-
-        try:
-            output = resp.result
-        except AttributeError as exc:
+            output = body["choices"][0]["message"]["content"]
+        except (IndexError, KeyError, TypeError) as exc:
             raise ValueError("qianfan_invalid_response") from exc
         return parse_model_output(output)
 
@@ -507,7 +486,14 @@ def parse_model_output(output):
     try:
         return json.loads(text)
     except (TypeError, ValueError):
-        return text
+        object_start = text.find("{")
+        if object_start < 0:
+            return text
+        try:
+            parsed, _end = json.JSONDecoder().raw_decode(text[object_start:])
+        except (TypeError, ValueError):
+            return text
+        return parsed if isinstance(parsed, (dict, list)) else text
 
 
 class ZhipuChatRouter(ModelRouter):

@@ -18,7 +18,7 @@ function loadApp(search) {
   return context.APP;
 }
 
-function loadBridge(search) {
+function loadBridge(search, fetchImpl) {
   const cache = new Map();
   const context = {
     location: { search: search },
@@ -28,7 +28,7 @@ function loadBridge(search) {
       removeItem: function (key) { cache.delete(key); }
     },
     console: { warn: function () {} },
-    fetch: function () { return Promise.reject(new Error('offline')); },
+    fetch: fetchImpl || function () { return Promise.reject(new Error('offline')); },
     setTimeout: setTimeout,
     clearTimeout: clearTimeout,
     AbortController: class { abort() {} },
@@ -50,6 +50,9 @@ async function run() {
     assert.ok(html.includes('data-state-view="empty"'), name + ' must retain an empty state');
     assert.ok(html.includes('window.APP.isDemoMode()'), name + ' must guard synthetic success rendering');
   }
+  const f2 = fs.readFileSync(path.join(root, 'docs', 'pages', 'f2-match.html'), 'utf8');
+  assert.ok(f2.includes('data-state-view="confirmation"'), 'F2 must require a visible confirmation state before matching');
+  assert.ok(loadApp('?demo=1').STATES.includes('confirmation'), 'confirmation must be a valid application state');
 
   const bridge = loadBridge('');
   const offlineResults = await Promise.all([
@@ -67,6 +70,20 @@ async function run() {
   });
   assert.strictEqual(bridge.getMockData('resumeProfile'), null, 'production code must not read demo data');
   assert.strictEqual(loadBridge('?demo=1').getMockData('resumeProfile').score_R, 73, 'demo data must require explicit opt-in');
+
+  const requests = [];
+  const online = loadBridge('', function (url, options) {
+    requests.push({ url: url, options: options });
+    const response = url.endsWith('/wf01/consent')
+      ? { status: 'ACCEPTED', consent_token: 'signed-test-token', expires_in_seconds: 120 }
+      : { resume_profile: { score_R: 70 } };
+    return Promise.resolve({ ok: true, json: function () { return Promise.resolve(response); } });
+  });
+  const consent = await online.submitConsent('session');
+  assert.strictEqual(consent.status, 'ACCEPTED');
+  await online.diagnoseResume('candidate supplied text that is long enough for the validation contract');
+  assert.strictEqual(requests[0].options.headers['X-Consent-Token'], undefined, 'consent request must not send a prior token');
+  assert.strictEqual(requests[1].options.headers['X-Consent-Token'], 'signed-test-token', 'material requests must include the issued consent token');
 
   console.log('public page state checks passed');
 }

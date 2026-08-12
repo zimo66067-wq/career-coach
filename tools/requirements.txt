@@ -14,3 +14,6 @@ playwright==1.62.0
 
 # Chinese tokenization (optional)
 jieba==0.42.1
+
+# Optional model provider enabled by ZHIPU_API_KEY
+zhipuai>=2.0,<3.0

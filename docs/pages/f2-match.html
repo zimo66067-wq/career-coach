@@ -104,6 +104,12 @@
       <div style="flex:1;min-width:260px" id="matchSubbars"></div>
     </div>
     <div class="degraded-banner match-notice" id="matchNotice" hidden aria-live="polite"><div class="icon">ℹ️</div><div><h3>匹配方式说明</h3><p></p></div></div>
+    <div class="card" id="lowScoreCard" hidden aria-live="polite">
+      <h3>匹配结果分析</h3>
+      <p id="lowScoreSummary"></p>
+      <div id="lowScoreDims"></div>
+      <p id="lowScoreAdvice"></p>
+    </div>
     <div class="card">
       <h3>逐条要求四态判定（硬性要求置顶）</h3>
       <div class="flow-line" aria-hidden="true"></div>
@@ -147,19 +153,7 @@
   </div>
 </div>
 
-<script src="../js/mock-data.js"></script>
-<script src="../js/app.js"></script>
-<script src="../js/pages-api-config.js"></script>
-<script src="../js/data-bridge.js"></script>
-<script src="../js/job-upload.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  if (!window.APP.isDemoMode() || window.APP.getState() !== "success") return;
-  var DB = window.DataBridge;
-  var m = DB && DB.getMockData ? DB.getMockData("matchResult") : null;
-  if (m && window.JobUpload) window.JobUpload.renderMatchResult(m);
-});
-</script>
+<!-- 侧边栏：个人账号 + 历史记录（演示原型，数据存 localStorage） -->
 <aside class="zy-sidebar" id="zySidebar" aria-label="账号与历史记录">
   <div class="zy-sidebar-head">
     <div class="zy-user-card">
@@ -206,7 +200,19 @@ document.addEventListener("DOMContentLoaded", function () {
     <p class="zy-form-msg" id="zyAuthMsg"></p>
   </div>
 </div>
-
+<script src="../js/mock-data.js"></script>
+<script src="../js/app.js"></script>
+<script src="../js/pages-api-config.js"></script>
+<script src="../js/data-bridge.js"></script>
 <script src="../js/account.js"></script>
+<script src="../js/job-upload.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (!window.APP.isDemoMode() || window.APP.getState() !== "success") return;
+  var DB = window.DataBridge;
+  var m = DB && DB.getMockData ? DB.getMockData("matchResult") : null;
+  if (m && window.JobUpload) window.JobUpload.renderMatchResult(m);
+});
+</script>
 </body>
 </html>

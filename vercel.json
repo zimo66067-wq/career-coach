@@ -109,6 +109,30 @@
     {
       "source": "/api/history/(.*)",
       "destination": "/api?_route=history/$1"
+    },
+    {
+      "source": "/",
+      "destination": "/public/index.html"
+    },
+    {
+      "source": "/index.html",
+      "destination": "/public/index.html"
+    },
+    {
+      "source": "/css/:path*",
+      "destination": "/public/css/:path*"
+    },
+    {
+      "source": "/js/:path*",
+      "destination": "/public/js/:path*"
+    },
+    {
+      "source": "/pages/:path*",
+      "destination": "/public/pages/:path*"
+    },
+    {
+      "source": "/assets/:path*",
+      "destination": "/ui/assets/:path*"
     }
   ]
 }

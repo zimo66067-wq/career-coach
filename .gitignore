@@ -32,8 +32,16 @@ preview-*.png
 # DuMate 运行时目录
 .dumate/
 
+# 本地环境变量绝不入库（.env.example 保留为模板）
+.env
+.env.*
+!.env.example
+
 # 系统垃圾
 Thumbs.db
 .DS_Store
 ~$*
 deliverables/career-coach-push.bundle
+
+.vercel
+.env*
