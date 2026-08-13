@@ -307,3 +307,84 @@ def test_vercel_routes_cover_phase4_endpoints():
     }
     for source, destination in expected.items():
         assert routes[source] == destination, source
+
+
+# ---------------------------------------------------------------- #
+# 打字对话状态机：追问回答后自动进入下一主问题
+# ---------------------------------------------------------------- #
+
+def _parse_sse_done(data):
+    done = None
+    for block in data.split("\n\n"):
+        line = None
+        for l in block.splitlines():
+            if l.startswith("data: "):
+                line = l[len("data: "):]
+        if not line:
+            continue
+        ev = json.loads(line)
+        if ev.get("type") == "done":
+            done = ev
+    assert done is not None, "missing done event"
+    return done
+
+
+def test_wf04_stream_advances_to_next_question_after_followup(monkeypatch):
+    raw = raw_client(monkeypatch)
+    token = issue_consent(raw)
+    uploaded = upload_resume(raw, token)
+    sid = uploaded["session_id"]
+    resume_text = uploaded["resumeText"]
+    profile = diagnose(raw, token, sid, resume_text)["resumeProfile"]
+
+    parsed = authed_post(raw, token, "/api/wf03/jd", {"jdText": JD_TEXT, "session_id": sid})
+    assert parsed.status_code == 200
+    job_profile = parsed.json["jobProfile"]
+    job_profile["user_confirmed"] = True
+    matched = authed_post(
+        raw, token, "/api/wf03/match",
+        {"resumeText": resume_text, "jobProfile": job_profile, "session_id": sid},
+    )
+    assert matched.status_code == 200
+    gaps = [
+        {"id": g["id"], "type": g["type"], "text": g["text"], "status": g["status"]}
+        for g in matched.json["requirements"]
+        if g["status"] in ("missing", "weak")
+    ]
+
+    started = authed_post(
+        raw, token, "/api/wf04/start",
+        {"jobProfile": job_profile, "resumeProfile": profile,
+         "matchGaps": gaps, "session_id": sid},
+    )
+    assert started.status_code == 200
+    assert started.json["firstQuestion"]
+
+    # 主回答：缺少结果/量化 → 应生成追问，且不进入下一题
+    vague = "我负责后端开发，使用 Python 和 Flask 完成接口，遇到问题就修复。"
+    streamed = authed_post(
+        raw, token, "/api/wf04/stream",
+        {"session_id": sid, "answer_text": vague},
+    )
+    assert streamed.status_code == 200
+    done1 = _parse_sse_done(streamed.get_data(as_text=True))
+    assert done1["followUp"] is not None, "vague answer should produce a follow-up"
+    assert done1["nextQuestion"] is None, "main answer with follow-up must not advance"
+    assert done1["evaluation"] is not None
+    assert done1["evaluation"]["weaknesses"]
+
+    # 追问回答：补充量化结果 → 记录追问并自动进入下一主问题
+    followup_answer = (
+        "结果：接口上线后响应时间从 800ms 降到 200ms，性能提升 75%，日处理 100 万条记录。"
+    )
+    streamed2 = authed_post(
+        raw, token, "/api/wf04/stream",
+        {"session_id": sid, "answer_text": followup_answer},
+    )
+    assert streamed2.status_code == 200
+    done2 = _parse_sse_done(streamed2.get_data(as_text=True))
+    assert done2["followUp"] is None
+    assert done2["nextQuestion"] is not None
+    assert done2["nextQuestion"].get("question")
+    assert done2["nextQuestion"].get("done") is False
+    assert done2["evaluation"] is not None

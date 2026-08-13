@@ -346,6 +346,8 @@ class InterviewEngine:
         }
         session["turns"].append(turn)
         session["current_followup_count"] += 1
+        # 追问已回答，清除待回答标记，下一轮输入视为新的主问题回答
+        session["_current_followup"] = ""
 
         return {
             "turn_id": turn_id,
@@ -730,6 +732,69 @@ class InterviewEngine:
         lines.append("## 4. Seven-Day Plan Linkage")
         lines.append("- Review gaps above and incorporate into seven-day improvement plan.")
         lines.append("- Focus on areas with highest missing frequency.")
+        lines.append("")
+
+        # 中文结论：优点 / 不足 / 下一步安排
+        star_labels = {
+            "situation": "情境交代", "task": "任务职责", "action": "行动过程",
+            "result": "结果呈现", "metric": "量化数据", "reflection": "复盘反思",
+        }
+        dim_labels = {
+            "structure": "结构完整度", "relevance": "内容相关性",
+            "specificity": "具体程度", "followup_adaptation": "追问适应度",
+            "clarity": "表达清晰度",
+        }
+        covered_counter = Counter()
+        missing_counter = Counter()
+        for t in turns:
+            me = set(t.get("missing_elements") or [])
+            covered_counter.update(set(star_labels) - me)
+            missing_counter.update(me)
+        n_turns = max(1, len([t for t in turns if t.get("answer")]))
+        strengths = [star_labels[e] for e, c in covered_counter.items() if c / n_turns >= 0.5]
+        weaknesses = [star_labels[e] for e, c in missing_counter.items() if c / n_turns >= 0.3]
+        strong_dims = [k for k, v in i_subscores.items() if v is not None and v >= 65]
+        weak_dims = [k for k, v in i_subscores.items() if v is not None and v < 60]
+
+        step_templates = {
+            "action": "用 STAR 重写 2 个代表项目，突出你本人的具体行动与分工。",
+            "result": "为每段经历补充结果句（完成/上线/交付 + 影响）。",
+            "metric": "为关键经历补充量化数据（百分比、耗时、规模等）。",
+            "situation": "回答前先用 1-2 句交代项目背景与当时处境。",
+            "task": "明确说出你的任务目标与职责边界。",
+            "reflection": "为一次项目写复盘笔记，提炼经验与改进点。",
+        }
+        next_steps = []
+        for e in weaknesses:
+            if e in step_templates:
+                next_steps.append(step_templates[e])
+        next_steps.extend([
+            "基于本报告的高频缺失项，用文字完成一轮 5 题模拟面试复测。",
+            "将报告结论同步到 F4 七天提升计划并设置每日任务。",
+        ])
+        next_steps = next_steps[:5]
+
+        lines.append("## 5. 优点总结（Strengths）")
+        if strengths or strong_dims:
+            for s in strengths:
+                lines.append("- " + s)
+            for d in strong_dims:
+                lines.append("- 维度表现良好：" + dim_labels.get(d, d))
+        else:
+            lines.append("- 暂无显著优势项，建议按不足项逐项补齐。")
+        lines.append("")
+        lines.append("## 6. 不足总结（Weaknesses）")
+        if weaknesses or weak_dims:
+            for w in weaknesses:
+                lines.append("- " + w)
+            for d in weak_dims:
+                lines.append("- 维度待提升：" + dim_labels.get(d, d))
+        else:
+            lines.append("- 无明显短板。")
+        lines.append("")
+        lines.append("## 7. 下一步安排（Next Steps）")
+        for i, step in enumerate(next_steps, 1):
+            lines.append("%d. %s" % (i, step))
         lines.append("")
 
         return "\n".join(lines)

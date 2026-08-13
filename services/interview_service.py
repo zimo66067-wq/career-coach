@@ -21,6 +21,29 @@ from services.match_service import MATCH_WEIGHTS
 
 # ------------------------------------------------------------------ #
 
+STAR_LABELS = {
+    "situation": "情境交代",
+    "task": "任务职责",
+    "action": "行动过程",
+    "result": "结果呈现",
+    "metric": "量化数据",
+    "reflection": "复盘反思",
+}
+
+
+def build_turn_evaluation(result):
+    """将引擎单轮结果转换为前端可展示的 优点/不足/子分 结构。"""
+    missing = result.get("missing_elements") or []
+    covered = [STAR_LABELS[k] for k in STAR_LABELS if k not in missing]
+    return {
+        "strengths": covered,
+        "weaknesses": [STAR_LABELS.get(k, k) for k in missing],
+        "missing_elements": missing,
+        "subscores": result.get("subscores"),
+        "answer_quote": result.get("answer_quote", ""),
+    }
+
+
 def build_interview_router():
     """Return a router when configured; None otherwise (question-bank fallback)."""
     try:

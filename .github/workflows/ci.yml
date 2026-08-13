@@ -52,7 +52,7 @@ jobs:
 
       - name: Run browser contract tests
         run: |
-          node --test tests/test_public_page_states.js tests/test_resume_upload.js tests/test_job_upload.js tests/test_publish_mirror.js tests/test_voice_ui.js tests/test_frontend_chain.js
+          node --test tests/test_public_page_states.js tests/test_resume_upload.js tests/test_job_upload.js tests/test_publish_mirror.js tests/test_f3_chat_ui.js tests/test_frontend_chain.js
 
       # --- 步骤5: Schema 校验（对所有 fixtures 执行 validate_schema） ---
       - name: Schema validation

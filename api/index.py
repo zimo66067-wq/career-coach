@@ -102,6 +102,7 @@ from services.interview_service import (  # noqa: E402
     answer_interview,
     build_ability_profile,
     build_interview_router,
+    build_turn_evaluation,
     end_interview,
     start_interview,
 )
@@ -651,10 +652,35 @@ def route_api(**_ignored):
         if len(answer_text) < 1:
             raise ApiError("invalid_answer", "回答内容不能为空。", 422)
         asr_confidence = body.get("asr_confidence")
-        result = engine.submit_answer(engine_session, answer_text, asr_confidence)
+
+        # 打字对话状态机：
+        # 1) 有待回答追问 -> 本次输入为追问回答，记录后进入下一主问题；
+        # 2) 主回答生成追问 -> 等待用户回答追问；
+        # 3) 主回答无追问 -> 直接进入下一主问题。
+        pending_followup = bool(engine_session.get("_current_followup"))
+        next_question = None
+        if pending_followup:
+            result = engine.submit_followup_answer(engine_session, answer_text)
+            next_question = engine.next_question(engine_session)
+        else:
+            result = engine.submit_answer(engine_session, answer_text, asr_confidence)
+            follow_up = result.get("follow_up") if isinstance(result.get("follow_up"), dict) else None
+            if not follow_up:
+                next_question = engine.next_question(engine_session)
         update_session(session_id, engine_session.get("state", "ASK"), engine_session)
+
         follow_up = result.get("follow_up") if isinstance(result.get("follow_up"), dict) else None
-        full_text = str((follow_up or {}).get("question") or "").strip() or "已收到回答，请继续。"
+        if next_question:
+            if next_question.get("done"):
+                full_text = "本轮面试已完成，正在生成综合报告…"
+            else:
+                full_text = str(next_question.get("question") or "").strip()
+        else:
+            full_text = str((follow_up or {}).get("question") or "").strip()
+        if not full_text:
+            full_text = "已收到回答，请继续。"
+
+        evaluation = build_turn_evaluation(result)
 
         def _sse_gen():
             chunk_size = 32
@@ -665,7 +691,9 @@ def route_api(**_ignored):
                     ensure_ascii=False,
                 ) + "\n\n"
             yield "data: " + json.dumps(
-                {"type": "done", "turn": result, "followUp": follow_up, "done": True},
+                {"type": "done", "turn": result, "followUp": follow_up,
+                 "evaluation": evaluation, "nextQuestion": next_question,
+                 "done": True},
                 ensure_ascii=False,
             ) + "\n\n"
 

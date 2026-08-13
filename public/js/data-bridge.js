@@ -620,6 +620,7 @@
         report: res.report,
         score_I: res.score_I,
         turns: res.turns,
+        i_subscores: res.i_subscores || {},
         trace_id: res.trace_id || traceId
       };
     }
