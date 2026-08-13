@@ -57,6 +57,7 @@
     var bridge = options.bridge;
     var getResumeText = options.getResumeText || function () { return ''; };
     var onProcessing = options.onProcessing || function () {};
+    var onUploadProgress = options.onUploadProgress || function () {};
     var ensureConsent = options.ensureConsent || async function () { return { ok: true }; };
     var isApiAvailable = options.isApiAvailable || function () {
       return typeof window !== 'undefined' && !!window.DUMATE_API_BASE;
@@ -156,7 +157,10 @@
       var consent = await confirmConsent();
       if (!consent.ok) return consent;
       onProcessing();
-      var uploadResponse = await bridge.uploadJD(file);
+      var jobUploader = (bridge && typeof bridge.uploadJDWithProgress === 'function')
+        ? function (targetFile) { return bridge.uploadJDWithProgress(targetFile, onUploadProgress); }
+        : function (targetFile) { return bridge.uploadJD(targetFile); };
+      var uploadResponse = await jobUploader(file);
       var prepared = prepareJobText(uploadResponse && uploadResponse.jdText);
       if (!usableResult(uploadResponse) || !prepared.ok) {
         return {

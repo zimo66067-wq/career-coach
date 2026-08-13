@@ -20,11 +20,16 @@
   <a class="nav" data-page="f2" href="pages/f2-match.html">F2 岗位匹配</a>
   <a class="nav" data-page="f3" href="pages/f3-interview.html">F3 模拟面试</a>
   <a class="nav" data-page="f4" href="pages/f4-report.html">F4 能力报告</a>
+  <a class="nav" data-page="f5" href="pages/f5-apply.html">F5 投递</a>
 </nav>
 <div class="wrap" id="main">
   <header class="hero">
     <h1 class="page-title">一位精密、安静、<br>值得信任的数字职业顾问</h1>
     <p class="page-sub">模型做语义，规则做分数，验证器做事实 —— 每个分数都能回指证据</p>
+      <div class="hero-cta">
+      <a class="btn" href="pages/f1-resume.html?quick=1">⚡ 30 秒体验 F1 简历诊断</a>
+      <a class="btn ghost" href="pages/f2-match.html?quick=1">⚡ 30 秒体验 F2 岗位匹配</a>
+    </div>
   </header>
 
   <div class="feat-grid">
@@ -66,7 +71,8 @@
 </div>
 <script src="js/mock-data.js"></script>
 <script src="js/app.js"></script>
-<!-- 侧边栏：个人账号 + 历史记录（原型演示） -->
+<script src="js/pages-api-config.js"></script>
+<script src="js/data-bridge.js"></script>
 <aside class="zy-sidebar" id="zySidebar" aria-label="账号与历史记录">
   <div class="zy-sidebar-head">
     <div class="zy-user-card">
@@ -80,16 +86,14 @@
     </div>
   </div>
   <div class="zy-history">
-    <div class="zy-history-title"><span>历史检测记录</span><button class="zy-history-clear" id="zyHistoryClear" type="button">清空</button></div>
+    <div class="zy-history-title"><span>历史检测记录</span><button class="zy-history-clear zy-hidden" id="zyHistoryClear" type="button">清空</button></div>
     <ul class="zy-history-list" id="zyHistoryList"></ul>
-    <div class="zy-history-empty" id="zyHistoryEmpty">还没有检测记录<br>完成一次诊断后会自动出现在这里</div>
-    <div class="zy-sidebar-demo-note" id="zyDemoNote">· 以下为演示数据 ·</div>
-    <button class="zy-add-record" id="zyAddRecord" type="button">＋ 模拟一次检测</button>
+    <div class="zy-history-empty" id="zyHistoryEmpty">还没有检测记录<br>完成一次诊断并登录后，记录会自动出现在这里</div>
+    <div class="zy-sidebar-demo-note zy-hidden" id="zyDemoNote">· 以下为演示数据 ·</div>
+    <button class="zy-add-record zy-hidden" id="zyAddRecord" type="button">＋ 模拟一次检测</button>
   </div>
 </aside>
 <div class="zy-sidebar-backdrop" id="zySidebarBackdrop"></div>
-
-<!-- 账号弹窗（原型演示：数据存 localStorage） -->
 <div class="zy-modal zy-hidden" id="zyAuthModal" role="dialog" aria-modal="true" aria-labelledby="zyAuthTitle">
   <div class="zy-modal-box">
     <button class="zy-modal-close" id="zyAuthClose" type="button" aria-label="关闭">×</button>
@@ -115,7 +119,8 @@
     <p class="zy-form-msg" id="zyAuthMsg"></p>
   </div>
 </div>
-<script src="js/data-bridge.js"></script>
+
 <script src="js/account.js"></script>
+<script src="js/quick-demo.js"></script>
 </body>
 </html>

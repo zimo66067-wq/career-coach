@@ -12,6 +12,7 @@
   var ENDPOINTS = {
     uploadResume:    '/api/wf01/upload',
     uploadJD:        '/api/wf03/upload',
+    tasks:           '/api/tasks',
     diagnoseResume:  '/api/wf02/diagnose',
     submitJD:        '/api/wf03/jd',
     matchJD:         '/api/wf03/match',
@@ -20,7 +21,9 @@
     endInterview:    '/api/wf04/end',
     getAbility:      '/api/wf05/ability',
     deleteData:      '/api/wf06/delete',
-    consent:         '/api/wf01/consent'
+    consent:         '/api/wf01/consent',
+    coverLetter:     '/api/wf07/cover-letter',
+    applications:    '/api/wf07/applications'
   };
 
   // 后端会依次尝试主模型与备用模型（Vercel 函数上限为 60 秒）。
@@ -184,6 +187,36 @@
     };
   }
 
+  // ── F5: 投递闭环（求职信 + 申请跟踪） ───────────────────
+  function generateCoverLetter(sessionId, company, position) {
+    return request(ENDPOINTS.coverLetter, {
+      method: 'POST',
+      body: { session_id: sessionId, company: company, position: position }
+    });
+  }
+
+  function saveApplication(sessionId, company, position, coverLetter) {
+    return request(ENDPOINTS.applications, {
+      method: 'POST',
+      body: {
+        session_id: sessionId,
+        company: company,
+        position: position,
+        cover_letter: coverLetter
+      }
+    });
+  }
+
+  function listApplications() {
+    return request(ENDPOINTS.applications, { method: 'GET' });
+  }
+
+  function deleteApplication(appId) {
+    return request(ENDPOINTS.applications + '?id=' + encodeURIComponent(String(appId)), {
+      method: 'DELETE'
+    });
+  }
+
   // ── 演示辅助：仅 ?demo=1 可返回合成数据 ───────────────
   function demoData(mockKey, traceId, reason) {
     if (!isDemoMode()) return unavailable(traceId, reason);
@@ -228,7 +261,8 @@
     }
 
     // 新上传的简历绝不能在接口失败时回退到上一份会话缓存；否则会把旧结果
-    // 错配给当前用户材料。生产路径直接返回明确错误，演示模式才允许样本数据。
+    // 错配给当前用户材料。生产路径直接透传服务端明确错误（含 scanned_pdf 等具体错误码），演示模式才允许样本数据。
+    if (!isDemoMode()) return res;
     var demoText = demoData('resumeText', traceId, res.error);
     var demoProfile = demoData('resumeProfile', traceId, res.error);
     if (demoText.error || demoProfile.error) return demoText.error ? demoText : demoProfile;
@@ -308,6 +342,138 @@
     if (res.error) return res;
     setCache('jobText', res.jdText);
     return { jdText: res.jdText, trace_id: res.trace_id || traceId };
+  }
+
+  // ── 带进度上传（XHR onprogress）─────────────────────────
+  function uploadWithXhr(endpoint, file, onProgress, traceId) {
+    return new Promise(function (resolve) {
+      var timedOut = false;
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', API_BASE + endpoint, true);
+        if (endpoint !== ENDPOINTS.consent) {
+          var consentToken = getCache('consentToken');
+          if (consentToken) xhr.setRequestHeader('X-Consent-Token', consentToken);
+        }
+        xhr.setRequestHeader('X-Trace-Id', traceId);
+        if (typeof onProgress === 'function' && xhr.upload) {
+          xhr.upload.addEventListener('progress', function (ev) {
+            if (ev.lengthComputable) {
+              onProgress({ loaded: ev.loaded, total: ev.total, percent: Math.round(ev.loaded / ev.total * 100) });
+            }
+          });
+        }
+        var timer = setTimeout(function () {
+          timedOut = true;
+          try { xhr.abort(); } catch (e) { /* ignore */ }
+          console.warn('[DataBridge] 上传超时 (' + TIMEOUT_MS + 'ms): ' + endpoint);
+          resolve({ error: 'timeout', message: '上传超时，请检查网络后重试', trace_id: traceId, degraded: true });
+        }, TIMEOUT_MS);
+        xhr.onload = function () {
+          clearTimeout(timer);
+          var json = {};
+          try { json = JSON.parse(xhr.responseText || '{}'); } catch (e) { /* ignore */ }
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(json);
+          } else {
+            resolve({
+              error: json.error || 'http_' + xhr.status,
+              message: json.message || ('服务器返回 ' + xhr.status),
+              trace_id: json.trace_id || traceId,
+              degraded: true
+            });
+          }
+        };
+        xhr.onerror = function () {
+          clearTimeout(timer);
+          if (timedOut) return;
+          console.warn('[DataBridge] 上传失败: ' + endpoint);
+          resolve({ error: 'network', message: '网络错误，请稍后重试', trace_id: traceId, degraded: true });
+        };
+        xhr.onabort = function () {
+          clearTimeout(timer);
+          if (timedOut) return;
+          resolve({ error: 'network', message: '上传已中断', trace_id: traceId, degraded: true });
+        };
+        var formData = new FormData();
+        formData.append('file', file);
+        xhr.send(formData);
+      } catch (err) {
+        resolve({ error: 'network', message: '上传失败：' + ((err && err.message) || '未知错误'), trace_id: traceId, degraded: true });
+      }
+    });
+  }
+
+  // 上传简历（带进度）-> {resumeText, resumeProfile, trace_id}
+  async function uploadResumeWithProgress(file, onProgress) {
+    var traceId = genTraceId();
+    var res = await uploadWithXhr(ENDPOINTS.uploadResume, file, onProgress, traceId);
+    if (!res.error) {
+      setCache('resumeText', res.resumeText);
+      setCache('resumeProfile', res.resumeProfile);
+      setCache('sessionId', res.session_id || traceId);
+      return { resumeText: res.resumeText, resumeProfile: res.resumeProfile, trace_id: res.trace_id || traceId, session_id: res.session_id || traceId };
+    }
+    if (!isDemoMode()) return res;
+    var demoText = demoData('resumeText', traceId, res.error);
+    var demoProfile = demoData('resumeProfile', traceId, res.error);
+    if (demoText.error || demoProfile.error) return demoText.error ? demoText : demoProfile;
+    return {
+      resumeText: demoText.data,
+      resumeProfile: demoProfile.data,
+      degraded: true,
+      degraded_reason: 'demo_mock',
+      demo_data: true,
+      trace_id: traceId
+    };
+  }
+
+  // 上传 JD（带进度）-> {jdText, trace_id}
+  async function uploadJDWithProgress(file, onProgress) {
+    var traceId = genTraceId();
+    var res = await uploadWithXhr(ENDPOINTS.uploadJD, file, onProgress, traceId);
+    if (res.error) return res;
+    setCache('jobText', res.jdText);
+    return { jdText: res.jdText, trace_id: res.trace_id || traceId };
+  }
+  // ── 任务中心（阶段3：客户端驱动分片）────────────────────
+  // 创建任务；同 owner + idempotency_key 幂等返回同一任务
+  async function createTask(taskType, payload, idempotencyKey) {
+    var traceId = genTraceId();
+    var body = { task_type: taskType, payload: payload };
+    if (idempotencyKey) body.idempotency_key = String(idempotencyKey).slice(0, 120);
+    var res = await request(ENDPOINTS.tasks, { body: body, _traceId: traceId });
+    if (res.error) return res;
+    return res.task || res;
+  }
+
+  // 查询任务进度
+  async function getTask(taskId) {
+    var res = await request(ENDPOINTS.tasks + '/' + encodeURIComponent(taskId), { method: 'GET', _traceId: genTraceId() });
+    if (res.error) return res;
+    return res.task || res;
+  }
+
+  // 推进一个分片（客户端驱动）
+  async function advanceTask(taskId) {
+    var res = await request(ENDPOINTS.tasks + '/' + encodeURIComponent(taskId) + '/next', { _traceId: genTraceId() });
+    if (res.error) return res;
+    return res.task || res;
+  }
+
+  // 轮询推进直至 done/failed；onProgress 收到每次任务快照
+  async function pollTask(taskId, onProgress) {
+    var task = await getTask(taskId);
+    if (!task || task.error) return task;
+    if (typeof onProgress === 'function') onProgress(task);
+    var guard = 0;
+    while (task && !task.error && (task.state === 'pending' || task.state === 'running') && guard < 80) {
+      task = await advanceTask(taskId);
+      if (!task || task.error) return task;
+      if (typeof onProgress === 'function') onProgress(task);
+      guard += 1;
+    }
+    return task;
   }
 
   // 提交 JD -> {jobProfile, trace_id}
@@ -611,7 +777,13 @@
   // ── 暴露接口 ──────────────────────────────────────────
   window.DataBridge = {
     uploadResume: uploadResume,
+    uploadResumeWithProgress: uploadResumeWithProgress,
     uploadJD: uploadJD,
+    createTask: createTask,
+    getTask: getTask,
+    advanceTask: advanceTask,
+    pollTask: pollTask,
+    uploadJDWithProgress: uploadJDWithProgress,
     diagnoseResume: diagnoseResume,
     submitJD: submitJD,
     matchJD: matchJD,
@@ -621,6 +793,10 @@
     getAbility: getAbility,
     submitConsent: submitConsent,
     deleteAllData: deleteAllData,
+  generateCoverLetter: generateCoverLetter,
+  saveApplication: saveApplication,
+  listApplications: listApplications,
+  deleteApplication: deleteApplication,
 
     // 降级检查
     isDegraded: function (result) {

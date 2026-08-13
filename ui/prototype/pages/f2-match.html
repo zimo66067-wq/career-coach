@@ -21,6 +21,7 @@
   <a class="nav" data-page="f2" href="f2-match.html">F2 岗位匹配</a>
   <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
   <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
+  <a class="nav" data-page="f5" href="f5-apply.html">F5 投递</a>
 </nav>
 <div class="wrap" id="main">
   <h1 class="page-title">F2 · 专业导向岗位匹配</h1>
@@ -67,6 +68,10 @@
         <div class="f2-intent-results" id="f2IntentResults"></div>
       </div>
       <div class="f2-selected zy-hidden" id="f2Selected"></div>
+            <div class="f2-demo-entry">
+        <button class="btn ghost" id="quickDemoF2" type="button">⚡ 一键体验：样例专业 + 样例简历</button>
+        <p class="f2-hint">无需注册上传，30 秒体验完整匹配流程（演示结果带标注，不写入历史记录）。</p>
+      </div>
       <div class="f2-panel-nav">
         <button class="btn" id="f2Next1" type="button" disabled>下一步：查看岗位画像</button>
       </div>
@@ -78,6 +83,7 @@
       <h3>第二步 · <span id="f2ProfileTitle"></span> 的岗位画像</h3>
       <p class="f2-hint" id="f2ProfileSummary"></p>
       <div id="f2ProfileBody"></div>
+            
       <div class="f2-panel-nav">
         <button class="btn" id="f2Back1" type="button">上一步</button>
         <button class="btn" id="f2Next2" type="button">下一步：上传简历</button>
@@ -93,12 +99,18 @@
         <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L8 8m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
         <span>拖入 .txt / .docx / .pdf，或点击选择</span>
         <input type="file" id="f2File" accept=".txt,.md,.docx,.pdf" class="zy-hidden">
+        <p class="f2-file-status" id="f2FileStatus" role="status" aria-live="polite"></p>
+        <div class="upload-progress" id="f2UploadProgress" hidden>
+          <div class="upload-progress-track"><div class="upload-progress-bar" id="f2UploadProgressBar"></div></div>
+          <span class="upload-progress-text" id="f2UploadProgressText">0%</span>
+        </div>
       </div>
       <textarea id="f2Resume" rows="9" placeholder="或直接粘贴简历正文（建议包含教育背景、技能、项目/实习经历）…"></textarea>
       <details class="f2-jd">
         <summary>可选：粘贴目标岗位 JD（填写后进入模式B精准匹配）</summary>
         <textarea id="f2Jd" rows="5" placeholder="粘贴 JD 文本，如：本科及以上学历，计算机相关专业；精通Java；负责订单系统开发…"></textarea>
       </details>
+            
       <div class="f2-panel-nav">
         <button class="btn" id="f2Back2" type="button">上一步</button>
         <button class="btn primary" id="f2StartMatch" type="button">开始匹配</button>
@@ -117,7 +129,8 @@
       </div>
     </div>
     <div class="card" id="f2ReportBody"></div>
-    <div class="f2-panel-nav">
+          
+      <div class="f2-panel-nav">
       <button class="btn" id="f2Back3" type="button">上一步</button>
       <button class="btn" id="f2Restart" type="button">重新匹配</button>
     </div>
@@ -125,6 +138,10 @@
 
   <div class="card zy-hidden" id="f2Loading">
     <div class="ai-status"><span class="ai-orb" aria-hidden="true"></span>正在匹配 · 解析画像与简历证据…</div>
+    <div class="upload-progress" id="f2TaskProgress" hidden>
+      <div class="upload-progress-track"><div class="upload-progress-bar" id="f2TaskProgressBar"></div></div>
+      <span class="upload-progress-text" id="f2TaskProgressText">0%</span>
+    </div>
     <div class="skel h-md" style="margin:14px 0"></div>
     <div class="skel h-md" style="margin:14px 0"></div>
     <div class="skel h-md"></div>
@@ -187,8 +204,10 @@
   </div>
 </div>
 <script src="../js/data-bridge.js"></script>
+<script src="../js/pages-api-config.js"></script>
 <script src="../js/account.js"></script>
 <script src="../js/app.js"></script>
 <script src="../js/f2-major.js"></script>
+<script src="../js/quick-demo.js"></script>
 </body>
 </html>

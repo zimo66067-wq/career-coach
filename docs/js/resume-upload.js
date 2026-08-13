@@ -81,6 +81,7 @@
     options = options || {};
     var bridge = options.bridge;
     var onProcessing = typeof options.onProcessing === "function" ? options.onProcessing : function () {};
+    var onUploadProgress = typeof options.onUploadProgress === "function" ? options.onUploadProgress : function () {};
     var ensureConsent = typeof options.ensureConsent === "function" ? options.ensureConsent : async function () { return { ok: true }; };
 
     function unavailable() {
@@ -129,7 +130,10 @@
         onProcessing();
         var uploaded;
         try {
-          uploaded = await bridge.uploadResume(file);
+          var resumeUploader = (bridge && typeof bridge.uploadResumeWithProgress === "function")
+            ? function (targetFile) { return bridge.uploadResumeWithProgress(targetFile, onUploadProgress); }
+            : function (targetFile) { return bridge.uploadResume(targetFile); };
+          uploaded = await resumeUploader(file);
         } catch (error) {
           return { ok: false, error: "network", message: failureMessage({ error: "network" }) };
         }
@@ -289,6 +293,16 @@
       onProcessing: function () {
         if (window.APP && typeof window.APP.setState === "function") window.APP.setState("processing");
       },
+      onUploadProgress: function (p) {
+        var progressWrap = document.getElementById("resumeUploadProgress");
+        var progressBar = document.getElementById("resumeUploadProgressBar");
+        var progressText = document.getElementById("resumeUploadProgressText");
+        var percent = Math.min(100, Math.max(0, Number(p && p.percent) || 0));
+        if (progressWrap) progressWrap.hidden = false;
+        if (progressBar) progressBar.style.width = percent + "%";
+        if (progressText) progressText.textContent = percent + "%";
+        setStatus("正在上传… " + percent + "%", false);
+      },
       ensureConsent: async function () {
         if (!consentCheckbox || !consentCheckbox.checked) {
           return { ok: false, error: "consent_required", message: "请先阅读并勾选数据处理说明。" };
@@ -320,6 +334,8 @@
 
     function finish(outcome) {
       isSubmitting = false;
+      var progressWrap = document.getElementById("resumeUploadProgress");
+      if (progressWrap) progressWrap.hidden = true;
       if (!outcome || !outcome.ok) {
         showError((outcome && outcome.message) || "诊断未完成，请稍后重试。");
         return;

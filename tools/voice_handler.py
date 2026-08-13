@@ -22,6 +22,7 @@ import urllib.parse
 from typing import Optional, Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from tools.providers.asr import build_asr_provider  # noqa: E402
 
 logger = logging.getLogger("voice_handler")
 
@@ -90,12 +91,33 @@ class VoiceHandler:
 
         # 后端编排层不直接调用浏览器 API；
         # 百度 ASR API 备用通道需要配置 ASR_API_URL
-        if self.asr_api:
+        # ASR fallback channel via provider abstraction (default mock).
+        provider = build_asr_provider()
+        if provider.name != "mock":
             try:
-                self._call_baidu_asr(turn_id, on_result, on_error, on_timeout)
+                self._call_provider_asr(provider, turn_id, on_result, on_error)
             except Exception as e:
-                logger.warning("[voice] ASR API error: %s", e)
+                logger.warning("[voice] ASR provider error: %s", e)
                 on_error(self.ASR_ERROR, str(e))
+
+    def _call_provider_asr(self, provider, turn_id, on_result, on_error):
+        """Run provider.transcribe in a worker thread (non-blocking)."""
+        def _asr_worker():
+            try:
+                result = provider.transcribe(None)
+            except Exception as exc:
+                on_error(self.ASR_ERROR, "asr_provider: %s" % exc)
+                return
+            text = str(result.get("text") or "")
+            if text and not self._cancelled:
+                self._stop_timer(turn_id)
+                on_result(text, float(result.get("confidence", 0.85)))
+            else:
+                on_error(self.ASR_ERROR, "asr_empty_result")
+
+        thread = threading.Thread(target=_asr_worker, daemon=True)
+        thread.start()
+
 
     def _call_baidu_asr(self, turn_id, on_result, on_error, on_timeout):
         """调用百度 ASR API（备用通道）。

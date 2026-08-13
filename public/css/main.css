@@ -556,3 +556,66 @@ table.dim th { background: var(--zy-bg-cool); font-weight: 650; }
   margin-top: 14px; padding: 12px 14px; border-radius: var(--zy-r-md);
   background: var(--zy-primary-soft); color: var(--zy-ink); font-size: 13.5px; line-height: 1.7;
 }
+
+/* ── Quick Demo（P0-1） ─────────────────────────── */
+.hero-cta {
+  margin-top: 18px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.hero-cta .btn {
+  font-size: 14px;
+}
+.demo-badge {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 80;
+  background: #7c3aed;
+  color: #fff;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .18);
+  display: none;
+}
+.demo-badge.show {
+  display: block;
+}
+.f2-demo-entry {
+  margin: 14px 0 4px;
+}
+.f2-demo-entry .btn {
+  margin-bottom: 6px;
+}
+
+/* 阶段2：上传进度条 */
+.upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.upload-progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, 0.22);
+  overflow: hidden;
+}
+.upload-progress-bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2563eb, #06b6d4);
+  transition: width 0.25s ease;
+}
+.upload-progress-text {
+  min-width: 3em;
+  font-size: 12px;
+  color: #6b7280;
+  text-align: right;
+}

@@ -7,6 +7,38 @@
   },
   "rewrites": [
     {
+      "source": "/api/tasks/(.*)",
+      "destination": "/api?_route=tasks/$1"
+    },
+    {
+      "source": "/api/tasks",
+      "destination": "/api?_route=tasks"
+    },
+    {
+      "source": "/api/knowledge/search",
+      "destination": "/api?_route=knowledge/search"
+    },
+    {
+      "source": "/api/knowledge/questions",
+      "destination": "/api?_route=knowledge/questions"
+    },
+    {
+      "source": "/api/wf04/asr",
+      "destination": "/api?_route=wf04/asr"
+    },
+    {
+      "source": "/api/wf04/stream",
+      "destination": "/api?_route=wf04/stream"
+    },
+    {
+      "source": "/api/wf02/optimize",
+      "destination": "/api?_route=wf02/optimize"
+    },
+    {
+      "source": "/api/wf02/apply-rewrite",
+      "destination": "/api?_route=wf02/apply-rewrite"
+    },
+    {
       "source": "/api/wf01/consent",
       "destination": "/api?_route=wf01/consent"
     },
@@ -133,6 +165,14 @@
     {
       "source": "/assets/:path*",
       "destination": "/ui/assets/:path*"
+    },
+    {
+      "source": "/api/wf07/cover-letter",
+      "destination": "/api?_route=wf07/cover-letter"
+    },
+    {
+      "source": "/api/wf07/applications",
+      "destination": "/api?_route=wf07/applications"
     }
   ]
 }

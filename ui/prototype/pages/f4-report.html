@@ -9,6 +9,144 @@
 <link rel="stylesheet" href="../css/main.css">
 <link rel="stylesheet" href="../css/states.css">
 <link rel="stylesheet" href="../css/sidebar.css">
+<style>
+  /* F1-F3 完成进度追踪器 */
+  .progress-tracker {
+    margin-bottom: 24px;
+    padding: 20px 24px;
+  }
+  .progress-tracker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+  .progress-summary {
+    font-size: 13px;
+    color: var(--zy-ink-3, #68707e);
+    font-weight: 600;
+    background: var(--zy-bg-cool, #f4f6f9);
+    padding: 4px 12px;
+    border-radius: var(--zy-r-pill, 999px);
+  }
+  .progress-steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 16px;
+  }
+  .progress-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+  .step-node {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--zy-line-2, rgba(22,30,52,.16));
+    background: var(--zy-surface, #fff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all var(--zy-d-mid, 260ms) var(--zy-ease, ease);
+  }
+  .step-num {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--zy-ink-3, #68707e);
+    transition: opacity .2s;
+  }
+  .step-icon {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    stroke: #fff;
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .progress-step.done .step-node {
+    border-color: var(--zy-covered, #15803d);
+    background: var(--zy-covered, #15803d);
+  }
+  .progress-step.done .step-num { opacity: 0; }
+  .progress-step.done .step-icon { opacity: 1; }
+  .step-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .step-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--zy-ink, #1b1e26);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .step-status {
+    font-size: 12px;
+    color: var(--zy-ink-3, #68707e);
+    transition: color .2s;
+  }
+  .progress-step.done .step-status {
+    color: var(--zy-covered, #15803d);
+    font-weight: 600;
+  }
+  .step-link {
+    font-size: 12px;
+    color: var(--zy-primary, #2f5fe8);
+    cursor: pointer;
+    text-decoration: none;
+    padding: 4px 10px;
+    border-radius: var(--zy-r-sm, 8px);
+    border: 1px solid var(--zy-line, rgba(22,30,52,.10));
+    transition: all .2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .step-link:hover {
+    background: var(--zy-primary-soft, #eef2ff);
+    border-color: var(--zy-primary, #2f5fe8);
+  }
+  .progress-step.done .step-link { display: none; }
+  .progress-connector {
+    flex: 0 1 32px;
+    height: 2px;
+    background: var(--zy-line-2, rgba(22,30,52,.16));
+    margin: 0 4px;
+    border-radius: 1px;
+    transition: background var(--zy-d-mid, 260ms) var(--zy-ease, ease);
+    align-self: center;
+    margin-top: -28px;
+  }
+  .progress-connector.active {
+    background: var(--zy-covered, #15803d);
+  }
+  .progress-bar-track {
+    width: 100%;
+    height: 6px;
+    background: var(--zy-bg-cool, #f4f6f9);
+    border-radius: var(--zy-r-pill, 999px);
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--zy-grad-ai, linear-gradient(135deg, #2f6bff 0%, #4f46e5 100%));
+    border-radius: var(--zy-r-pill, 999px);
+    transition: width 600ms var(--zy-ease-spring, cubic-bezier(.34,1.38,.44,1));
+  }
+  @media (max-width: 640px) {
+    .progress-steps { flex-direction: column; align-items: stretch; gap: 12px; }
+    .progress-connector { display: none; }
+    .progress-step { width: 100%; }
+  }
+</style>
+<link rel="stylesheet" href="../css/sidebar.css">
 </head>
 <body data-page="f4">
 <a class="skip-link" href="#main">跳到主要内容</a>
@@ -20,10 +158,48 @@
   <a class="nav" data-page="f2" href="f2-match.html">F2 岗位匹配</a>
   <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
   <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
+  <a class="nav" data-page="f5" href="f5-apply.html">F5 投递</a>
 </nav>
 <div class="wrap" id="main">
   <h1 class="page-title">F4 · 能力报告 + 七天竞争力情景推演</h1>
   <p class="page-sub">C0 = 0.25R + 0.35M + 0.40I ｜ 七天结果为公开假设下的情景区间，不是预测</p>
+
+  <section class="card journey-progress" aria-labelledby="journeyProgressTitle">
+    <div class="journey-progress-head">
+      <div>
+        <p class="journey-eyebrow">报告前置任务</p>
+        <h2 id="journeyProgressTitle">F1–F3 完成进度</h2>
+      </div>
+      <p class="journey-progress-count" aria-live="polite"><strong id="journeyCompleteCount">0</strong><span> / 3 已完成</span></p>
+    </div>
+    <div class="journey-map" id="journeyMap" data-complete="0">
+      <svg class="journey-links" viewBox="0 0 960 236" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <path class="journey-link journey-link-f1" d="M218 78 C342 34, 397 76, 450 108"></path>
+        <path class="journey-link journey-link-f2" d="M742 78 C618 34, 563 76, 510 108"></path>
+        <path class="journey-link journey-link-f3" d="M480 194 C480 170, 480 154, 480 140"></path>
+      </svg>
+      <a class="journey-node journey-node-f1" id="journeyF1" href="f1-resume.html">
+        <span class="journey-node-code">F1</span>
+        <strong>简历诊断</strong>
+        <span class="journey-node-state" id="journeyF1State">待完成</span>
+      </a>
+      <a class="journey-node journey-node-f2" id="journeyF2" href="f2-match.html">
+        <span class="journey-node-code">F2</span>
+        <strong>岗位匹配</strong>
+        <span class="journey-node-state" id="journeyF2State">待完成</span>
+      </a>
+      <a class="journey-node journey-node-f3" id="journeyF3" href="f3-interview.html">
+        <span class="journey-node-code">F3</span>
+        <strong>模拟面试</strong>
+        <span class="journey-node-state" id="journeyF3State">待完成</span>
+      </a>
+      <div class="journey-hub" id="journeyHub" role="status" aria-live="polite">
+        <span>F4</span>
+        <strong id="journeyHubState">待解锁</strong>
+      </div>
+    </div>
+    <p class="journey-description" id="journeyDescription">正在读取本次浏览器会话的完成记录。</p>
+  </section>
 
   <div data-state-view="empty">
     <div class="card empty-state">
@@ -108,9 +284,7 @@
   </div>
 </div>
 
-<script src="../js/mock-data.js"></script>
-<script src="../js/app.js"></script>
-<script src="../js/radar.js"></script>
+<!-- 侧边栏：个人账号 + 历史记录（演示原型，数据存 localStorage） -->
 <aside class="zy-sidebar" id="zySidebar" aria-label="账号与历史记录">
   <div class="zy-sidebar-head">
     <div class="zy-user-card">
@@ -157,23 +331,125 @@
     <p class="zy-form-msg" id="zyAuthMsg"></p>
   </div>
 </div>
+<script src="../js/mock-data.js"></script>
+<script src="../js/app.js"></script>
+<script src="../js/radar.js"></script>
+<script src="../js/pages-api-config.js"></script>
 <script src="../js/data-bridge.js"></script>
 <script src="../js/account.js"></script>
 <script>
+// ── F1-F3 完成进度追踪器 ──────────────────────────────
+(function () {
+  function checkProgress() {
+    var DB = window.DataBridge;
+    if (!DB || !DB._cache) return { f1: false, f2: false, f3: false };
+
+    var f1Done = !!DB._cache.get('resumeProfile');
+    var f2Done = !!DB._cache.get('matchResult');
+    var f3Done = !!DB._cache.get('interviewReport') || !!DB._cache.get('sessionId');
+
+    return { f1: f1Done, f2: f2Done, f3: f3Done };
+  }
+
+  function renderProgress() {
+    var p = checkProgress();
+    var count = (p.f1 ? 1 : 0) + (p.f2 ? 1 : 0) + (p.f3 ? 1 : 0);
+    var pct = (count / 3) * 100;
+
+    document.getElementById('progressSummary').textContent = count + ' / 3 步完成';
+    document.getElementById('progressBarFill').style.width = pct + '%';
+
+    var steps = document.querySelectorAll('.progress-step');
+    steps.forEach(function (s) {
+      var step = s.getAttribute('data-step');
+      s.classList.toggle('done', !!p[step]);
+      var statusEl = s.querySelector('.step-status');
+      if (statusEl) statusEl.textContent = p[step] ? '已完成' : '未完成';
+    });
+
+    document.getElementById('connector1').classList.toggle('active', p.f1 && p.f2);
+    document.getElementById('connector2').classList.toggle('active', p.f2 && p.f3);
+  }
+
+  function bindStepLinks() {
+    document.querySelectorAll('.step-link').forEach(function (link) {
+      link.addEventListener('click', function () {
+        var href = this.getAttribute('data-href');
+        if (href) window.location.href = href;
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    renderProgress();
+    bindStepLinks();
+  });
+
+  // 暴露给外部以便其他页面完成后通知刷新
+  window.ProgressTracker = { render: renderProgress, check: checkProgress };
+})();
+
 function renderPlan(elId, plan) {
   document.getElementById(elId).innerHTML = plan.map(function (p) {
     return '<div class="plan-day"><div class="d">第 ' + p.day + " 天</div><div style=\"font-size:14px\">" + p.focus + '</div><div class="m">⏱ ' + p.minutes + " 分钟 ｜ 成果物：" + p.artifact + "</div></div>";
   }).join("");
 }
+function updateJourneyProgress() {
+  var cache = window.DataBridge && window.DataBridge._cache;
+  function hasResult(key) {
+    if (!cache || typeof cache.get !== "function") return false;
+    try {
+      var value = cache.get(key);
+      return value !== null && value !== undefined;
+    } catch (err) {
+      return false;
+    }
+  }
+  var steps = [
+    { key: "diagnoseResult", node: "journeyF1", state: "journeyF1State", label: "F1 简历诊断" },
+    { key: "matchResult", node: "journeyF2", state: "journeyF2State", label: "F2 岗位匹配" },
+    { key: "interviewReport", node: "journeyF3", state: "journeyF3State", label: "F3 模拟面试" }
+  ];
+  var completeCount = 0;
+  steps.forEach(function (step, index) {
+    var complete = hasResult(step.key);
+    if (complete) completeCount += 1;
+    var node = document.getElementById(step.node);
+    var state = document.getElementById(step.state);
+    if (node) {
+      node.classList.toggle("is-complete", complete);
+      node.setAttribute("aria-label", step.label + "：" + (complete ? "已完成" : "待完成"));
+    }
+    if (state) state.textContent = complete ? "已完成" : "待完成";
+    var map = document.getElementById("journeyMap");
+    if (map) map.classList.toggle("journey-f" + (index + 1) + "-complete", complete);
+  });
+  var count = document.getElementById("journeyCompleteCount");
+  var hub = document.getElementById("journeyHub");
+  var hubState = document.getElementById("journeyHubState");
+  var description = document.getElementById("journeyDescription");
+  var allComplete = completeCount === steps.length;
+  if (count) count.textContent = completeCount;
+  if (hub) hub.classList.toggle("is-ready", allComplete);
+  if (hubState) hubState.textContent = allComplete ? "可生成" : "待解锁";
+  if (description) {
+    description.textContent = window.APP && window.APP.isDemoMode()
+      ? "演示数据不会计入进度；完成状态仅依据本浏览器会话中的真实结果。"
+      : "仅在成功得到诊断、匹配或面试报告后计为完成；上传文件或访问页面不计入进度。";
+  }
+}
 document.addEventListener("DOMContentLoaded", function () {
+  updateJourneyProgress();
   var state = window.APP.getState();
-  // 主链路: 优先 DataBridge, MOCK 作为降级缓存
+  if (!window.APP.isDemoMode() || (state !== "success" && state !== "degraded")) return;
+  // 成功/降级态的合成内容仅用于显式演示模式。
   var DB = window.DataBridge;
   function fetchSync(key) {
     if (DB && DB.getMockData) { var d = DB.getMockData(key); if (d) return d; }
-    return window.MOCK ? window.MOCK[key] : null;
+    return null;
   }
   var a = fetchSync('ability');
+  if (!a) return;
   if (state === "success") {
     document.getElementById("assump").innerHTML = "<b>情景假设：</b>" + a.scenario_day7.assumptions.join("；");
     window.RADAR.mount("radar", a, false);
@@ -200,5 +476,53 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 </script>
+<aside class="zy-sidebar" id="zySidebar" aria-label="账号与历史记录">
+  <div class="zy-sidebar-head">
+    <div class="zy-user-card">
+      <div class="zy-avatar" id="zyAvatar">访</div>
+      <div class="zy-user-meta">
+        <div class="zy-user-name" id="zyUserName">未登录游客</div>
+        <div class="zy-user-sub" id="zyUserSub">登录后历史可长期保存</div>
+        <button class="zy-user-action" id="zyLoginBtn" type="button">登录 / 注册</button>
+        <button class="zy-user-action zy-hidden" id="zyLogoutBtn" type="button">退出登录</button>
+      </div>
+    </div>
+  </div>
+  <div class="zy-history">
+    <div class="zy-history-title"><span>历史检测记录</span><button class="zy-history-clear zy-hidden" id="zyHistoryClear" type="button">清空</button></div>
+    <ul class="zy-history-list" id="zyHistoryList"></ul>
+    <div class="zy-history-empty" id="zyHistoryEmpty">还没有检测记录<br>完成一次诊断并登录后，记录会自动出现在这里</div>
+    <div class="zy-sidebar-demo-note zy-hidden" id="zyDemoNote">· 以下为演示数据 ·</div>
+    <button class="zy-add-record zy-hidden" id="zyAddRecord" type="button">＋ 模拟一次检测</button>
+  </div>
+</aside>
+<div class="zy-sidebar-backdrop" id="zySidebarBackdrop"></div>
+<div class="zy-modal zy-hidden" id="zyAuthModal" role="dialog" aria-modal="true" aria-labelledby="zyAuthTitle">
+  <div class="zy-modal-box">
+    <button class="zy-modal-close" id="zyAuthClose" type="button" aria-label="关闭">×</button>
+    <h3 id="zyAuthTitle">登录 / 注册</h3>
+    <div class="zy-tabs">
+      <button class="zy-tab active" data-tab="login" type="button">登录</button>
+      <button class="zy-tab" data-tab="register" type="button">注册</button>
+    </div>
+    <form class="zy-form" id="zyLoginForm">
+      <label>手机号或邮箱<input name="account" type="text" placeholder="手机号或邮箱" required></label>
+      <label>登录密码<input name="password" type="password" placeholder="登录密码" required></label>
+      <button class="zy-btn" type="submit">登 录</button>
+    </form>
+    <form class="zy-form zy-hidden" id="zyRegisterForm">
+      <label>手机号<input name="phone" type="tel" placeholder="11 位手机号" required></label>
+      <label>邮箱<input name="email" type="email" placeholder="you@example.com" required></label>
+      <label>邮箱密码<input name="emailPwd" type="password" placeholder="设置平台登录密码" required>
+        <span class="zy-hint">请设置专用登录密码，勿使用邮箱本身的密码</span>
+      </label>
+      <label>账户名<input name="name" type="text" placeholder="2-16 个字符，如：小张" required></label>
+      <button class="zy-btn" type="submit">注 册</button>
+    </form>
+    <p class="zy-form-msg" id="zyAuthMsg"></p>
+  </div>
+</div>
+
+<script src="../js/account.js"></script>
 </body>
 </html>

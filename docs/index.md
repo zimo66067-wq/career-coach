@@ -22,6 +22,7 @@
 | remaining-items.md | 项目管理 | 剩余未完成任务 |
 | remaining-items-2026-08-02-fixed.md | 项目管理 | 已修复问题清单 |
 | design-and-tech-path.md | 设计与技术 | 设计路径与技术路径汇总（PRD/架构/隐私/审查恢复版） |
+| iteration-3-plan-2026-08-12-phases-1-5.md | 规划 | 竞品驱动阶段 1-5 全链路规划（Quick Demo / OCR / 任务中心 / 内容生态 / 工程化） |
 | test-report.md | 测试报告 | 对照设计与 GitHub 仓库的完整性测试报告 |
 
 > 新增文件请按 `主题_类型.md` 命名，并更新本索引。

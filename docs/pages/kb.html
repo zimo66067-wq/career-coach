@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>面经知识库 · 职跃AI</title>
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/main.css">
+<link rel="stylesheet" href="../css/states.css">
+<link rel="stylesheet" href="../css/sidebar.css">
+<style>
+  .kb-search { display: flex; gap: 8px; margin: 18px 0 10px; flex-wrap: wrap; }
+  .kb-search input { flex: 1; min-width: 240px; padding: 10px 12px; border: 1px solid var(--zy-line-2, rgba(22,30,52,.16)); border-radius: var(--zy-r-sm, 8px); font-size: 14px; }
+  .kb-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 16px; }
+  .kb-chip { border: 1px solid var(--zy-line-2, rgba(22,30,52,.16)); background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  .kb-chip.active { background: var(--zy-primary, #2f5fe8); border-color: var(--zy-primary, #2f5fe8); color: #fff; }
+  .kb-item { margin-bottom: 12px; }
+  .kb-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--zy-ink-3, #7a8699); margin-bottom: 6px; }
+  .kb-cat { background: rgba(47,107,255,.08); color: var(--zy-primary, #2f5fe8); border-radius: 4px; padding: 2px 8px; }
+  .kb-item h3 { margin: 0 0 8px; font-size: 15px; }
+  .kb-answer { margin: 0 0 8px; line-height: 1.7; }
+  .kb-tips { font-size: 13px; color: var(--zy-weak, #b45309); margin: 0; }
+  .kb-empty { color: var(--zy-ink-3, #7a8699); padding: 32px 0; text-align: center; }
+  .kb-notice { font-size: 12px; color: var(--zy-ink-3, #7a8699); }
+</style>
+</head>
+<body data-page="kb">
+<a class="skip-link" href="#main">跳到主要内容</a>
+<nav class="topnav" aria-label="主导航">
+  <button class="zy-sidebar-toggle" id="zySidebarToggle" type="button" aria-label="切换侧边栏" aria-expanded="true">☰</button>
+  <span class="brand">职跃AI</span>
+  <a class="nav" data-page="home" href="../index.html">首页</a>
+  <a class="nav" data-page="f1" href="f1-resume.html">F1 简历诊断</a>
+  <a class="nav" data-page="f2" href="f2-match.html">F2 岗位匹配</a>
+  <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
+  <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
+  <a class="nav" data-page="f5" href="f5-apply.html">F5 投递</a>
+  <a class="nav" data-page="kb" href="kb.html">面经知识库</a>
+</nav>
+<div class="wrap" id="main">
+  <h1 class="page-title">面经知识库</h1>
+  <p class="page-sub">按 F3 面试场景分类的常见问题与回答框架，支持关键词检索（BM25）</p>
+  <div class="kb-search">
+    <input id="kbQuery" type="search" placeholder="输入关键词，如：项目难点、性能优化、反问…" aria-label="检索面经">
+    <span class="btn primary" id="kbSearchBtn" role="button" tabindex="0">检索</span>
+  </div>
+  <div class="kb-chips" id="kbChips"></div>
+  <p class="kb-notice" id="kbNotice"></p>
+  <div id="kbResults"></div>
+</div>
+<aside class="zy-sidebar" id="zySidebar" aria-label="账号与历史记录">
+  <div class="zy-sidebar-head">
+    <div class="zy-user-card">
+      <div class="zy-avatar" id="zyAvatar">访</div>
+      <div class="zy-user-meta">
+        <div class="zy-user-name" id="zyUserName">未登录游客</div>
+        <div class="zy-user-sub" id="zyUserSub">登录后历史可长期保存</div>
+        <button class="zy-user-action" id="zyLoginBtn" type="button">登录 / 注册</button>
+        <button class="zy-user-action zy-hidden" id="zyLogoutBtn" type="button">退出登录</button>
+      </div>
+    </div>
+  </div>
+  <div class="zy-history">
+    <div class="zy-history-title"><span>历史检测记录</span><button class="zy-history-clear zy-hidden" id="zyHistoryClear" type="button">清空</button></div>
+    <ul class="zy-history-list" id="zyHistoryList"></ul>
+    <div class="zy-history-empty" id="zyHistoryEmpty">还没有检测记录<br>完成一次诊断并登录后，记录会自动出现在这里</div>
+    <div class="zy-sidebar-demo-note zy-hidden" id="zyDemoNote">· 以下为演示数据 ·</div>
+    <button class="zy-add-record zy-hidden" id="zyAddRecord" type="button">＋ 模拟一次检测</button>
+  </div>
+</aside>
+<div class="zy-sidebar-backdrop" id="zySidebarBackdrop"></div>
+<div class="zy-modal zy-hidden" id="zyAuthModal" role="dialog" aria-modal="true" aria-labelledby="zyAuthTitle">
+  <div class="zy-modal-box">
+    <button class="zy-modal-close" id="zyAuthClose" type="button" aria-label="关闭">×</button>
+    <h3 id="zyAuthTitle">登录 / 注册</h3>
+    <div class="zy-tabs">
+      <button class="zy-tab active" data-tab="login" type="button">登录</button>
+      <button class="zy-tab" data-tab="register" type="button">注册</button>
+    </div>
+    <form class="zy-form" id="zyLoginForm">
+      <label>手机号或邮箱<input name="account" type="text" placeholder="手机号或邮箱" required></label>
+      <label>登录密码<input name="password" type="password" placeholder="登录密码" required></label>
+      <button class="zy-btn" type="submit">登 录</button>
+    </form>
+    <form class="zy-form zy-hidden" id="zyRegisterForm">
+      <label>手机号<input name="phone" type="tel" placeholder="11 位手机号" required></label>
+      <label>邮箱<input name="email" type="email" placeholder="you@example.com" required></label>
+      <label>邮箱密码<input name="emailPwd" type="password" placeholder="设置平台登录密码" required>
+        <span class="zy-hint">请设置专用登录密码，勿使用邮箱本身的密码</span>
+      </label>
+      <label>账户名<input name="name" type="text" placeholder="2-16 个字符，如：小张" required></label>
+      <button class="zy-btn" type="submit">注 册</button>
+    </form>
+    <p class="zy-form-msg" id="zyAuthMsg"></p>
+  </div>
+</div>
+<script src="../js/mock-data.js"></script>
+<script src="../js/app.js"></script>
+<script src="../js/pages-api-config.js"></script>
+<script src="../js/data-bridge.js"></script>
+<script src="../js/account.js"></script>
+<script src="../js/kb.js"></script>
+</body>
+</html>

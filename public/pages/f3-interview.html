@@ -144,6 +144,8 @@
   <a class="nav" data-page="f2" href="f2-match.html">F2 岗位匹配</a>
   <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
   <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
+  <a class="nav" data-page="f5" href="f5-apply.html">F5 投递</a>
+  <a class="nav" data-page="kb" href="kb.html">面经知识库</a>
 </nav>
 <div class="wrap" id="main">
   <h1 class="page-title">F3 · AI 模拟面试（文字主链路）</h1>
@@ -158,7 +160,7 @@
         <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
         <span style="font-size:12px;color:var(--zy-ink-3)">语音链路待命</span>
       </div>
-      <span class="btn">开始面试</span> <span class="btn ghost">启用语音（增强）</span>
+      <button class="btn" id="f3StartBtn" type="button">开始面试</button> <span class="btn ghost">启用语音（增强）</span>
     </div>
   </div>
 
@@ -185,6 +187,15 @@
       </div>
       <h3>面试记录（3 轮节选）与即时评估</h3>
       <div id="turns"></div>
+      <div class="card" id="f3AnswerCard" style="margin-top:14px">
+        <h3>回答第 <span id="f3TurnNo">1</span> 题</h3>
+        <textarea id="f3Answer" rows="4" placeholder="输入你的回答（Ctrl+Enter 提交）…"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn primary" id="f3SendAnswer" type="button">提交回答（流式追问）</button>
+          <button class="btn ghost" id="f3EndInterview" type="button">结束面试</button>
+        </div>
+        <div id="f3StreamingBubble" style="display:none;margin-top:10px"></div>
+      </div>
       <div style="text-align:center;margin-top:10px"><span class="btn ghost">继续第 4 题</span></div>
     </div>
   </div>
@@ -554,5 +565,6 @@ document.addEventListener("DOMContentLoaded", function () {
 </div>
 
 <script src="../js/account.js"></script>
+<script src="../js/f3-interview.js"></script>
 </body>
 </html>

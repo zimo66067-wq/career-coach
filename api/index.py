@@ -5,6 +5,7 @@ only de-identified, anonymized session data in a lightweight SQLite store
 (/tmp by default; ephemeral on Vercel).  Real resumes, JD texts and model
 outputs are never logged verbatim.
 """
+import hashlib
 import json
 import os
 import re
@@ -13,7 +14,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request, stream_with_context
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from jsonschema import Draft202012Validator
 from werkzeug.exceptions import HTTPException
@@ -40,6 +41,9 @@ from tools.database import (  # noqa: E402
     save_resume,
     save_session,
     update_session,
+    list_rewrites,
+    mark_rewrite_applied,
+    save_rewrite,
 )
 from tools.account import (  # noqa: E402
     AccountError,
@@ -56,6 +60,14 @@ from tools.account import (  # noqa: E402
 )
 from tools.deidentify import deidentify  # noqa: E402
 from tools.extract_text import extract_docx, extract_pdf, extract_txt  # noqa: E402
+from tools.ocr_provider import ocr_pdf  # noqa: E402
+from tools.knowledge import (  # noqa: E402
+    list_categories,
+    list_questions,
+    search_questions,
+)
+from tools.optimizer import rewrite_suggestion  # noqa: E402
+from tools.providers.asr import build_asr_provider  # noqa: E402
 from tools.interview_engine import InterviewEngine  # noqa: E402
 from tools.match_requirements import (  # noqa: E402
     Bm25Matcher,
@@ -68,7 +80,42 @@ from tools.model_router import ZhipuModelRouter  # noqa: E402
 from tools.radar_adapter import build_option  # noqa: E402
 from tools.redflag import JSON_NOISE, RE_NUMBER, RE_PLACEHOLDER  # noqa: E402
 from tools.rescore import calc_R, compute as rescore_compute, round2  # noqa: E402
+from tools.tasks import advance_task as tasks_advance  # noqa: E402
+from tools.tasks import create_task as tasks_create  # noqa: E402
+from tools.tasks import get_task as tasks_get  # noqa: E402
 from tools.validate_schema import business_rules  # noqa: E402
+
+
+
+# ---- Phase 5: shared modules + service layer ----
+from services.apply_service import (  # noqa: E402
+    create_application,
+    delete_application,
+    generate_cover_letter,
+    list_applications_for,
+)
+from services.diagnosis_service import (  # noqa: E402
+    build_rule_based_resume_profile,
+    diagnose_resume,
+)
+from services.interview_service import (  # noqa: E402
+    answer_interview,
+    build_ability_profile,
+    build_interview_router,
+    end_interview,
+    start_interview,
+)
+from services.match_service import (  # noqa: E402
+    build_job_profile,
+    match_job_profile,
+    validate_job_profile,
+)
+from services.task_service import _f2_match_chunk  # noqa: E402
+from tools.api_errors import ApiError  # noqa: E402
+from tools.contracts import MAX_TEXT_CHARS, MIN_TEXT_CHARS  # noqa: E402
+from tools.providers.model import build_model_router  # noqa: E402
+from tools.trace import trace_id  # noqa: E402
+
 
 
 app = Flask(__name__)
@@ -81,41 +128,10 @@ PUBLIC_PAGES_ORIGIN = "https://zimo66067-wq.github.io"
 TRACE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{6,96}$")
 CONSENT_TOKEN_SALT = "career-coach-consent-v1"
 DEFAULT_CONSENT_MAX_AGE_SECONDS = 1800
-SUBSCORE_DEFAULTS = {
-    "structure": "结构完整度",
-    "clarity": "表达清晰度",
-    "achievement_evidence": "成果证据",
-    "skill_evidence": "技能证据",
-    "ats_readability": "ATS 可读性",
-}
 
 # Multipart overhead is allowed here; the file itself is checked separately.
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_BYTES + 1024 * 1024
 
-with (REPOSITORY_ROOT / "contracts" / "resume-profile.schema.json").open(
-    encoding="utf-8"
-) as schema_file:
-    RESUME_PROFILE_VALIDATOR = Draft202012Validator(json.load(schema_file))
-
-with (REPOSITORY_ROOT / "contracts" / "job-profile.schema.json").open(
-    encoding="utf-8"
-) as schema_file:
-    JOB_PROFILE_VALIDATOR = Draft202012Validator(json.load(schema_file))
-
-
-class ApiError(Exception):
-    def __init__(self, code, message, status=400):
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.status = status
-
-
-def trace_id():
-    candidate = request.headers.get("X-Trace-Id", "")
-    if TRACE_ID_PATTERN.fullmatch(candidate):
-        return candidate
-    return "api_" + uuid.uuid4().hex[:16]
 
 
 def configured_origins():
@@ -371,7 +387,20 @@ def read_uploaded_document(label, error_code):
         raise
     except SystemExit:
         if extension == ".pdf":
-            raise ApiError("scanned_pdf", "该 PDF 是扫描件/图片型，无法直接提取文字，请改为可复制文字的 PDF、DOCX、TXT 或直接粘贴正文。", 422)
+            # 扫描件 OCR 兜底：配置 OCR_API_KEY/OCR_SECRET_KEY 时自动逐页识别
+            try:
+                ocr_result = ocr_pdf(temporary_path)
+            except Exception:  # noqa: BLE001
+                ocr_result = {"ok": False, "error": "ocr_failed", "message": "OCR 处理异常"}
+            if ocr_result.get("ok") and str(ocr_result.get("text") or "").strip():
+                text = str(ocr_result["text"]).strip()
+                return validate_document_text(text, label, error_code), uploaded.filename, extension, file_size
+            detail = str(ocr_result.get("message") or "")
+            raise ApiError(
+                "scanned_pdf",
+                "该 PDF 是扫描件/图片型，无法直接提取文字。%s请改为可复制文字的 PDF、DOCX、TXT 或直接粘贴正文。" % (detail + ("，" if detail else "")),
+                422,
+            )
         raise ApiError("unreadable_file", "未能读取该文件，请改为可复制文字的 PDF、DOCX、TXT 或直接粘贴正文。", 422)
     except Exception:
         raise ApiError("unreadable_file", "未能读取该文件，请确认文件未损坏后重试。", 422)
@@ -391,939 +420,15 @@ def read_uploaded_job():
     return read_uploaded_document("职位说明（JD）", "invalid_jd_text")
 
 
-def build_model_router():
-    primary_model = (
-        os.environ.get("DUMATE_MODEL")
-        or os.environ.get("ZHIPU_MODEL")
-        or os.environ.get("PRIMARY_MODEL")
-    )
-    fallback_model = os.environ.get("ZHIPU_FALLBACK_MODEL") or os.environ.get("FALLBACK_MODEL")
-    if not os.environ.get("ZHIPU_API_KEY") or not (primary_model or fallback_model):
-        raise ApiError("model_not_configured", "诊断模型尚未配置完成，请联系服务管理员。", 503)
-    return ZhipuModelRouter(primary_model=primary_model, fallback_model=fallback_model)
+def _task_owner_key():
+    """服务端派生任务归属：登录用户 user:<id>，游客 guest:<consent hash>。"""
+    user, _token = current_session()
+    if user:
+        return "user:%s" % user["id"]
+    consent = request.headers.get("X-Consent-Token", "")
+    return "guest:" + hashlib.sha256(consent.encode("utf-8")).hexdigest()[:24]
 
 
-# ------------------------------------------------------------------ #
-# Resume profile normalization and validation (F1 / WF-02)
-# ------------------------------------------------------------------ #
-
-def profile_validation_errors(profile, resume_text):
-    errors = []
-    for error in sorted(RESUME_PROFILE_VALIDATOR.iter_errors(profile), key=str):
-        path = "/".join(str(part) for part in error.absolute_path) or "(root)"
-        errors.append("schema:%s" % path)
-    try:
-        business_rules(profile, errors)
-    except (AttributeError, TypeError):
-        errors.append("business_rule_type")
-
-    for subscore in (profile.get("subscores") or {}).values():
-        if not isinstance(subscore, dict):
-            continue
-        for span in subscore.get("source_spans", []):
-            validate_source_span(span, resume_text, errors)
-    for suggestion in profile.get("suggestions", []):
-        if not isinstance(suggestion, dict):
-            continue
-        for span in suggestion.get("source_spans", []):
-            validate_source_span(span, resume_text, errors)
-    errors.extend(redflag_errors(profile, resume_text))
-    return errors
-
-
-def validate_source_span(span, resume_text, errors):
-    if not isinstance(span, dict):
-        return
-    quote = span.get("quote")
-    start = span.get("start")
-    end = span.get("end")
-    if not isinstance(quote, str) or not isinstance(start, int) or not isinstance(end, int):
-        return
-    if start < 0 or end <= start or end > len(resume_text) or resume_text[start:end] != quote:
-        errors.append("source_span_not_grounded")
-
-
-def fallback_source_span(resume_text):
-    """Return a short, exact excerpt when the provider omitted location metadata."""
-    start = next((index for index, char in enumerate(resume_text) if not char.isspace()), 0)
-    end = min(len(resume_text), start + 160)
-    return {
-        "doc": "resume",
-        "quote": resume_text[start:end],
-        "start": start,
-        "end": end,
-    }
-
-
-def normalize_source_spans(raw_spans, resume_text):
-    """Fill omitted source-span fields and flag provider citations that cannot be proven."""
-    if not isinstance(raw_spans, list):
-        return [], False
-
-    normalized = []
-    for raw_span in raw_spans:
-        if not isinstance(raw_span, dict):
-            continue
-        quote = raw_span.get("quote")
-        start = raw_span.get("start")
-        end = raw_span.get("end")
-
-        if isinstance(quote, str) and quote:
-            if isinstance(start, int) and isinstance(end, int):
-                if start < 0 or end <= start or end > len(resume_text) or resume_text[start:end] != quote:
-                    return [], True
-            else:
-                start = resume_text.find(quote)
-                end = start + len(quote)
-                if start < 0:
-                    return [], True
-        elif isinstance(start, int) and isinstance(end, int):
-            if start < 0 or end <= start or end > len(resume_text):
-                return [], True
-            quote = resume_text[start:end]
-        else:
-            continue
-
-        normalized.append({
-            "doc": "resume",
-            "quote": quote,
-            "start": start,
-            "end": end,
-        })
-    return normalized, False
-
-
-def normalize_score(raw_score):
-    """Keep a provider score only when it is a finite numeric value."""
-    if isinstance(raw_score, dict):
-        raw_score = raw_score.get("score")
-    if isinstance(raw_score, bool):
-        return 50
-    if isinstance(raw_score, (int, float)) and raw_score == raw_score:
-        return max(0, min(100, raw_score))
-    if isinstance(raw_score, str) and re.fullmatch(r"\s*\d+(?:\.\d+)?\s*", raw_score):
-        return max(0, min(100, float(raw_score)))
-    return 50
-
-
-def has_unsupported_number(text, resume_text):
-    placeholder_numbers = set(RE_PLACEHOLDER.findall(text))
-    for match in RE_NUMBER.finditer(text):
-        number = match.group(1)
-        if number in placeholder_numbers or number in JSON_NOISE:
-            continue
-        variants = {number, number + "%"}
-        if "." in number:
-            variants.add(number.rstrip("0").rstrip("."))
-        if not any(value in resume_text for value in variants):
-            return True
-    return False
-
-
-def safe_narrative(value, fallback, resume_text):
-    """Avoid presenting provider prose that contains unsupported facts."""
-    if not isinstance(value, str):
-        return fallback
-    candidate = value.strip()
-    if not candidate or has_unsupported_number(candidate, resume_text):
-        return fallback
-    return candidate
-
-
-def normalize_resume_profile(raw_profile, resume_text):
-    """Adapt known provider shape omissions into the frozen public contract."""
-    raw_subscores = raw_profile.get("subscores") if isinstance(raw_profile.get("subscores"), dict) else {}
-    normalized_subscores = {}
-    for key, label in SUBSCORE_DEFAULTS.items():
-        raw_subscore = raw_subscores.get(key)
-        raw_data = raw_subscore if isinstance(raw_subscore, dict) else {}
-        spans, has_invalid_quote = normalize_source_spans(raw_data.get("source_spans"), resume_text)
-        if has_invalid_quote:
-            spans = [fallback_source_span(resume_text)]
-        elif not spans:
-            spans = [fallback_source_span(resume_text)]
-        rationale = "%s仅基于所引用的简历原文进行评估。" % label
-        if not has_invalid_quote:
-            rationale = safe_narrative(raw_data.get("rationale"), rationale, resume_text)
-        normalized_subscores[key] = {
-            "score": normalize_score(raw_subscore),
-            "rationale": rationale,
-            "source_spans": spans,
-        }
-
-    raw_suggestions = raw_profile.get("suggestions") if isinstance(raw_profile.get("suggestions"), list) else []
-    normalized_suggestions = []
-    for index, raw_suggestion in enumerate(raw_suggestions):
-        if not isinstance(raw_suggestion, dict):
-            continue
-        spans, has_invalid_quote = normalize_source_spans(raw_suggestion.get("source_spans"), resume_text)
-        if has_invalid_quote:
-            spans = [fallback_source_span(resume_text)]
-        elif not spans:
-            spans = [fallback_source_span(resume_text)]
-        issue = "当前简历中存在可进一步核实和完善的表达。"
-        suggestion_text = "请根据已引用的简历原文，补充职责、成果和技能的可核验证据。"
-        if not has_invalid_quote:
-            issue = safe_narrative(raw_suggestion.get("issue"), issue, resume_text)
-            suggestion_text = safe_narrative(raw_suggestion.get("suggestion"), suggestion_text, resume_text)
-        suggestion = {
-            "id": raw_suggestion.get("id") if isinstance(raw_suggestion.get("id"), str) and raw_suggestion["id"].strip() else "suggestion-%s" % (index + 1),
-            "severity": raw_suggestion.get("severity") if raw_suggestion.get("severity") in {"P0", "P1", "P2"} else "P1",
-            "issue": issue,
-            "suggestion": suggestion_text,
-            "source_spans": spans,
-        }
-        rewrite_draft = ""
-        if not has_invalid_quote:
-            rewrite_draft = safe_narrative(raw_suggestion.get("rewrite_draft"), "", resume_text)
-        if rewrite_draft:
-            suggestion["rewrite_draft"] = rewrite_draft
-        normalized_suggestions.append(suggestion)
-
-    if not normalized_suggestions:
-        normalized_suggestions.append({
-            "id": "suggestion-1",
-            "severity": "P1",
-            "issue": "当前模型结果未提供完整的可展示建议。",
-            "suggestion": "请根据已引用的简历原文，补充职责、成果和技能的可核验证据。",
-            "source_spans": [fallback_source_span(resume_text)],
-        })
-
-    return {
-        "version": "1.0",
-        "pii_removed": True,
-        "subscores": normalized_subscores,
-        "suggestions": normalized_suggestions,
-    }
-
-
-def redflag_errors(profile, resume_text):
-    """Apply redflag.py's numeric fact-lock without persisting user content."""
-    strings = []
-    for subscore in (profile.get("subscores") or {}).values():
-        if isinstance(subscore, dict) and isinstance(subscore.get("rationale"), str):
-            strings.append(subscore["rationale"])
-    for suggestion in profile.get("suggestions", []):
-        if not isinstance(suggestion, dict):
-            continue
-        for field in ("issue", "suggestion", "rewrite_draft"):
-            if isinstance(suggestion.get(field), str):
-                strings.append(suggestion[field])
-    joined = "\n".join(strings)
-    placeholder_numbers = set(RE_PLACEHOLDER.findall(joined))
-    unsupported = set()
-    for match in RE_NUMBER.finditer(joined):
-        number = match.group(1)
-        if number in placeholder_numbers or number in JSON_NOISE:
-            continue
-        variants = {number, number + "%"}
-        if "." in number:
-            variants.add(number.rstrip("0").rstrip("."))
-        if not any(value in resume_text for value in variants):
-            unsupported.add(number)
-    return ["unsupported_number:%s" % number for number in sorted(unsupported)]
-
-
-def rule_score(value, minimum=0, maximum=100):
-    return max(minimum, min(maximum, int(value)))
-
-
-def count_present_terms(text, terms):
-    lowered = text.lower()
-    return sum(1 for term in terms if term in lowered)
-
-
-def build_rule_based_resume_profile(resume_text):
-    """Produce a transparent, evidence-bound fallback when models are unavailable."""
-    span = fallback_source_span(resume_text)
-    section_count = count_present_terms(resume_text, (
-        "教育", "经历", "项目", "技能", "实习", "工作", "奖项", "证书",
-    ))
-    action_count = count_present_terms(resume_text, (
-        "负责", "完成", "优化", "开发", "设计", "推动", "协作", "上线", "分析", "管理",
-    ))
-    skill_count = count_present_terms(resume_text, (
-        "python", "java", "javascript", "sql", "excel", "figma", "linux", "git", "ai", "数据",
-    ))
-    number_count = len(RE_NUMBER.findall(resume_text))
-    line_count = len([line for line in resume_text.splitlines() if line.strip()])
-
-    scores = {
-        "structure": rule_score(38 + section_count * 7 + min(line_count, 10) * 2),
-        "clarity": rule_score(45 + min(line_count, 12) * 2 + min(action_count, 5) * 3),
-        "achievement_evidence": rule_score(35 + min(action_count, 7) * 5 + min(number_count, 5) * 6),
-        "skill_evidence": rule_score(38 + min(skill_count, 8) * 6),
-        "ats_readability": rule_score(50 + min(section_count, 6) * 5 + min(line_count, 10)),
-    }
-    rationales = {
-        "structure": "依据简历原文中的标题和段落组织进行基础规则检查。",
-        "clarity": "依据简历原文的分行和行动表达进行基础规则检查。",
-        "achievement_evidence": "依据简历原文中可见的行动词和量化文本进行基础规则检查。",
-        "skill_evidence": "依据简历原文中可见的技能关键词进行基础规则检查。",
-        "ats_readability": "依据简历原文的常见栏目和文本可读性进行基础规则检查。",
-    }
-    suggestions = [
-        {
-            "id": "rule-evidence",
-            "severity": "P1",
-            "issue": "请复核已引用段落中的职责与成果表达。",
-            "suggestion": "为关键项目补充可公开核验的职责、动作和结果，并确保新增数字与原始材料一致。",
-            "source_spans": [span],
-        },
-        {
-            "id": "rule-structure",
-            "severity": "P2",
-            "issue": "请复核已引用段落中的栏目组织和技能呈现。",
-            "suggestion": "使用清晰栏目和统一格式呈现经历与技能，方便招聘系统和人工阅读。",
-            "source_spans": [span],
-        },
-    ]
-    return {
-        "version": "1.0",
-        "pii_removed": True,
-        "subscores": {
-            key: {"score": scores[key], "rationale": rationales[key], "source_spans": [span]}
-            for key in SUBSCORE_DEFAULTS
-        },
-        "suggestions": suggestions,
-    }
-
-
-def rule_fallback_diagnosis(resume_text, reason, trace=None):
-    """Return a usable, explicitly labeled result rather than an opaque 503."""
-    fallback_profile = build_rule_based_resume_profile(resume_text)
-    fallback_trace = trace or trace_id()
-    print(json.dumps({
-        "event": "resume_rule_fallback",
-        "trace_id": fallback_trace,
-        "reason": reason,
-    }, ensure_ascii=False), flush=True)
-    score_r = round2(calc_R({
-        key: value["score"] for key, value in fallback_profile["subscores"].items()
-    }))
-    return (
-        fallback_profile,
-        score_r,
-        fallback_trace,
-        "rule_fallback",
-        "诊断模型暂时不可用，本次展示基于简历原文的基础规则诊断；恢复后可再次诊断以获取模型解释。",
-    )
-
-
-def diagnose_resume(resume_text):
-    cleaned_text, _mapping = deidentify(resume_text)
-    try:
-        router = build_model_router()
-        result = router.call("resume_diagnosis", cleaned_text)
-    except ApiError as error:
-        if error.code == "model_not_configured":
-            return rule_fallback_diagnosis(cleaned_text, error.code)
-        raise
-    except Exception as error:
-        return rule_fallback_diagnosis(cleaned_text, "router_exception:%s" % type(error).__name__)
-
-    if not isinstance(result, dict) or result.get("status") != "success" or not isinstance(result.get("output"), dict):
-        result_trace = result.get("trace_id") if isinstance(result, dict) else None
-        return rule_fallback_diagnosis(cleaned_text, "model_unavailable", result_trace)
-
-    profile = normalize_resume_profile(result["output"], cleaned_text)
-    validation_errors = profile_validation_errors(profile, cleaned_text)
-    if validation_errors:
-        print(json.dumps({
-            "event": "resume_validation_rejected",
-            "trace_id": result.get("trace_id"),
-            "error_codes": sorted(set(validation_errors))[:20],
-        }, ensure_ascii=False), flush=True)
-        return rule_fallback_diagnosis(cleaned_text, "validation_rejected", result.get("trace_id"))
-
-    score_r = round2(calc_R({
-        key: value["score"] for key, value in profile["subscores"].items()
-    }))
-    if result.get("degraded"):
-        return (
-            profile,
-            score_r,
-            result.get("trace_id") or trace_id(),
-            "fallback_model",
-            "主模型暂时不可用，本次由备用模型完成诊断。",
-        )
-    return profile, score_r, result.get("trace_id") or trace_id(), "model", ""
-
-
-# ------------------------------------------------------------------ #
-# F2 JD parsing and matching (WF-03)
-# ------------------------------------------------------------------ #
-
-JOB_TYPE_LABELS = {
-    "hard": "硬性要求",
-    "responsibility": "岗位职责",
-    "preferred": "加分项",
-    "terminology": "术语与工具",
-}
-MATCH_WEIGHTS = {
-    "hard": 0.50,
-    "responsibility": 0.25,
-    "preferred": 0.15,
-    "terminology": 0.10,
-}
-RESUME_TOO_SHORT_CHARS = 200
-RESUME_SECTION_KEYWORDS = ("教育", "经历", "项目", "技能", "实习", "工作", "奖项", "证书")
-JOB_SECTION_HINTS = (
-    (("岗位职责", "工作职责", "职位职责", "工作内容", "你将负责"), "responsibility"),
-    (("任职要求", "职位要求", "岗位要求", "基本要求", "硬性要求", "资格要求"), "hard"),
-    (("加分项", "优先条件", "优先考虑", "bonus"), "preferred"),
-    (("技术栈", "工具", "术语", "技术要求"), "terminology"),
-)
-PROMPT_INJECTION_PATTERN = re.compile(
-    r"(?:忽略(?:以上|之前|前面)|ignore\s+(?:previous|above)|system\s+prompt|提示词|指令注入)",
-    re.IGNORECASE,
-)
-
-
-def job_requirement_type(text, active_type):
-    lowered = text.lower()
-    for hints, requirement_type in JOB_SECTION_HINTS:
-        if any(hint.lower() in lowered for hint in hints):
-            return requirement_type
-    if any(word in text for word in ("负责", "协同", "推进", "交付", "维护")):
-        return "responsibility"
-    if any(word in text for word in ("优先", "加分", "有过")):
-        return "preferred"
-    return active_type or "hard"
-
-
-def strip_requirement_prefix(text):
-    cleaned = re.sub(r"^[\s•·●▪◆\-—]+", "", text).strip()
-    cleaned = re.sub(r"^\d+[.、)）]\s*", "", cleaned)
-    cleaned = re.sub(r"^(?:任职要求|岗位职责|工作职责|职位要求|岗位要求|加分项|技术栈|工具)[：:\s]*", "", cleaned)
-    return cleaned.strip()
-
-
-def injection_flags(text):
-    flags = []
-    for match in PROMPT_INJECTION_PATTERN.finditer(text):
-        flags.append({
-            "quote": match.group(0),
-            "start": match.start(),
-            "end": match.end(),
-            "reason": "疑似指令性文本，已按普通 JD 文本处理。",
-        })
-    return flags
-
-
-def build_job_profile(job_text):
-    requirements = []
-    active_type = "hard"
-    offset = 0
-    job_title = ""
-    for raw_line in job_text.splitlines(keepends=True):
-        line = raw_line.strip()
-        line_start = offset + (len(raw_line) - len(raw_line.lstrip()))
-        offset += len(raw_line)
-        if not line:
-            continue
-        title_match = re.match(r"^(?:职位名称|岗位名称|招聘职位|职位|岗位)[：:]\s*(.{2,80})$", line)
-        if title_match and not job_title:
-            job_title = title_match.group(1).strip()
-            continue
-        matched_heading = None
-        for hints, requirement_type in JOB_SECTION_HINTS:
-            if line.rstrip("：:") in hints:
-                active_type = requirement_type
-                matched_heading = True
-                break
-        if matched_heading:
-            continue
-        requirement_text = strip_requirement_prefix(line)
-        if len(requirement_text) < 4:
-            continue
-        quote_start = job_text.find(line, max(0, line_start - 2))
-        if quote_start < 0:
-            quote_start = line_start
-        requirements.append({
-            "id": "req_%02d" % (len(requirements) + 1),
-            "type": job_requirement_type(line, active_type),
-            "text": requirement_text[:500],
-            "source_span": {
-                "doc": "job",
-                "quote": line,
-                "start": quote_start,
-                "end": quote_start + len(line),
-            },
-        })
-        if len(requirements) >= 30:
-            break
-
-    if not requirements:
-        for match in re.finditer(r"[^。；;！？!?]{4,500}", job_text):
-            quote = match.group(0).strip()
-            if not quote:
-                continue
-            requirements.append({
-                "id": "req_%02d" % (len(requirements) + 1),
-                "type": job_requirement_type(quote, "hard"),
-                "text": strip_requirement_prefix(quote),
-                "source_span": {"doc": "job", "quote": quote, "start": match.start(), "end": match.end()},
-            })
-            if len(requirements) >= 30:
-                break
-
-    profile = {
-        "version": "1.0",
-        "user_confirmed": False,
-        "requirements": requirements,
-        "prompt_injection_flags": injection_flags(job_text),
-    }
-    if job_title:
-        profile["job_title"] = job_title
-    errors = sorted(JOB_PROFILE_VALIDATOR.iter_errors(profile), key=str)
-    if errors:
-        raise ApiError("invalid_jd_text", "未能从 JD 中识别出可匹配的岗位要求，请补充职责或任职要求。", 422)
-    return profile
-
-
-def validate_job_profile(value):
-    if not isinstance(value, dict):
-        raise ApiError("invalid_job_profile", "岗位要求解析结果无效，请重新提交 JD。", 422)
-    errors = sorted(JOB_PROFILE_VALIDATOR.iter_errors(value), key=str)
-    if errors or not value.get("user_confirmed"):
-        raise ApiError("invalid_job_profile", "岗位要求解析结果无效，请重新提交 JD。", 422)
-    return value
-
-
-def requirement_status_counts(requirements, requirement_type):
-    items = [r for r in requirements if r.get("type") == requirement_type]
-    counts = {"covered": 0, "weak": 0, "missing": 0, "unknown": 0}
-    for item in items:
-        status = item.get("status")
-        if status in counts:
-            counts[status] += 1
-    return items, counts
-
-
-def _coverage_sentence(counts, total, label):
-    matched = counts["covered"] + counts["weak"]
-    if total == 0:
-        return None
-    if counts["missing"] or counts["unknown"]:
-        return "岗位的%s共 %d 项，目前仅有 %d 项能找到部分关联素材，其余项目前覆盖不足或材料不足以判断。" % (
-            label, total, matched)
-    return "岗位的%s共 %d 项，简历中均能找到可回指的关联素材。" % (label, total)
-
-
-def build_low_score_analysis(resume_text, requirements, score_m, resume_too_short):
-    """生成低分/材料不足的中长文本分析（规则驱动，不少于 3 个角度）。
-
-    文案口径：委婉、可执行、基于真实匹配数据，不做能力贬低。
-    """
-    hard_items, hard_c = requirement_status_counts(requirements, "hard")
-    resp_items, resp_c = requirement_status_counts(requirements, "responsibility")
-    pref_items, pref_c = requirement_status_counts(requirements, "preferred")
-    term_items, term_c = requirement_status_counts(requirements, "terminology")
-
-    dimensions = []
-
-    hard_sentence = _coverage_sentence(hard_c, len(hard_items), "硬性要求")
-    if hard_sentence:
-        dimensions.append({
-            "angle": "硬性要求覆盖",
-            "level": "P0" if hard_c["missing"] else "P1",
-            "finding": hard_sentence + " 硬性要求通常是岗位的准入条件，覆盖不足对匹配分影响最大。",
-            "advice": "优先为未覆盖的硬性要求补充真实经历或技能证据，并确保表述与要求对应。",
-        })
-
-    resp_sentence = _coverage_sentence(resp_c, len(resp_items), "岗位职责")
-    if resp_sentence:
-        dimensions.append({
-            "angle": "经历与职责匹配",
-            "level": "P1" if resp_c["missing"] else "P2",
-            "finding": resp_sentence + " 职责类要求的匹配依赖简历中的经历描述，描述越具体越容易被识别。",
-            "advice": "建议用「负责…、通过…、结果…」的结构重写相关经历，突出你在其中的动作与产出。",
-        })
-
-    term_total = len(term_items) + len(pref_items)
-    term_matched = (term_c["covered"] + term_c["weak"] + pref_c["covered"] + pref_c["weak"])
-    if term_total:
-        dimensions.append({
-            "angle": "技能与术语覆盖",
-            "level": "P1" if term_total - term_matched else "P2",
-            "finding": "岗位涉及的技能与术语共 %d 项，简历中出现相关表述的 %d 项；术语缺失会直接影响关键词层面的匹配。" % (
-                term_total, term_matched),
-            "advice": "在真实经历的基础上，补充与岗位匹配的工具、框架与关键词，避免空泛罗列。",
-        })
-
-    section_count = sum(1 for kw in RESUME_SECTION_KEYWORDS if kw in resume_text)
-    number_count = len(RE_NUMBER.findall(resume_text))
-    material_parts = []
-    if resume_too_short:
-        material_parts.append("简历正文约 %d 字，篇幅较短，可供核验的素材有限" % len(resume_text))
-    if section_count < 4:
-        material_parts.append("常见板块（教育、经历、项目、技能等）出现 %d 处" % section_count)
-    if number_count < 3:
-        material_parts.append("量化成果较少（全文数字类表述 %d 处）" % number_count)
-    if material_parts:
-        dimensions.append({
-            "angle": "材料完整度",
-            "level": "P2",
-            "finding": "；".join(material_parts) + "。完整且量化的简历有助于系统识别信息，也更容易让招聘方快速理解你的能力。",
-            "advice": "补充项目细节、职责描述与真实可核验的数字，保持结构清晰。",
-        })
-
-    if len(dimensions) < 3:
-        dimensions.append({
-            "angle": "整体匹配度",
-            "level": "P2",
-            "finding": "当前简历与目标岗位之间的可核验关联素材整体偏少，导致匹配分偏低。",
-            "advice": "围绕岗位要求逐条补齐真实经历与成果，匹配度会随之改善。",
-        })
-
-    return {
-        "summary": (
-            "本次匹配得分 %s 分，低于 50 分，主要原因是简历与目标岗位之间可核验的关联素材不足。"
-            "以下从几个角度说明差距，供你参考——这些都可以通过补充真实素材来改进，不必把它看作能力否定。"
-        ) % score_m,
-        "dimensions": dimensions,
-        "suggestion": (
-            "建议按优先级改进：1) 为硬性要求补充直接相关的真实经历与量化成果；"
-            "2) 用具体职责句重写经历；3) 补充与岗位匹配的技能与术语；"
-            "4) 完善简历结构。所有补充都应以真实经历为基础。"
-        ),
-    }
-
-
-def match_job_profile(resume_text, job_profile):
-    cleaned_resume, _mapping = deidentify(resume_text)
-    sentences = split_sentences(cleaned_resume) or [cleaned_resume]
-    sentence_tokens = [tokenize(sentence) for sentence in sentences]
-    sentence_unigrams = [unigrams(sentence) for sentence in sentences]
-    document_unigrams = unigrams(cleaned_resume)
-    matcher = Bm25Matcher()
-    requirements = []
-    type_values = {name: [] for name in MATCH_WEIGHTS}
-
-    for requirement in job_profile["requirements"]:
-        confidence, sentence_index = matcher.best(
-            requirement["text"], sentence_tokens, sentence_unigrams, document_unigrams
-        )
-        query_words = unigrams(requirement["text"])
-        partial = bool(query_words & document_unigrams)
-        status = judge(confidence, partial)
-        result = {
-            "id": requirement["id"],
-            "type": requirement["type"],
-            "typeLabel": JOB_TYPE_LABELS[requirement["type"]],
-            "text": requirement["text"],
-            "status": status,
-            "evidence": sentences[sentence_index] if status in {"covered", "weak"} and sentence_index >= 0 else "",
-        }
-        requirements.append(result)
-        if status != "unknown":
-            type_values[requirement["type"]].append({"covered": 1.0, "weak": 0.5, "missing": 0.0}[status])
-
-    subscores = {}
-    weighted_score = 0.0
-    active_weight = 0.0
-    for requirement_type, weight in MATCH_WEIGHTS.items():
-        values = type_values[requirement_type]
-        score = round(sum(values) / len(values) * 100) if values else 0
-        subscores[requirement_type] = {"label": JOB_TYPE_LABELS[requirement_type], "score": score}
-        if values:
-            weighted_score += weight * score
-            active_weight += weight
-    score_m = round(weighted_score / active_weight) if active_weight else 0
-
-    gaps = []
-    for item in requirements:
-        if item["status"] == "covered" or item["status"] == "unknown":
-            continue
-        priority = "P0" if item["type"] == "hard" else ("P1" if item["type"] == "responsibility" else "P2")
-        gaps.append({
-            "level": priority,
-            "text": item["text"],
-            "action": "在简历中补充与该要求直接相关的真实经历、成果或技能证据。",
-        })
-
-    resume_too_short = len(cleaned_resume) < RESUME_TOO_SHORT_CHARS
-    all_unknown = bool(requirements) and all(r["status"] == "unknown" for r in requirements)
-    insufficient_evidence = False
-    low_score_analysis = None
-    if all_unknown:
-        insufficient_evidence = True
-        score_m = None
-        gaps = []
-        match_notice = (
-            "本次使用基于简历原文的规则关键词匹配；未调用模型。"
-            "当前简历与岗位要求的可比材料不足，无法计算匹配分；"
-            "建议补充与岗位相关的真实经历与技能后再试。"
-        )
-    elif score_m < 50 or resume_too_short:
-        low_score_analysis = build_low_score_analysis(
-            cleaned_resume, requirements, score_m, resume_too_short
-        )
-        if resume_too_short:
-            match_notice = (
-                "本次使用基于简历原文的规则关键词匹配；未调用模型。"
-                "检测到简历内容较短，匹配结果可能不充分，下方已说明主要差距与改进建议。"
-            )
-        else:
-            match_notice = (
-                "本次使用基于简历原文的规则关键词匹配；未调用模型。"
-                "匹配分低于 50，下方已从多个角度说明主要差距与改进建议。"
-            )
-    else:
-        match_notice = "本次使用基于简历原文的规则关键词匹配；未调用模型。"
-
-    return {
-        "score_M": score_m,
-        "subscores": subscores,
-        "requirements": requirements,
-        "gaps": gaps,
-        "match_mode": "rule_bm25",
-        "match_notice": match_notice,
-        "resume_length": len(cleaned_resume),
-        "resume_too_short": resume_too_short,
-        "insufficient_evidence": insufficient_evidence,
-        "low_score_analysis": low_score_analysis,
-    }
-
-
-# ------------------------------------------------------------------ #
-# F3 Interview session endpoints (WF-04)
-# ------------------------------------------------------------------ #
-
-def build_interview_router():
-    """Return a router when configured; None otherwise (question-bank fallback)."""
-    try:
-        return build_model_router()
-    except ApiError:
-        return None
-
-
-def start_interview(body):
-    engine = InterviewEngine(model_router=build_interview_router())
-    job_profile = body.get("jobProfile") if isinstance(body.get("jobProfile"), dict) else {}
-    resume_profile = body.get("resumeProfile") if isinstance(body.get("resumeProfile"), dict) else {}
-    match_gaps = body.get("matchGaps") if isinstance(body.get("matchGaps"), list) else []
-    session = engine.start(job_profile, resume_profile, match_gaps)
-    first = engine.next_question(session)
-    if not first or first.get("question") is None:
-        raise ApiError("interview_not_started", "未能生成面试问题，请稍后重试。", 503)
-    session_id = body.get("session_id") or ("iv_" + uuid.uuid4().hex[:16])
-    save_session(session_id, "ASK", session)
-    return {
-        "session_id": session_id,
-        "firstQuestion": first.get("question"),
-        "targets": first.get("targets", []),
-        "state": session.get("state", "ASK"),
-    }
-
-
-def answer_interview(body):
-    session_id = body.get("session_id", "")
-    if not session_id:
-        raise ApiError("session_required", "缺少面试会话标识。", 422)
-    state, payload = load_session(session_id)
-    if not payload:
-        raise ApiError("session_not_found", "面试会话不存在或已过期。", 404)
-    engine = InterviewEngine(model_router=build_interview_router())
-    engine.start(
-        payload.get("job_profile", {}),
-        payload.get("resume_profile", {}),
-        payload.get("match_gaps", []),
-    )
-    # Rebuild the engine session object from the stored payload in-place.
-    engine_session = payload
-    answer_text = str(body.get("answer_text", "") or "").strip()
-    if len(answer_text) < 1:
-        raise ApiError("invalid_answer", "回答内容不能为空。", 422)
-    asr_confidence = body.get("asr_confidence")
-    result = engine.submit_answer(engine_session, answer_text, asr_confidence)
-    update_session(session_id, engine_session.get("state", "ASK"), engine_session)
-    return {
-        "session_id": session_id,
-        "turn": result,
-        "followUp": result.get("follow_up"),
-    }
-
-
-def end_interview(body):
-    session_id = body.get("session_id", "")
-    if not session_id:
-        raise ApiError("session_required", "缺少面试会话标识。", 422)
-    state, payload = load_session(session_id)
-    if not payload:
-        raise ApiError("session_not_found", "面试会话不存在或已过期。", 404)
-    engine = InterviewEngine(model_router=build_interview_router())
-    engine_session = payload
-    report = engine.end_session(engine_session)
-    update_session(session_id, engine_session.get("state", "REPORT"), engine_session)
-    return {
-        "session_id": session_id,
-        "report": report.get("report", ""),
-        "score_I": report.get("score_I"),
-        "turns": report.get("turns", []),
-        "i_subscores": report.get("i_subscores", {}),
-    }
-
-
-# ------------------------------------------------------------------ #
-# F4 Ability report (WF-05)
-# ------------------------------------------------------------------ #
-
-PLAN_TEMPLATE = [
-    (1, "为三条核心经历补充量化证据，无法确认的数字用「待用户核实：」占位", 40, "修订后的三段经历文本"),
-    (2, "针对 P0 缺口整理项目复盘笔记", 35, "一页复盘笔记"),
-    (3, "按 STAR 结构重写两个面试高频回答", 40, "两份 STAR 回答稿"),
-    (4, "针对岗位术语做概念速学并自测", 30, "术语自测清单"),
-    (5, "完成一轮五题文字模拟面试并复盘 missing_elements", 45, "面试复盘记录"),
-    (6, "根据复盘改写简历自我评价与技能描述", 35, "简历修订版 v2"),
-    (7, "复测诊断与匹配，对比 C0 变化并记录真实提升", 40, "复测对比表"),
-]
-
-ABILITY_DIMENSIONS = [
-    ("job_fit", "岗位契合"),
-    ("achievement_evidence", "成果证据"),
-    ("professional_expression", "专业表达"),
-    ("structured_answer", "结构化回答"),
-    ("job_depth", "岗位深度"),
-    ("followup_adaptation", "追问适应"),
-]
-
-
-def _latest_diagnosis(session_id):
-    detail = get_resume_detail(session_id)
-    if not detail or not detail.get("diagnoses"):
-        return None
-    return detail["diagnoses"][0]
-
-
-def build_ability_profile(session_id):
-    """Aggregate stored R/M/I and produce AbilityProfile + radar option."""
-    diag = _latest_diagnosis(session_id)
-    match = load_match(session_id)
-    state, payload = load_session(session_id)
-    turns = (payload or {}).get("turns", []) or []
-
-    if not diag or not match or not turns:
-        missing = []
-        if not diag:
-            missing.append("F1 简历诊断")
-        if not match:
-            missing.append("F2 岗位匹配")
-        if not turns:
-            missing.append("F3 模拟面试")
-        raise ApiError(
-            "insufficient_evidence",
-            "能力报告需要先完成：%s。" % "、".join(missing),
-            422,
-        )
-
-    try:
-        profile = json.loads(diag.get("diagnosis_json") or "{}")
-    except (TypeError, ValueError):
-        profile = {}
-    r_subscores = {}
-    for key in SUBSCORE_DEFAULTS:
-        item = (profile.get("subscores") or {}).get(key)
-        r_subscores[key] = item.get("score") if isinstance(item, dict) else None
-    r_score = diag.get("score_r")
-    if r_score is None:
-        try:
-            r_score = round2(calc_R(r_subscores))
-        except (ValueError, TypeError):
-            r_score = None
-
-    m_score = match.get("score_M")
-    m_requirements = [
-        {"type": item.get("type", "hard"), "status": item.get("status", "unknown")}
-        for item in match.get("requirements", [])
-        if isinstance(item, dict)
-    ]
-    m_categories = {}
-    for key in MATCH_WEIGHTS:
-        item = (match.get("subscores") or {}).get(key)
-        m_categories[key] = item.get("score") if isinstance(item, dict) else None
-
-    i_keys = ["structure", "relevance", "specificity", "followup_adaptation", "clarity"]
-    sums = {k: 0.0 for k in i_keys}
-    counts = {k: 0 for k in i_keys}
-    for turn in turns:
-        sc = turn.get("subscores")
-        if not isinstance(sc, dict):
-            continue
-        quote = turn.get("answer_quote", "")
-        answer = turn.get("answer", "")
-        if not quote or not answer or quote not in answer:
-            continue
-        for k in i_keys:
-            v = sc.get(k)
-            if isinstance(v, (int, float)):
-                sums[k] += v
-                counts[k] += 1
-    i_subscores = {
-        k: round(sums[k] / counts[k], 2) if counts[k] else None
-        for k in i_keys
-    }
-    if not any(v is not None for v in i_subscores.values()):
-        raise ApiError("insufficient_evidence", "面试回合证据不足，无法生成能力报告。", 422)
-
-    score_input = {"R": r_subscores, "M": {"requirements": m_requirements}, "I": i_subscores}
-    try:
-        result = rescore_compute(score_input)
-    except (ValueError, KeyError):
-        result = {"insufficient_evidence": True}
-    if result.get("insufficient_evidence"):
-        raise ApiError("insufficient_evidence", "综合证据不足，无法计算 C0；请先完成 F1-F3。", 422)
-
-    c0 = result["C0"]
-    dims = []
-    for key, name in ABILITY_DIMENSIONS:
-        if key == "job_fit":
-            value = m_score if m_score is not None else (m_categories.get("hard") or 0)
-        elif key == "achievement_evidence":
-            value = r_subscores.get("achievement_evidence") or 0
-        elif key == "professional_expression":
-            value = round(((r_subscores.get("clarity") or 0) + (i_subscores.get("clarity") or 0)) / 2, 1)
-        elif key == "structured_answer":
-            value = i_subscores.get("structure") or 0
-        elif key == "job_depth":
-            value = round(((m_categories.get("responsibility") or 0) + (i_subscores.get("relevance") or 0)) / 2, 1)
-        else:
-            value = i_subscores.get("followup_adaptation") or 0
-        dims.append({
-            "key": key,
-            "name": name,
-            "score": round(max(0, min(100, float(value))), 1),
-            "evidence": ["F1-F3 规则复算结果"],
-        })
-
-    plan = [
-        {"day": day, "focus": focus, "minutes": minutes, "artifact": artifact}
-        for day, focus, minutes, artifact in PLAN_TEMPLATE
-    ]
-    ability = {
-        "version": "1.0",
-        "resume_score": round(r_score, 2) if r_score is not None else None,
-        "match_score": round(m_score, 2) if m_score is not None else None,
-        "interview_score": round(result["I"], 2),
-        "dimensions": dims,
-        "baseline": round(c0, 2),
-        "scenario_day7": {
-            "low": result["C7_low"],
-            "high": result["C7_high"],
-            "assumptions": [
-                "0.30 与 0.70 为 MVP 演示假设，非统计学习参数",
-                "假设用户按计划完成每天 30-45 分钟训练并产出 artifact",
-                "第七天复测结果才是真实变化",
-            ],
-        },
-        "plan": plan,
-    }
-    save_ability(session_id, ability)
-    return ability, result
-
-
-# ------------------------------------------------------------------ #
 # Routing
 # ------------------------------------------------------------------ #
 
@@ -1337,8 +442,12 @@ def route_api(**_ignored):
             "wf05/ability", "wf06/delete", "health",
             "admin/resumes", "admin/export",
             "auth/register", "auth/login", "auth/logout", "auth/me",
-            "history",
-        } or route.startswith("history/"):
+            "history", "tasks",
+            "knowledge/search", "knowledge/questions",
+            "wf04/asr", "wf04/stream",
+            "wf02/optimize", "wf02/apply-rewrite",
+            "wf07/cover-letter", "wf07/applications",
+        } or route.startswith("history/") or route.startswith("tasks/"):
             return ("", 204)
         raise ApiError("not_found", "接口不存在。", 404)
 
@@ -1455,6 +564,207 @@ def route_api(**_ignored):
         except AccountError as err:
             raise ApiError(err.code, err.message, err.status)
         return api_response({"status": "DELETED"})
+
+    if route == "tasks" and request.method == "POST":
+        require_consent()
+        body = request.get_json(silent=True) or {}
+        task_type = str(body.get("task_type") or "")
+        if task_type != "f2_match":
+            raise ApiError("unsupported_task_type", "不支持的任务类型。", 422)
+        payload = body.get("payload")
+        if not isinstance(payload, dict):
+            raise ApiError("invalid_request", "任务参数格式无效。", 422)
+        idempotency_key = str(body.get("idempotency_key") or "").strip()[:120] or None
+        task = tasks_create(
+            task_type,
+            _task_owner_key(),
+            payload=payload,
+            idempotency_key=idempotency_key,
+            total_steps=4,
+        )
+        return api_response({"task": task}, 201)
+
+    if route.startswith("tasks/"):
+        require_consent()
+        parts = route.split("/")
+        task_id = parts[1]
+        owner = _task_owner_key()
+        if request.method == "GET" and len(parts) == 2:
+            task = tasks_get(task_id)
+            if task is None or task["owner_key"] != owner:
+                raise ApiError("not_found", "任务不存在。", 404)
+            return api_response({"task": task})
+        if request.method == "POST" and len(parts) == 3 and parts[2] == "next":
+            task, status = tasks_advance(task_id, owner, _f2_match_chunk)
+            if task is None or status == "forbidden":
+                raise ApiError("not_found", "任务不存在。", 404)
+            if status == "already_done":
+                return api_response({"task": task, "notice": "任务已完成。"})
+            return api_response({"task": task})
+
+    if route == "knowledge/search" and request.method == "GET":
+        q = request.args.get("q", "")
+        category = request.args.get("category", "") or None
+        try:
+            limit = int(request.args.get("limit", 5))
+        except (TypeError, ValueError):
+            limit = 5
+        return api_response(search_questions(q, category=category, limit=limit))
+
+    if route == "knowledge/questions" and request.method == "GET":
+        category = request.args.get("category", "") or None
+        items = list_questions(category)
+        return api_response({
+            "categories": list_categories(),
+            "items": items,
+            "total": len(items),
+        })
+
+    if route == "wf04/asr" and request.method == "POST":
+        require_consent()
+        audio = request.get_data(cache=False)
+        if not audio:
+            raise ApiError("audio_required", "请上传音频数据。", 422)
+        try:
+            asr_result = build_asr_provider().transcribe(audio)
+        except Exception as exc:
+            raise ApiError("asr_failed", str(exc), 502)
+        return api_response(asr_result)
+
+    if route == "wf04/stream" and request.method == "POST":
+        require_consent()
+        body = request.get_json(silent=True) or {}
+        session_id = str(body.get("session_id") or "")
+        if not session_id:
+            raise ApiError("session_required", "缺少面试会话标识。", 422)
+        state, payload = load_session(session_id)
+        if not payload:
+            raise ApiError("session_not_found", "面试会话不存在或已过期。", 404)
+        engine = InterviewEngine(model_router=build_interview_router())
+        engine.start(
+            payload.get("job_profile", {}),
+            payload.get("resume_profile", {}),
+            payload.get("match_gaps", []),
+        )
+        engine_session = payload
+        answer_text = str(body.get("answer_text", "") or "").strip()
+        if len(answer_text) < 1:
+            raise ApiError("invalid_answer", "回答内容不能为空。", 422)
+        asr_confidence = body.get("asr_confidence")
+        result = engine.submit_answer(engine_session, answer_text, asr_confidence)
+        update_session(session_id, engine_session.get("state", "ASK"), engine_session)
+        follow_up = result.get("follow_up") if isinstance(result.get("follow_up"), dict) else None
+        full_text = str((follow_up or {}).get("question") or "").strip() or "已收到回答，请继续。"
+
+        def _sse_gen():
+            chunk_size = 32
+            for i in range(0, len(full_text), chunk_size):
+                chunk = full_text[i:i + chunk_size]
+                yield "data: " + json.dumps(
+                    {"type": "fragment", "text": chunk, "done": False},
+                    ensure_ascii=False,
+                ) + "\n\n"
+            yield "data: " + json.dumps(
+                {"type": "done", "turn": result, "followUp": follow_up, "done": True},
+                ensure_ascii=False,
+            ) + "\n\n"
+
+        stream_resp = Response(
+            stream_with_context(_sse_gen()), mimetype="text/event-stream"
+        )
+        stream_resp.headers["Cache-Control"] = "no-cache"
+        stream_resp.headers["X-Accel-Buffering"] = "no"
+        return stream_resp
+
+    if route == "wf02/optimize" and request.method == "POST":
+        require_consent()
+        body = request.get_json(silent=True) or {}
+        session_id = str(body.get("session_id") or "")
+        if not session_id:
+            raise ApiError("session_required", "缺少会话标识。", 422)
+        detail = get_resume_detail(session_id)
+        if not detail or not detail.get("diagnoses"):
+            raise ApiError("diagnosis_required", "请先完成 F1 简历诊断。", 422)
+        profile = {}
+        diag = detail["diagnoses"][0]
+        try:
+            profile = json.loads(diag.get("diagnosis_json") or "{}")
+        except (TypeError, ValueError):
+            profile = {}
+        suggestions = profile.get("suggestions") if isinstance(profile, dict) else []
+        suggestion_id = str(body.get("suggestion_id") or "")
+        suggestion = None
+        for item in suggestions:
+            if str(item.get("id") or "") == suggestion_id:
+                suggestion = item
+                break
+        if suggestion is None and suggestions:
+            suggestion = suggestions[0]
+        if suggestion is None:
+            raise ApiError("suggestion_required", "暂无可用诊断建议。", 422)
+        try:
+            router = build_model_router()
+        except ApiError:
+            router = None
+        return api_response(
+            rewrite_suggestion(suggestion, resume_profile=profile, model_router=router)
+        )
+
+    if route == "wf02/apply-rewrite" and request.method == "POST":
+        require_consent()
+        body = request.get_json(silent=True) or {}
+        session_id = str(body.get("session_id") or "")
+        candidate = str(body.get("candidate_text") or "").strip()
+        suggestion_id = str(body.get("suggestion_id") or "")
+        issue = str(body.get("issue") or "")
+        if not session_id or len(candidate) < 5:
+            raise ApiError("invalid_request", "缺少会话标识或改写内容。", 422)
+        saved = save_rewrite(session_id, suggestion_id, issue, candidate)
+        if saved is None:
+            raise ApiError("save_failed", "改写内容保存失败。", 500)
+        applied = mark_rewrite_applied(saved["id"], session_id)
+        return api_response({"rewrite": applied, "status": "APPLIED"}, 201)
+
+    if route == "wf07/cover-letter" and request.method == "POST":
+        require_consent()
+        body = request.get_json(silent=True) or {}
+        session_id = str(body.get("session_id") or "")
+        if not session_id:
+            raise ApiError("session_required", "缺少会话标识。", 422)
+        return api_response(
+            generate_cover_letter(
+                session_id,
+                company=body.get("company", ""),
+                position=body.get("position", ""),
+            )
+        )
+
+    if route == "wf07/applications" and request.method == "GET":
+        require_consent()
+        return api_response({"applications": list_applications_for(_task_owner_key())})
+
+    if route == "wf07/applications" and request.method == "POST":
+        require_consent()
+        body = request.get_json(silent=True) or {}
+        session_id = str(body.get("session_id") or "")
+        application = create_application(
+            session_id=session_id,
+            owner_key=_task_owner_key(),
+            company=body.get("company", ""),
+            position=body.get("position", ""),
+            cover_letter=body.get("cover_letter", ""),
+        )
+        return api_response({"application": application}, 201)
+
+    if route == "wf07/applications" and request.method == "DELETE":
+        require_consent()
+        app_id = request.args.get("id", "")
+        try:
+            app_id = int(app_id)
+        except (TypeError, ValueError):
+            raise ApiError("invalid_request", "缺少有效的申请记录 ID。", 422)
+        deleted = delete_application(app_id, _task_owner_key())
+        return api_response({"application": deleted, "status": "DELETED"})
 
     if route == "health" and request.method == "GET":
         return api_response({
@@ -1677,6 +987,11 @@ for _rule in (
     "/api/admin/resumes", "/api/admin/export",
     "/api/auth/register", "/api/auth/login", "/api/auth/logout", "/api/auth/me",
     "/api/history", "/api/history/<id>",
+    "/api/tasks", "/api/tasks/<id>", "/api/tasks/<id>/next",
+    "/api/knowledge/search", "/api/knowledge/questions",
+    "/api/wf04/asr", "/api/wf04/stream",
+    "/api/wf02/optimize", "/api/wf02/apply-rewrite",
+    "/api/wf07/cover-letter", "/api/wf07/applications",
 ):
     app.add_url_rule(_rule, endpoint="route_" + _rule.replace("/", "_") or "root", view_func=route_api,
                      methods=["GET", "POST", "DELETE", "OPTIONS"])

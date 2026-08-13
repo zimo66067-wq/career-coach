@@ -20,6 +20,8 @@
   <a class="nav" data-page="f2" href="f2-match.html">F2 岗位匹配</a>
   <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
   <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
+  <a class="nav" data-page="f5" href="f5-apply.html">F5 投递</a>
+  <a class="nav" data-page="kb" href="kb.html">面经知识库</a>
 </nav>
 <div class="wrap" id="main">
   <h1 class="page-title">F1 · 简历 AI 诊断</h1>
@@ -34,11 +36,18 @@
         <h3>拖入或选择你的简历</h3>
         <p id="resumeUploadHint">支持 PDF / DOCX / TXT；可直接将一个文件拖到此处</p>
         <p class="resume-file-status" id="resumeUploadStatus" role="status" aria-live="polite">尚未选择文件</p>
+        <div class="upload-progress" id="resumeUploadProgress" hidden>
+          <div class="upload-progress-track"><div class="upload-progress-bar" id="resumeUploadProgressBar"></div></div>
+          <span class="upload-progress-text" id="resumeUploadProgressText">0%</span>
+        </div>
       </div>
       <div class="resume-upload-actions">
         <button class="btn" type="button" id="chooseResumeFile">选择文件</button>
         <button class="btn" type="button" id="startResumeDiagnosis" hidden disabled>开始诊断</button>
         <button class="btn ghost" type="button" id="openResumeText">直接粘贴文本</button>
+      </div>
+      <div class="resume-upload-actions">
+        <button class="btn ghost" type="button" id="quickDemoF1">⚡ 一键体验（样例简历）</button>
       </div>
       <label class="data-consent" for="resumeConsent">
         <input id="resumeConsent" type="checkbox">
@@ -209,7 +218,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   p.suggestions.forEach(function (s) {
     list += '<div class="reason-item" data-quote="' + encodeURIComponent(s.quote) + '"><span class="badge ' + s.severity.toLowerCase() + '">' + s.severity + "</span> <b>" + s.issue + "</b><br>" +
-      "建议：" + s.suggestion + '<br><span class="tag">改写草案：' + s.rewrite_draft + "</span></div>";
+      "建议：" + s.suggestion + '<br><span class="tag">改写草案：' + s.rewrite_draft + "</span>" +
+      '<br><button type="button" class="btn ghost rewrite-btn" data-suggestion-id="' + String(s.id || "").replace(/"/g, "&quot;") + '">应用建议改写</button></div>';
   });
   document.getElementById("reasonList").innerHTML = list;
   window.EVIDENCE.bindReasons(".reason-item", highlight, function (item) {
@@ -265,5 +275,7 @@ document.addEventListener("DOMContentLoaded", function () {
 </div>
 
 <script src="../js/account.js"></script>
+<script src="../js/quick-demo.js"></script>
+<script src="../js/optimizer.js"></script>
 </body>
 </html>

@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>F2 岗位匹配 · 职跃AI</title>
+<title>F2 专业导向岗位匹配 · 职跃AI</title>
 <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../css/tokens.css">
 <link rel="stylesheet" href="../css/main.css">
 <link rel="stylesheet" href="../css/states.css">
 <link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/f2-major.css">
 </head>
 <body data-page="f2">
 <a class="skip-link" href="#main">跳到主要内容</a>
@@ -20,140 +21,142 @@
   <a class="nav" data-page="f2" href="f2-match.html">F2 岗位匹配</a>
   <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
   <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
+  <a class="nav" data-page="f5" href="f5-apply.html">F5 投递</a>
 </nav>
 <div class="wrap" id="main">
-  <h1 class="page-title">F2 · 简历-JD 匹配</h1>
-  <p class="page-sub">M = 硬性50% + 职责25% + 加分15% + 术语10% ｜ 已覆盖=1 / 部分覆盖=0.5 / 待补充=0；材料不足不参与计分</p>
+  <h1 class="page-title">F2 · 专业导向岗位匹配</h1>
+  <p class="page-sub">先确认你的本科专业，再上传简历 —— 双分制：专业契合 + 岗位覆盖，让匹配结果因"专业"而异</p>
 
-  <div data-state-view="empty">
-    <div class="job-upload-layout">
-      <section class="card empty-state resume-upload-card job-upload-card" id="jobUploadCard" aria-labelledby="jobUploadTitle">
-        <input class="visually-hidden" id="jobFileInput" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain">
-        <div class="resume-dropzone job-dropzone" id="jobDropzone" role="button" tabindex="0" aria-describedby="jobUploadHint jobFileStatus">
-          <div class="art"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M5 14v4a2 2 0 002 2h10a2 2 0 002-2v-4"/></svg></div>
-          <h3 id="jobUploadTitle">拖入、选择或粘贴目标岗位 JD</h3>
-          <p id="jobUploadHint">支持 PDF / DOCX / TXT；可直接将一个文件拖到此处</p>
-          <p class="resume-file-status" id="jobFileStatus" aria-live="polite">尚未选择文件</p>
-        </div>
-        <div class="resume-upload-actions">
-          <button class="btn" id="chooseJobFile" type="button">选择文件</button>
-          <button class="btn" id="startJobMatch" type="button" hidden disabled>开始匹配</button>
-          <button class="btn ghost" id="openJobText" type="button">直接粘贴文本</button>
-        </div>
-        <label class="data-consent" for="jobConsent">
-          <input id="jobConsent" type="checkbox">
-          <span>我已阅读并同意仅为本次岗位匹配处理我提交的 JD 和已完成诊断的简历内容。</span>
+  <ol class="f2-steps" id="f2Steps" aria-label="匹配流程步骤">
+    <li data-step="1" class="on"><span>1</span>选择专业</li>
+    <li data-step="2"><span>2</span>岗位画像</li>
+    <li data-step="3"><span>3</span>上传简历</li>
+    <li data-step="4"><span>4</span>匹配报告</li>
+  </ol>
+
+  <section class="f2-panel" id="f2Step1" aria-label="第一步 选择专业">
+    <div class="card">
+      <h3>第一步 · 选择你的本科专业</h3>
+      <p class="f2-hint">支持三级联动或直接搜索（教育部《本科专业目录（2025年）》：12 门类 / 93 专业类 / 845 专业）。</p>
+      <div class="f2-search-box">
+        <input id="f2Search" type="search" placeholder="搜索专业名称或代码，如：计算机、080901" autocomplete="off">
+        <div class="f2-search-results zy-hidden" id="f2SearchResults" role="listbox"></div>
+      </div>
+      <div class="f2-cascade">
+        <label>学科门类
+          <select id="f2Cat" aria-label="学科门类"><option value="">请选择门类</option></select>
         </label>
-        <form class="resume-text-entry" id="jobTextEntry" hidden>
-          <label for="jobTextInput">粘贴职位描述 / 招聘要求</label>
-          <textarea id="jobTextInput" placeholder="例如：岗位职责、任职要求、技能要求、加分项等。"></textarea>
-          <p class="resume-text-help">JD 中的操作指令只会作为普通招聘文本处理，不会改变系统规则。</p>
-          <div class="resume-upload-actions">
-            <button class="btn" type="submit">开始匹配</button>
-            <button class="btn ghost" id="cancelJobText" type="button">取消</button>
-          </div>
-        </form>
-      </section>
-      <aside class="card job-help-card" aria-label="JD 说明与上传格式">
-        <span class="job-help-label">术语说明</span>
-        <h3>什么是 JD？</h3>
-        <p><strong>JD</strong> 是 <em>Job Description</em> 的缩写，指招聘方发布的<strong>职位描述 / 岗位要求</strong>。</p>
-        <ul class="job-help-list">
-          <li><b>岗位职责</b>：入职后需要完成的工作</li>
-          <li><b>任职要求</b>：学历、经验、技能等条件</li>
-          <li><b>加分项</b>：优先但非必须的能力或经历</li>
-        </ul>
-        <p class="job-format-note"><b>可上传格式</b><br>PDF、DOCX、TXT；单个文件不超过 10MB。</p>
-        <a class="job-help-link" href="f1-resume.html">还没有完成简历诊断？先去 F1</a>
-      </aside>
-    </div>
-  </div>
-
-  <div data-state-view="confirmation">
-    <section class="card job-confirm-card" aria-labelledby="jobConfirmTitle">
-      <span class="job-help-label">确认步骤</span>
-      <h2 id="jobConfirmTitle">确认解析出的岗位要求</h2>
-      <p>请核对以下要求。只有在你确认后，系统才会使用当前简历计算匹配分。</p>
-      <div class="job-requirements-preview" id="jobRequirementsPreview" aria-live="polite"></div>
-      <div class="resume-upload-actions">
-        <button class="btn" id="confirmJobProfile" type="button">确认并开始匹配</button>
-        <button class="btn ghost" id="editJobProfile" type="button">返回修改 JD</button>
+        <label>专业类
+          <select id="f2Cls" aria-label="专业类" disabled><option value="">先选门类</option></select>
+        </label>
+        <label>专业
+          <select id="f2Major" aria-label="专业" disabled><option value="">先选专业类</option></select>
+        </label>
       </div>
-    </section>
-  </div>
-
-  <div data-state-view="processing">
-    <div class="card">
-      <div class="ai-status"><span class="ai-orb" aria-hidden="true"></span>正在解析岗位要求并进行简历匹配…（通常 ≤ 25 秒）</div>
-      <div class="flow-line" aria-hidden="true"></div>
-      <div class="ai-stages" aria-label="匹配阶段">
-        <span class="ai-stage done">JD 文本读取</span>
-        <span class="ai-stage on">要求抽取</span>
-        <span class="ai-stage">规则匹配</span>
-        <span class="ai-stage">结果校验</span>
+      <div class="f2-chips" id="f2QuickWrap">
+        <span class="f2-chips-title">常用专业</span>
+        <div class="f2-chip-row" id="f2QuickChips"></div>
       </div>
-      <div class="skel h-md" style="margin:14px 0"></div>
-      <div class="skel h-md" style="margin:14px 0"></div>
-      <div class="skel h-md"></div>
+      <div class="f2-chips zy-hidden" id="f2RecentWrap">
+        <span class="f2-chips-title">最近选择</span>
+        <div class="f2-chip-row" id="f2RecentChips"></div>
+      </div>
+      <div class="f2-intent">
+        <label>不确定专业？按求职意向找专业
+          <input id="f2Intent" type="search" placeholder="如：程序员、数据分析、律师" autocomplete="off">
+        </label>
+        <div class="f2-intent-results" id="f2IntentResults"></div>
+      </div>
+      <div class="f2-selected zy-hidden" id="f2Selected"></div>
+            <div class="f2-demo-entry">
+        <button class="btn ghost" id="quickDemoF2" type="button">⚡ 一键体验：样例专业 + 样例简历</button>
+        <p class="f2-hint">无需注册上传，30 秒体验完整匹配流程（演示结果带标注，不写入历史记录）。</p>
+      </div>
+      <div class="f2-panel-nav">
+        <button class="btn" id="f2Next1" type="button" disabled>下一步：查看岗位画像</button>
+      </div>
     </div>
-  </div>
+  </section>
 
-  <div data-state-view="success">
-    <div class="card" style="display:flex;gap:28px;align-items:center;flex-wrap:wrap">
-      <div class="score-ring" id="matchScoreRing" style="--pct:0" role="img" aria-label="匹配分 M：0 分"><div class="inner"><span class="num" id="matchScore">0</span><span class="lbl">匹配分 M</span></div></div>
-      <div style="flex:1;min-width:260px" id="matchSubbars"></div>
-    </div>
-    <div class="degraded-banner match-notice" id="matchNotice" hidden aria-live="polite"><div class="icon">ℹ️</div><div><h3>匹配方式说明</h3><p></p></div></div>
-    <div class="card" id="lowScoreCard" hidden aria-live="polite">
-      <h3>匹配结果分析</h3>
-      <p id="lowScoreSummary"></p>
-      <div id="lowScoreDims"></div>
-      <p id="lowScoreAdvice"></p>
-    </div>
+  <section class="f2-panel zy-hidden" id="f2Step2" aria-label="第二步 岗位画像">
     <div class="card">
-      <h3>逐条要求四态判定（硬性要求置顶）</h3>
-      <div class="flow-line" aria-hidden="true"></div>
-      <div class="cover-track" style="margin-bottom:12px" id="coverTrack" role="img" aria-label="要求四态覆盖分布"></div>
-      <div id="reqList"></div>
+      <h3>第二步 · <span id="f2ProfileTitle"></span> 的岗位画像</h3>
+      <p class="f2-hint" id="f2ProfileSummary"></p>
+      <div id="f2ProfileBody"></div>
+            
+      <div class="f2-panel-nav">
+        <button class="btn" id="f2Back1" type="button">上一步</button>
+        <button class="btn" id="f2Next2" type="button">下一步：上传简历</button>
+      </div>
     </div>
-    <div class="card">
-      <h3>缺口分级与行动建议</h3>
-      <div id="gapList"></div>
-    </div>
-  </div>
+  </section>
 
-  <div data-state-view="error">
-    <div class="error-banner">
-      <div class="icon">⚠️</div>
-      <div>
-        <h3>匹配未完成</h3>
-        <p id="matchErrorMessage">岗位要求未能处理完成。请确认文件格式或文本内容后重试。</p>
-        <div class="error-actions">
-          <button class="btn" id="retryJobMatch" type="button">重试一次</button>
-          <button class="btn ghost" id="returnToJobUpload" type="button">返回修改</button>
+  <section class="f2-panel zy-hidden" id="f2Step3" aria-label="第三步 上传简历">
+    <div class="card">
+      <h3>第三步 · 上传简历 <span class="f2-tag" id="f2ModeTag">模式A：专业画像匹配</span></h3>
+      <p class="f2-hint">拖入文件或粘贴文本。填 JD 后自动切换模式B（JD 精准匹配 + 专业契合度）。</p>
+      <div class="f2-drop" id="f2Drop" role="button" tabindex="0" aria-label="拖入或点击选择简历文件">
+        <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L8 8m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
+        <span>拖入 .txt / .docx / .pdf，或点击选择</span>
+        <input type="file" id="f2File" accept=".txt,.md,.docx,.pdf" class="zy-hidden">
+        <p class="f2-file-status" id="f2FileStatus" role="status" aria-live="polite"></p>
+        <div class="upload-progress" id="f2UploadProgress" hidden>
+          <div class="upload-progress-track"><div class="upload-progress-bar" id="f2UploadProgressBar"></div></div>
+          <span class="upload-progress-text" id="f2UploadProgressText">0%</span>
         </div>
       </div>
-    </div>
-  </div>
-
-  <div data-state-view="degraded">
-    <div class="degraded-banner">
-      <div class="icon">🔶</div>
-      <div>
-        <h3>已切换降级路径 · 简化匹配</h3>
-        <p>语义向量服务不可用，当前使用本地 BM25 关键词匹配，结果可能偏保守（界面已按规范标注「简化匹配」）。</p>
+      <textarea id="f2Resume" rows="9" placeholder="或直接粘贴简历正文（建议包含教育背景、技能、项目/实习经历）…"></textarea>
+      <details class="f2-jd">
+        <summary>可选：粘贴目标岗位 JD（填写后进入模式B精准匹配）</summary>
+        <textarea id="f2Jd" rows="5" placeholder="粘贴 JD 文本，如：本科及以上学历，计算机相关专业；精通Java；负责订单系统开发…"></textarea>
+      </details>
+            
+      <div class="f2-panel-nav">
+        <button class="btn" id="f2Back2" type="button">上一步</button>
+        <button class="btn primary" id="f2StartMatch" type="button">开始匹配</button>
       </div>
     </div>
-    <div class="card">
-      <h3>关键词覆盖（简化匹配）</h3>
-      <div class="req-item"><span class="badge covered">命中</span><span class="txt">Go / MySQL / Redis / RabbitMQ / 订单 / 库存</span></div>
-      <div class="req-item"><span class="badge missing">未命中</span><span class="txt">Kubernetes / gRPC / 分布式事务</span></div>
-      <p style="font-size:13px;color:var(--zy-ink-2);margin-top:12px">语义匹配恢复后将自动重算并更新四态。</p>
+  </section>
+
+  <section class="f2-panel zy-hidden" id="f2Step4" aria-label="第四步 匹配报告">
+    <div class="card f2-scores">
+      <div class="f2-ring" id="f2FitRing" style="--pct:0"><div class="inner"><span class="num">--</span><span class="lbl">专业契合</span></div></div>
+      <div class="f2-ring" id="f2CoverRing" style="--pct:0"><div class="inner"><span class="num">--</span><span class="lbl">岗位覆盖</span></div></div>
+      <div class="f2-overall">
+        <div class="num" id="f2OverallNum">--</div>
+        <div class="lbl">综合匹配 M</div>
+        <div class="sub" id="f2ModeLine"></div>
+      </div>
+    </div>
+    <div class="card" id="f2ReportBody"></div>
+          
+      <div class="f2-panel-nav">
+      <button class="btn" id="f2Back3" type="button">上一步</button>
+      <button class="btn" id="f2Restart" type="button">重新匹配</button>
+    </div>
+  </section>
+
+  <div class="card zy-hidden" id="f2Loading">
+    <div class="ai-status"><span class="ai-orb" aria-hidden="true"></span>正在匹配 · 解析画像与简历证据…</div>
+    <div class="upload-progress" id="f2TaskProgress" hidden>
+      <div class="upload-progress-track"><div class="upload-progress-bar" id="f2TaskProgressBar"></div></div>
+      <span class="upload-progress-text" id="f2TaskProgressText">0%</span>
+    </div>
+    <div class="skel h-md" style="margin:14px 0"></div>
+    <div class="skel h-md" style="margin:14px 0"></div>
+    <div class="skel h-md"></div>
+  </div>
+
+  <div class="error-banner zy-hidden" id="f2Error" role="alert">
+    <div class="icon">⚠️</div>
+    <div>
+      <h3>匹配未完成</h3>
+      <p id="f2ErrorMsg"></p>
+      <span class="btn" id="f2ErrorRetry">重试</span>
     </div>
   </div>
 </div>
 
-<!-- 侧边栏：个人账号 + 历史记录（演示原型，数据存 localStorage） -->
 <aside class="zy-sidebar" id="zySidebar" aria-label="账号与历史记录">
   <div class="zy-sidebar-head">
     <div class="zy-user-card">
@@ -167,11 +170,11 @@
     </div>
   </div>
   <div class="zy-history">
-    <div class="zy-history-title"><span>历史检测记录</span><button class="zy-history-clear zy-hidden" id="zyHistoryClear" type="button">清空</button></div>
+    <div class="zy-history-title"><span>历史检测记录</span><button class="zy-history-clear" id="zyHistoryClear" type="button">清空</button></div>
     <ul class="zy-history-list" id="zyHistoryList"></ul>
-    <div class="zy-history-empty" id="zyHistoryEmpty">还没有检测记录<br>完成一次诊断并登录后，记录会自动出现在这里</div>
-    <div class="zy-sidebar-demo-note zy-hidden" id="zyDemoNote">· 以下为演示数据 ·</div>
-    <button class="zy-add-record zy-hidden" id="zyAddRecord" type="button">＋ 模拟一次检测</button>
+    <div class="zy-history-empty" id="zyHistoryEmpty">还没有检测记录<br>完成一次诊断后会自动出现在这里</div>
+    <div class="zy-sidebar-demo-note" id="zyDemoNote">· 以下为演示数据 ·</div>
+    <button class="zy-add-record" id="zyAddRecord" type="button">＋ 模拟一次检测</button>
   </div>
 </aside>
 <div class="zy-sidebar-backdrop" id="zySidebarBackdrop"></div>
@@ -200,19 +203,11 @@
     <p class="zy-form-msg" id="zyAuthMsg"></p>
   </div>
 </div>
-<script src="../js/mock-data.js"></script>
-<script src="../js/app.js"></script>
-<script src="../js/pages-api-config.js"></script>
 <script src="../js/data-bridge.js"></script>
+<script src="../js/pages-api-config.js"></script>
 <script src="../js/account.js"></script>
-<script src="../js/job-upload.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  if (!window.APP.isDemoMode() || window.APP.getState() !== "success") return;
-  var DB = window.DataBridge;
-  var m = DB && DB.getMockData ? DB.getMockData("matchResult") : null;
-  if (m && window.JobUpload) window.JobUpload.renderMatchResult(m);
-});
-</script>
+<script src="../js/app.js"></script>
+<script src="../js/f2-major.js"></script>
+<script src="../js/quick-demo.js"></script>
 </body>
 </html>

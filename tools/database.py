@@ -131,98 +131,75 @@ CREATE TABLE IF NOT EXISTS history_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_history_user ON history_events(user_id, created_at DESC);
-"""
-
-_INIT_SQL_PG = """
-CREATE TABLE IF NOT EXISTS resumes (
-    id          BIGSERIAL PRIMARY KEY,
-    session_id  TEXT NOT NULL UNIQUE,
-    client_ip   TEXT,
-    user_agent  TEXT,
-    filename    TEXT,
-    file_type   TEXT,
-    file_size   INTEGER,
-    resume_text TEXT,
-    created_at  TEXT NOT NULL,
-    has_diagnosis INTEGER DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS idx_resumes_session ON resumes(session_id);
-CREATE INDEX IF NOT EXISTS idx_resumes_created ON resumes(created_at);
-
-CREATE TABLE IF NOT EXISTS matches (
-    id          BIGSERIAL PRIMARY KEY,
-    session_id  TEXT NOT NULL UNIQUE,
-    match_json  TEXT NOT NULL,
-    score_m     REAL,
-    created_at  TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_matches_session ON matches(session_id);
-
-CREATE TABLE IF NOT EXISTS interview_sessions (
-    id          BIGSERIAL PRIMARY KEY,
-    session_id  TEXT NOT NULL UNIQUE,
-    state       TEXT NOT NULL,
-    payload     TEXT NOT NULL,
-    created_at  TEXT NOT NULL,
-    updated_at  TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_sessions_session ON interview_sessions(session_id);
-
-CREATE TABLE IF NOT EXISTS abilities (
-    id          BIGSERIAL PRIMARY KEY,
-    session_id  TEXT NOT NULL UNIQUE,
-    ability_json TEXT NOT NULL,
-    created_at  TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_abilities_session ON abilities(session_id);
-
-CREATE TABLE IF NOT EXISTS diagnoses (
-    id              BIGSERIAL PRIMARY KEY,
-    resume_id       BIGINT NOT NULL,
-    score_r         REAL,
-    diagnosis_mode  TEXT,
-    diagnosis_notice TEXT,
-    model_trace_id  TEXT,
-    diagnosis_json  TEXT,
+CREATE TABLE IF NOT EXISTS tasks (
+    id              TEXT PRIMARY KEY,
+    task_type       TEXT NOT NULL,
+    idempotency_key TEXT,
+    owner_key       TEXT NOT NULL,
+    state           TEXT NOT NULL DEFAULT 'pending',
+    progress        INTEGER NOT NULL DEFAULT 0,
+    total_steps     INTEGER NOT NULL DEFAULT 1,
+    current_step    INTEGER NOT NULL DEFAULT 0,
+    payload         TEXT,
+    result_json     TEXT,
+    error_code      TEXT,
+    error_message   TEXT,
     created_at      TEXT NOT NULL,
-    FOREIGN KEY (resume_id) REFERENCES resumes(id)
+    updated_at      TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS users (
-    id            BIGSERIAL PRIMARY KEY,
-    phone         TEXT UNIQUE NOT NULL,
-    email         TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    display_name  TEXT NOT NULL,
-    role          TEXT NOT NULL DEFAULT 'user',
-    created_at    TEXT NOT NULL,
-    last_login_at TEXT
+CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_key, created_at DESC);
+CREATE TABLE IF NOT EXISTS resume_rewrites (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id     TEXT NOT NULL,
+    suggestion_id  TEXT,
+    issue          TEXT,
+    candidate_text TEXT NOT NULL,
+    status         TEXT NOT NULL DEFAULT 'pending',
+    created_at     TEXT NOT NULL,
+    applied_at     TEXT
 );
 
-CREATE TABLE IF NOT EXISTS sessions (
-    id         TEXT PRIMARY KEY,
-    user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at TEXT NOT NULL,
-    expires_at TEXT NOT NULL
+CREATE INDEX IF NOT EXISTS idx_rewrites_session ON resume_rewrites(session_id, status);
+CREATE TABLE IF NOT EXISTS applications (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id   TEXT NOT NULL,
+    owner_key    TEXT NOT NULL,
+    company      TEXT NOT NULL,
+    position     TEXT NOT NULL,
+    cover_letter TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'applied',
+    created_at   TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
-
-CREATE TABLE IF NOT EXISTS history_events (
-    id         BIGSERIAL PRIMARY KEY,
-    user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    session_id TEXT NOT NULL,
-    event_type TEXT NOT NULL,
-    title      TEXT NOT NULL,
-    status     TEXT NOT NULL,
-    created_at TEXT NOT NULL
+CREATE INDEX IF NOT EXISTS idx_applications_owner ON applications(owner_key, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_key, created_at DESC);
+CREATE TABLE IF NOT EXISTS resume_rewrites (
+    id             BIGSERIAL PRIMARY KEY,
+    session_id     TEXT NOT NULL,
+    suggestion_id  TEXT,
+    issue          TEXT,
+    candidate_text TEXT NOT NULL,
+    status         TEXT NOT NULL DEFAULT 'pending',
+    created_at     TEXT NOT NULL,
+    applied_at     TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_history_user ON history_events(user_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS applications (
+    id           BIGSERIAL PRIMARY KEY,
+    session_id   TEXT NOT NULL,
+    owner_key    TEXT NOT NULL,
+    company      TEXT NOT NULL,
+    position     TEXT NOT NULL,
+    cover_letter TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'applied',
+    created_at   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_applications_owner ON applications(owner_key, created_at DESC);
+
+
+
 """
 
 
@@ -765,5 +742,126 @@ def delete_history_event(event_id, user_id):
             (event_id, user_id),
         )
         return getattr(cur, "rowcount", 1) or 0
+    finally:
+        conn.close()
+
+# ------------------------------------------------------------------ #
+# Resume rewrites (WF-02 optimizer, phase 4)
+# ------------------------------------------------------------------ #
+
+def save_rewrite(session_id, suggestion_id, issue, candidate_text):
+    """Persist an optimizer candidate as pending; applied on user confirm."""
+    init_db()
+    conn = _get_conn()
+    try:
+        cur = conn.execute(
+            """
+            INSERT INTO resume_rewrites (session_id, suggestion_id, issue,
+                                         candidate_text, status, created_at)
+            VALUES (?, ?, ?, ?, 'pending', ?)
+            """,
+            (session_id, suggestion_id, issue, candidate_text, _utc_iso()),
+        )
+        row = conn.execute(
+            "SELECT * FROM resume_rewrites WHERE id = ?", (cur.lastrowid,)
+        ).fetchone()
+        return dict(row) if row is not None else None
+    finally:
+        conn.close()
+
+
+def mark_rewrite_applied(rewrite_id, session_id):
+    """Flip a pending rewrite to applied (user confirmed)."""
+    init_db()
+    conn = _get_conn()
+    try:
+        conn.execute(
+            """
+            UPDATE resume_rewrites SET status='applied', applied_at=?
+            WHERE id=? AND session_id=? AND status='pending'
+            """,
+            (_utc_iso(), rewrite_id, session_id),
+        )
+        row = conn.execute(
+            "SELECT * FROM resume_rewrites WHERE id = ? AND session_id = ?",
+            (rewrite_id, session_id),
+        ).fetchone()
+        return dict(row) if row is not None else None
+    finally:
+        conn.close()
+
+
+def list_rewrites(session_id, status=None):
+    """Return rewrites for a session, optionally filtered by status."""
+    init_db()
+    conn = _get_conn()
+    try:
+        if status:
+            rows = conn.execute(
+                "SELECT * FROM resume_rewrites WHERE session_id = ? AND status = ? "
+                "ORDER BY id DESC",
+                (session_id, status),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM resume_rewrites WHERE session_id = ? ORDER BY id DESC",
+                (session_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def save_application(session_id, owner_key, company, position, cover_letter, status="applied"):
+    """Persist a user-confirmed application record (phase 5 apply loop)."""
+    init_db()
+    conn = _get_conn()
+    try:
+        cur = conn.execute(
+            """
+            INSERT INTO applications (session_id, owner_key, company, position,
+                                      cover_letter, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (session_id, owner_key, company, position, cover_letter, status, _utc_iso()),
+        )
+        row = conn.execute(
+            "SELECT * FROM applications WHERE id = ?", (cur.lastrowid,)
+        ).fetchone()
+        return dict(row) if row is not None else None
+    finally:
+        conn.close()
+
+
+def list_applications(owner_key, limit=50, offset=0):
+    """Return application records for an owner (login user or guest)."""
+    init_db()
+    conn = _get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM applications WHERE owner_key = ? ORDER BY id DESC LIMIT ? OFFSET ?",
+            (owner_key, int(limit), int(offset)),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def delete_application(app_id, owner_key):
+    """Delete one application record owned by the given key; return the deleted row."""
+    init_db()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM applications WHERE id = ? AND owner_key = ?",
+            (app_id, owner_key),
+        ).fetchone()
+        if row is None:
+            return None
+        conn.execute(
+            "DELETE FROM applications WHERE id = ? AND owner_key = ?",
+            (app_id, owner_key),
+        )
+        return dict(row)
     finally:
         conn.close()
