@@ -94,6 +94,7 @@
     } else {
       if (no) no.textContent = String((state.turns.length || 0) + 1);
     }
+    if (turn.followUp && turn.followUp.question) maybeSpeak(turn.followUp.question);
     renderTurns();
     saveSnapshot();
   }
@@ -155,25 +156,43 @@
     });
   }
 
-  function submitAnswer() {
+  function submitAnswer(text) {
     var input = $("f3Answer");
-    if (!input || !state.sessionId) return;
-    var text = (input.value || "").trim();
+    if (!state.sessionId) return;
+    text = (text !== undefined && text !== null ? String(text) : (input ? input.value : "")).trim();
     if (!text) return;
     var turn = state.turns[state.turns.length - 1];
     if (!turn) return;
     turn.answer = text;
-    input.value = "";
+    if (input) input.value = "";
     renderTurns();
     setView("processing");
     streamFollowUp(turn);
+  }
+
+  function ensureConsent(DB) {
+    if (consentToken() || !DB || typeof DB.submitConsent !== "function") return Promise.resolve();
+    return DB.submitConsent().then(function (r) {
+      if (!r || r.error) console.warn("[F3] 自动同意未成功，继续尝试开始面试:", r && r.message);
+    }).catch(function (err) {
+      console.warn("[F3] 自动同意失败，继续尝试开始面试:", err);
+    });
+  }
+
+  function maybeSpeak(text) {
+    if (!text || !window.F3Voice || typeof window.F3Voice.speakQuestion !== "function") return;
+    var toggle = $("ttsToggle");
+    if (toggle && !toggle.checked) return;
+    window.F3Voice.speakQuestion(text);
   }
 
   function startInterview() {
     var DB = window.DataBridge;
     if (!DB || typeof DB.startInterview !== "function") return;
     setView("processing");
-    DB.startInterview({}, {}, []).then(function (res) {
+    ensureConsent(DB).then(function () {
+      return DB.startInterview({}, {}, []);
+    }).then(function (res) {
       if (!res || res.error || !res.firstQuestion) {
         setView("error");
         var msg = $("f3ErrorMsg");
@@ -194,6 +213,7 @@
       setView("success");
       renderTurns();
       hideStreamed();
+      maybeSpeak(res.firstQuestion);
       var no = $("f3TurnNo");
       if (no) no.textContent = "1";
       var input = $("f3Answer");
@@ -228,6 +248,8 @@
     if (sendBtn) sendBtn.addEventListener("click", submitAnswer);
     var endBtn = $("f3EndInterview");
     if (endBtn) endBtn.addEventListener("click", endInterview);
+    var retryBtn = $("f3RetryBtn");
+    if (retryBtn) retryBtn.addEventListener("click", startInterview);
     var input = $("f3Answer");
     if (input) input.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submitAnswer();
@@ -244,6 +266,15 @@
       hideStreamed();
       var no = $("f3TurnNo");
       if (no) no.textContent = String(state.turns.length + 1);
+      var last = state.turns[state.turns.length - 1];
+      if (last && last.question) maybeSpeak(last.question);
     }
   });
+
+  window.F3Interview = {
+    startInterview: startInterview,
+    submitAnswer: submitAnswer,
+    endInterview: endInterview,
+    getState: function () { return state; }
+  };
 })();

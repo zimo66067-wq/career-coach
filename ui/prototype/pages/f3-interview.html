@@ -238,9 +238,9 @@
     <div class="error-banner">
       <div class="icon">⚠️</div>
       <div>
-        <h3>本轮评估未完成</h3>
-        <p>评估输出未通过校验（answer_quote 不是回答原文），该轮已按规则作废，不计入分数。可重新作答本轮。</p>
-        <span class="btn">重新作答本轮</span>
+        <h3>面试未能开始或本轮未完成</h3>
+        <p>可能原因：后端服务暂不可用、模型超时，或回答未通过校验。可点击下方按钮重新开始面试。</p>
+        <button class="btn" id="f3RetryBtn" type="button">重新开始面试</button>
       </div>
     </div>
   </div>
@@ -261,52 +261,6 @@
 </div>
 
 <!-- 侧边栏：个人账号 + 历史记录（演示原型，数据存 localStorage） -->
-<aside class="zy-sidebar" id="zySidebar" aria-label="账号与历史记录">
-  <div class="zy-sidebar-head">
-    <div class="zy-user-card">
-      <div class="zy-avatar" id="zyAvatar">访</div>
-      <div class="zy-user-meta">
-        <div class="zy-user-name" id="zyUserName">未登录游客</div>
-        <div class="zy-user-sub" id="zyUserSub">登录后历史可长期保存</div>
-        <button class="zy-user-action" id="zyLoginBtn" type="button">登录 / 注册</button>
-        <button class="zy-user-action zy-hidden" id="zyLogoutBtn" type="button">退出登录</button>
-      </div>
-    </div>
-  </div>
-  <div class="zy-history">
-    <div class="zy-history-title"><span>历史检测记录</span><button class="zy-history-clear" id="zyHistoryClear" type="button">清空</button></div>
-    <ul class="zy-history-list" id="zyHistoryList"></ul>
-    <div class="zy-history-empty" id="zyHistoryEmpty">还没有检测记录<br>完成一次诊断后会自动出现在这里</div>
-    <div class="zy-sidebar-demo-note" id="zyDemoNote">· 以下为演示数据 ·</div>
-    <button class="zy-add-record" id="zyAddRecord" type="button">＋ 模拟一次检测</button>
-  </div>
-</aside>
-<div class="zy-sidebar-backdrop" id="zySidebarBackdrop"></div>
-<div class="zy-modal zy-hidden" id="zyAuthModal" role="dialog" aria-modal="true" aria-labelledby="zyAuthTitle">
-  <div class="zy-modal-box">
-    <button class="zy-modal-close" id="zyAuthClose" type="button" aria-label="关闭">×</button>
-    <h3 id="zyAuthTitle">登录 / 注册</h3>
-    <div class="zy-tabs">
-      <button class="zy-tab active" data-tab="login" type="button">登录</button>
-      <button class="zy-tab" data-tab="register" type="button">注册</button>
-    </div>
-    <form class="zy-form" id="zyLoginForm">
-      <label>手机号或邮箱<input name="account" type="text" placeholder="手机号或邮箱" required></label>
-      <label>登录密码<input name="password" type="password" placeholder="登录密码" required></label>
-      <button class="zy-btn" type="submit">登 录</button>
-    </form>
-    <form class="zy-form zy-hidden" id="zyRegisterForm">
-      <label>手机号<input name="phone" type="tel" placeholder="11 位手机号" required></label>
-      <label>邮箱<input name="email" type="email" placeholder="you@example.com" required></label>
-      <label>邮箱密码<input name="emailPwd" type="password" placeholder="设置平台登录密码" required>
-        <span class="zy-hint">请设置专用登录密码，勿使用邮箱本身的密码</span>
-      </label>
-      <label>账户名<input name="name" type="text" placeholder="2-16 个字符，如：小张" required></label>
-      <button class="zy-btn" type="submit">注 册</button>
-    </form>
-    <p class="zy-form-msg" id="zyAuthMsg"></p>
-  </div>
-</div>
 <script src="../js/mock-data.js"></script>
 <script src="../js/app.js"></script>
 <script src="../js/pages-api-config.js"></script>
@@ -316,7 +270,16 @@
 <script>
 // ── 演示模式：渲染面试记录（仅 ?demo=1&state=success 时执行） ──
 document.addEventListener("DOMContentLoaded", function () {
-  if (!window.APP.isDemoMode() || window.APP.getState() !== "success") return;
+  if (!window.APP.isDemoMode()) return;
+  // 演示模式空态：点击“开始面试”后切换到成功态并渲染第一问
+  if (window.APP.getState() === "empty") {
+    var demoStartBtn = document.getElementById("f3StartBtn");
+    if (demoStartBtn) demoStartBtn.addEventListener("click", function () {
+      window.APP.setState("success");
+    });
+    return;
+  }
+  if (window.APP.getState() !== "success") return;
   // 成功态的合成内容仅用于显式演示模式。
   var DB = window.DataBridge;
   function fetchSync(key) {
@@ -345,6 +308,29 @@ document.addEventListener("DOMContentLoaded", function () {
     html += "</div></div>";
   });
   document.getElementById("turns").innerHTML = html;
+
+  // 演示模式：绑定“提交回答”，追加回答气泡与模拟追问
+  var demoInput = document.getElementById("f3Answer");
+  var demoSendBtn = document.getElementById("f3SendAnswer");
+  if (demoSendBtn && demoInput) {
+    demoSendBtn.addEventListener("click", function () {
+      var val = demoInput.value.trim();
+      if (!val) return;
+      demoInput.value = "";
+      var turns = document.getElementById("turns");
+      if (!turns) return;
+      var escDemo = function (s) {
+        return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+      };
+      turns.insertAdjacentHTML("beforeend", '<div class="bubble a"><div class="who">你</div>' + escDemo(val) + "</div>");
+      var t = interviews[interviews.length - 1];
+      if (t && t.follow_up && t.follow_up.question) {
+        turns.insertAdjacentHTML("beforeend", '<div class="bubble q"><div class="who">面试官 · 追问</div>' + escDemo(t.follow_up.question) + "</div>");
+      }
+    });
+  }
 });
 
 // ── 语音增强初始化（生产+演示均执行，不受 demo 门控限制） ──
@@ -402,6 +388,8 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  window.F3Voice = { speakQuestion: speakQuestion };
+
   // 麦克风按钮: 按住说话
   var isRecording = false;
 
@@ -432,9 +420,18 @@ document.addEventListener("DOMContentLoaded", function () {
         micBtn.classList.remove('recording');
         updateIndicator();
         if (draft && draft.trim().length > 0) {
-          console.log('[F3] ASR 最终结果:', draft);
-          indicator.textContent = '识别完成: ' + draft.slice(0, 20) + (draft.length > 20 ? '...' : '');
-          indicator.className = 'voice-indicator';
+          var trimmed = draft.trim();
+          console.log('[F3] ASR 最终结果:', trimmed);
+          var ans = document.getElementById('f3Answer');
+          if (ans) ans.value = trimmed;
+          if (window.F3Interview && typeof window.F3Interview.submitAnswer === 'function') {
+            indicator.textContent = '识别完成，正在提交…';
+            indicator.className = 'voice-indicator speaking';
+            window.F3Interview.submitAnswer(trimmed);
+          } else {
+            indicator.textContent = '识别完成: ' + trimmed.slice(0, 20) + (trimmed.length > 20 ? '...' : '');
+            indicator.className = 'voice-indicator';
+          }
         }
       },
       onFallback: function (turnId, draft) {
@@ -472,25 +469,18 @@ document.addEventListener("DOMContentLoaded", function () {
     var text = fallbackText.value.trim();
     if (!text) return;
     console.log('[F3] 文字回退提交:', text);
-    if (window.DataBridge) {
-      window.DataBridge.submitAnswer('demo_session', text).then(function (res) {
-        console.log('[F3] 回答已提交', res);
-        if (window.DataBridge.isDegraded(res)) {
-          indicator.textContent = '已提交（降级模式）';
-        } else {
-          indicator.textContent = '已提交';
-        }
-        fallbackText.value = '';
-        fallbackArea.style.display = 'none';
-        draftHint.style.display = 'none';
-        updateIndicator();
-      });
+    fallbackText.value = '';
+    fallbackArea.style.display = 'none';
+    draftHint.style.display = 'none';
+    var ans = document.getElementById('f3Answer');
+    if (ans) ans.value = text;
+    if (window.F3Interview && typeof window.F3Interview.submitAnswer === 'function') {
+      window.F3Interview.submitAnswer(text);
+      indicator.textContent = '已提交';
     } else {
       indicator.textContent = '已提交（演示模式）';
-      fallbackText.value = '';
-      fallbackArea.style.display = 'none';
-      draftHint.style.display = 'none';
     }
+    updateIndicator();
   });
 
   // 文字回退: 重试语音
@@ -564,7 +554,6 @@ document.addEventListener("DOMContentLoaded", function () {
   </div>
 </div>
 
-<script src="../js/account.js"></script>
 <script src="../js/f3-interview.js"></script>
 </body>
 </html>
