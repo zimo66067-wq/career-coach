@@ -577,7 +577,7 @@
         buildTree();
       })
       .catch(function (err) {
-        showError("专业目录加载失败：" + err.message + "。请通过后端服务访问本页面（http://127.0.0.1:8123/pages/f2-match.html）。");
+        showError("专业目录加载失败：" + err.message + "。请检查网络连接后重试。");
       });
   }
 

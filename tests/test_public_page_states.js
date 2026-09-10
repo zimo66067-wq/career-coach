@@ -7,6 +7,18 @@ const vm = require('vm');
 const root = path.resolve(__dirname, '..');
 const appSource = fs.readFileSync(path.join(root, 'docs', 'js', 'app.js'), 'utf8');
 const bridgeSource = fs.readFileSync(path.join(root, 'docs', 'js', 'data-bridge.js'), 'utf8');
+const apiConfigSource = fs.readFileSync(path.join(root, 'docs', 'js', 'pages-api-config.js'), 'utf8');
+
+function configuredApiBase(hostname, origin, existing) {
+  const context = {
+    window: {
+      location: { hostname: hostname, origin: origin },
+      DUMATE_API_BASE: existing || ''
+    }
+  };
+  vm.runInNewContext(apiConfigSource, context, { filename: 'pages-api-config.js' });
+  return context.window.DUMATE_API_BASE;
+}
 
 function loadApp(search) {
   const context = {
@@ -41,6 +53,21 @@ function loadBridge(search, fetchImpl) {
 }
 
 async function run() {
+  assert.strictEqual(
+    configuredApiBase('career-coach-branch.example.vercel.app', 'https://career-coach-branch.example.vercel.app'),
+    'https://career-coach-branch.example.vercel.app',
+    'Vercel Preview must call its own API'
+  );
+  assert.strictEqual(
+    configuredApiBase('zimo66067-wq.github.io', 'https://zimo66067-wq.github.io'),
+    'https://career-coach-omega-three.vercel.app',
+    'GitHub Pages must call the production API'
+  );
+  assert.strictEqual(
+    configuredApiBase('localhost', 'http://localhost:8123', 'http://localhost:5000'),
+    'http://localhost:5000',
+    'an explicitly injected API base must be preserved'
+  );
   assert.strictEqual(loadApp('').getState(), 'empty', 'default product state must be empty');
   assert.strictEqual(loadApp('?state=success').getState(), 'empty', 'state alone must not enter success');
   assert.strictEqual(loadApp('?demo=1&state=success').getState(), 'success', 'explicit demo can show success');
