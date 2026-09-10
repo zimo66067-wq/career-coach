@@ -200,8 +200,13 @@ def test_http_full_product_chain_f1_to_f5_and_delete(monkeypatch):
     job_profile = parsed.json["jobProfile"]
     job_profile["user_confirmed"] = True
     matched = client.post(
-        "/api/wf03/match",
-        json={"resumeText": RESUME, "jobProfile": job_profile, "session_id": session_id},
+        "/api/f2/match",
+        json={
+            "majorCode": "080901",
+            "resumeText": RESUME,
+            "jdText": JD_TEXT,
+            "session_id": session_id,
+        },
     )
     assert matched.status_code == 200
     score_m = matched.json["score_M"]
@@ -241,7 +246,7 @@ def test_http_full_product_chain_f1_to_f5_and_delete(monkeypatch):
 
     # F4：能力报告 + 雷达图
     ability = client.post("/api/wf05/ability", json={"session_id": session_id})
-    assert ability.status_code == 200
+    assert ability.status_code == 200, ability.json
     body = ability.json
     assert body["score_R"] == score_r
     assert body["score_M"] == score_m

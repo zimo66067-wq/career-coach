@@ -55,22 +55,23 @@ def _f2_assemble_result(payload, rows, major_code):
             "action": "在简历中补充与该要求直接相关的真实经历、成果或技能证据。",
         })
     major_info = f2_major.MAJOR_INDEX[major_code]
-    return {
+    mode_b = {
+        "requirements": rows,
+        "subscores": subscores,
+        "coverage": coverage,
+        "major_fit": major_fit,
+        "major_fit_notice": major_fit_notice,
+        "overall": overall,
+        "occupation_hit": {
+            "occupation": occupation["occupation"],
+            "level": occupation["level"],
+        } if occupation else None,
+        "gaps": gaps,
+    }
+    assembled = {
         "mode": "B",
         "mode_notice": "模式B：JD 精准匹配（四态 + 专业契合度）。",
-        "modeB": {
-            "requirements": rows,
-            "subscores": subscores,
-            "coverage": coverage,
-            "major_fit": major_fit,
-            "major_fit_notice": major_fit_notice,
-            "overall": overall,
-            "occupation_hit": {
-                "occupation": occupation["occupation"],
-                "level": occupation["level"],
-            } if occupation else None,
-            "gaps": gaps,
-        },
+        "modeB": mode_b,
         "modeA": None,
         "major": {
             "code": major_code,
@@ -85,6 +86,8 @@ def _f2_assemble_result(payload, rows, major_code):
             "major_fit_notice": major_fit_notice,
         },
     }
+    assembled.update(f2_major.common_match_contract(mode_b))
+    return assembled
 
 
 def _persist_result(payload, assembled):
@@ -93,10 +96,8 @@ def _persist_result(payload, assembled):
         return assembled
     from tools.database import save_match
 
-    score_m = assembled["scores"].get("overall")
+    score_m = assembled.get("score_M")
     stored = dict(assembled)
-    stored["score_M"] = score_m
-    stored["gaps"] = assembled.get("modeB", {}).get("gaps", [])
     save_match(session_id, stored, score_m)
     assembled["session_id"] = session_id
     return assembled

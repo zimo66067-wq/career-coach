@@ -275,6 +275,27 @@ def mode_b_result(profile, resume_text, jd_text):
     }
 
 
+def common_match_contract(mode_result):
+    """Translate F2 display names into the frozen cross-feature match schema."""
+    type_aliases = {"bonus": "preferred", "term": "terminology"}
+    requirements = []
+    for item in mode_result.get("requirements", []):
+        normalized = dict(item)
+        normalized["type"] = type_aliases.get(normalized.get("type"), normalized.get("type"))
+        requirements.append(normalized)
+
+    subscores = {}
+    for key, value in mode_result.get("subscores", {}).items():
+        subscores[type_aliases.get(key, key)] = value
+
+    return {
+        "score_M": mode_result.get("overall"),
+        "requirements": requirements,
+        "subscores": subscores,
+        "gaps": mode_result.get("gaps", []),
+    }
+
+
 def route_api(**kwargs):
     # The old standalone serverless path bypassed the unified consent, quota,
     # ownership and error middleware. Keep only the documented /api/f2/* API.
@@ -364,14 +385,15 @@ def route_api(**kwargs):
                     "major_fit_notice": mode_result.get("major_fit_notice", ""),
                 },
             }
+        # Expose the common match contract at the top level so F3/F4 and the
+        # persistent store do not have to understand mode-specific nesting.
+        response_payload.update(common_match_contract(mode_result))
         session_id = str(body.get("session_id") or "").strip()
         if session_id:
             from tools.database import save_match
 
-            score_m = mode_result.get("overall")
+            score_m = response_payload["score_M"]
             stored = dict(response_payload)
-            stored["score_M"] = score_m
-            stored["gaps"] = mode_result.get("gaps", [])
             save_match(session_id, stored, score_m)
             response_payload["session_id"] = session_id
         return api_ok(response_payload)
