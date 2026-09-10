@@ -1,9 +1,9 @@
 # Core testing
-pytest==8.4.2
+pytest==9.0.3
 jsonschema==4.26.0
 
 # Document parsing
-pypdf==5.9.0
+pypdf==6.16.1
 python-docx==1.2.0
 
 # HTTP client (for model API calls)
@@ -22,6 +22,5 @@ Flask>=3.0,<4.0
 psycopg[binary]>=3.1,<4
 itsdangerous>=2.2,<3.0
 
-# Optional model provider enabled by ZHIPU_API_KEY
-zhipuai>=2.0,<3.0
+# Model provider uses the OpenAI-compatible HTTP endpoint directly.
 

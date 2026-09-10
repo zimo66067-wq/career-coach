@@ -43,4 +43,14 @@ test('f3-interview.js exposes the typing conversation API', () => {
   }
   assert.ok(js.includes('f3_session_snapshot_v1'), 'f3 must keep session snapshot');
   assert.ok(js.includes('/api/wf04/stream'), 'f3 must call the SSE stream endpoint');
+  assert.ok(js.includes('X-Guest-Token'), 'f3 stream must carry stable guest ownership');
+  assert.ok(js.includes('credentials: "include"'), 'f3 stream must carry the login cookie');
+  assert.ok(js.includes('_cache.get("jobProfile")'), 'f3 must restore the F2 job profile');
+  assert.ok(js.includes('_cache.get("resumeProfile")'), 'f3 must restore the F1 resume profile');
+});
+
+test('F5 confirmation actions are native keyboard-accessible buttons', () => {
+  const html = fs.readFileSync(path.join(root, 'public', 'pages', 'f5-apply.html'), 'utf8');
+  assert.match(html, /<button class="btn primary" id="f5Generate" type="button">/);
+  assert.match(html, /<button class="btn primary" id="f5Confirm" type="button" disabled>/);
 });

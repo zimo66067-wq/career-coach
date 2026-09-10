@@ -6,6 +6,7 @@
 服务层不接触 request，保证可单测。
 """
 import json
+import re
 
 from tools.api_errors import ApiError
 from tools.database import (
@@ -41,6 +42,25 @@ def _evidence_quotes(profile):
     return quotes
 
 
+def _output_text(output, fields):
+    if isinstance(output, dict):
+        output = next((output.get(field) for field in fields if output.get(field)), "")
+    text = str(output or "").strip()
+    return text if 20 <= len(text) <= 800 else ""
+
+
+def _grounded_in_evidence(candidate, evidence):
+    """Require at least one four-character evidence fragment in model prose."""
+    if not evidence:
+        return False
+    normalized_candidate = re.sub(r"\s+", "", candidate)
+    for quote in evidence:
+        normalized = re.sub(r"\s+", "", quote)
+        if any(normalized[i:i + 4] in normalized_candidate for i in range(max(0, len(normalized) - 3))):
+            return True
+    return False
+
+
 def generate_cover_letter(session_id, company="", position=""):
     """生成求职信候选（人工确认后才落库）。"""
     company = str(company or "").strip()
@@ -66,8 +86,10 @@ def generate_cover_letter(session_id, company="", position=""):
             )
             result = router.call("cover_letter", prompt)
             if result.get("status") == "success" and result.get("output"):
-                candidate = str(result["output"]).strip()[:800]
-                if candidate:
+                candidate = _output_text(
+                    result["output"], ("candidate", "cover_letter", "content", "text")
+                )
+                if candidate and (company in candidate or position in candidate) and _grounded_in_evidence(candidate, evidence):
                     return {
                         "candidate": candidate,
                         "pending_confirm": True,

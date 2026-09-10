@@ -26,11 +26,14 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from tools.database import (  # noqa: E402
     admin_password_ok,
+    bind_session_owner,
+    consume_usage,
     count_resumes,
     delete_session_data,
     dialect,
     export_all,
     get_resume_detail,
+    get_session_owner,
     list_resumes,
     load_ability,
     load_match,
@@ -40,6 +43,7 @@ from tools.database import (  # noqa: E402
     save_match,
     save_resume,
     save_session,
+    transfer_owner_data,
     update_session,
     list_rewrites,
     mark_rewrite_applied,
@@ -49,7 +53,6 @@ from tools.account import (  # noqa: E402
     AccountError,
     add_history,
     authenticate,
-    check_rate,
     create_session,
     delete_history,
     end_session,
@@ -84,6 +87,7 @@ from tools.tasks import advance_task as tasks_advance  # noqa: E402
 from tools.tasks import create_task as tasks_create  # noqa: E402
 from tools.tasks import get_task as tasks_get  # noqa: E402
 from tools.validate_schema import business_rules  # noqa: E402
+from api.f2_major import route_api as route_f2_major  # noqa: E402
 
 
 
@@ -116,6 +120,7 @@ from tools.api_errors import ApiError  # noqa: E402
 from tools.contracts import MAX_TEXT_CHARS, MIN_TEXT_CHARS  # noqa: E402
 from tools.providers.model import build_model_router  # noqa: E402
 from tools.trace import trace_id  # noqa: E402
+from tools.upload_security import UploadSecurityError, validate_upload  # noqa: E402
 
 
 
@@ -128,7 +133,9 @@ ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 PUBLIC_PAGES_ORIGIN = "https://zimo66067-wq.github.io"
 TRACE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{6,96}$")
 CONSENT_TOKEN_SALT = "career-coach-consent-v1"
+GUEST_TOKEN_SALT = "career-coach-guest-v1"
 DEFAULT_CONSENT_MAX_AGE_SECONDS = 1800
+DEFAULT_GUEST_MAX_AGE_SECONDS = 365 * 86400
 
 # Multipart overhead is allowed here; the file itself is checked separately.
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_BYTES + 1024 * 1024
@@ -144,6 +151,8 @@ def origin_allowed(origin):
     if not origin:
         return False
     normalized = origin.rstrip("/")
+    if normalized == request.host_url.rstrip("/"):
+        return True
     if normalized in configured_origins():
         return True
     if os.environ.get("APP_ENV", "production").lower() != "production":
@@ -158,7 +167,7 @@ def apply_cors(response):
         response.headers["Access-Control-Allow-Origin"] = origin.rstrip("/")
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, X-Trace-Id, X-Consent-Token, Authorization"
+            "Content-Type, X-Trace-Id, X-Consent-Token, X-Guest-Token, Authorization"
         )
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Max-Age"] = "600"
@@ -166,6 +175,19 @@ def apply_cors(response):
         response.headers["Vary"] = ", ".join(filter(None, [existing_vary, "Origin"]))
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@app.before_request
+def reject_cross_site_cookie_writes():
+    """Reject cross-site state changes that try to ride an authenticated cookie."""
+    if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return None
+    if not request.cookies.get("zy_session"):
+        return None
+    origin = request.headers.get("Origin", "").strip()
+    if origin and not origin_allowed(origin):
+        raise ApiError("csrf_rejected", "请求来源未获授权。", 403)
+    return None
 
 
 # ------------------------------------------------------------------ #
@@ -217,7 +239,15 @@ def _clear_session_cookie(response):
 
 @app.errorhandler(ApiError)
 def handle_api_error(error):
-    return jsonify({"error": error.code, "message": error.message, "trace_id": trace_id()}), error.status
+    payload = {"error": error.code, "message": error.message, "trace_id": trace_id()}
+    retry_after = getattr(error, "retry_after", None)
+    if retry_after:
+        payload["retry_after_seconds"] = int(retry_after)
+    response = jsonify(payload)
+    response.status_code = error.status
+    if retry_after:
+        response.headers["Retry-After"] = str(int(retry_after))
+    return response
 
 
 @app.errorhandler(413)
@@ -267,6 +297,16 @@ def api_response(payload, status=200):
     return jsonify(payload), status
 
 
+def require_json_object(label="请求"):
+    """Return a JSON object and reject malformed or array-shaped bodies."""
+    if not request.is_json:
+        raise ApiError("invalid_content_type", f"{label}必须使用 JSON 格式。", 415)
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        raise ApiError("invalid_request", f"{label}格式无效。", 422)
+    return body
+
+
 # ------------------------------------------------------------------ #
 # Consent (WF-01 gate)
 # ------------------------------------------------------------------ #
@@ -295,6 +335,50 @@ def consent_serializer():
     return URLSafeTimedSerializer(signing_material, salt=CONSENT_TOKEN_SALT)
 
 
+def guest_serializer():
+    """Build the independent signer used for stable anonymous ownership."""
+    signing_material = os.environ.get("DUMATE_GUEST_SECRET") or os.environ.get("DUMATE_CONSENT_SECRET")
+    if not signing_material:
+        if app.config.get("TESTING") or os.environ.get("APP_ENV", "production").lower() != "production":
+            signing_material = "development-guest-token-for-tests"
+        else:
+            raise ApiError(
+                "guest_identity_not_configured",
+                "服务尚未配置匿名会话签名密钥，暂不能处理材料。",
+                503,
+            )
+    return URLSafeTimedSerializer(signing_material, salt=GUEST_TOKEN_SALT)
+
+
+def guest_ttl_seconds():
+    try:
+        configured = int(os.environ.get("DUMATE_GUEST_MAX_AGE_SECONDS", DEFAULT_GUEST_MAX_AGE_SECONDS))
+    except (TypeError, ValueError):
+        configured = DEFAULT_GUEST_MAX_AGE_SECONDS
+    return min(max(configured, 86400), 2 * 365 * 86400)
+
+
+def _guest_id_from_token(token, strict=True):
+    if not token:
+        return None
+    try:
+        payload = guest_serializer().loads(token, max_age=guest_ttl_seconds())
+    except (SignatureExpired, BadSignature):
+        if strict:
+            raise ApiError("invalid_guest_identity", "匿名会话身份无效，请重新确认数据处理说明。", 401)
+        return None
+    if not isinstance(payload, dict) or payload.get("version") != "1":
+        if strict:
+            raise ApiError("invalid_guest_identity", "匿名会话身份无效，请重新确认数据处理说明。", 401)
+        return None
+    guest_id = str(payload.get("guest_id") or "")
+    if not re.fullmatch(r"[a-f0-9]{32}", guest_id):
+        if strict:
+            raise ApiError("invalid_guest_identity", "匿名会话身份无效，请重新确认数据处理说明。", 401)
+        return None
+    return guest_id
+
+
 def issue_consent():
     if not request.is_json:
         raise ApiError("invalid_content_type", "同意请求必须使用 JSON 格式。", 415)
@@ -305,10 +389,20 @@ def issue_consent():
     if not accepted:
         raise ApiError("consent_required", "请先明确同意本次会话的数据处理说明。", 422)
     consent_id = "consent_" + uuid.uuid4().hex[:16]
-    token = consent_serializer().dumps({"accepted": True, "version": "1"})
+    prior_guest_token = str(body.get("guest_token") or request.headers.get("X-Guest-Token") or "").strip()
+    guest_id = _guest_id_from_token(prior_guest_token, strict=False) or uuid.uuid4().hex
+    # Include a nonce so independently issued consent tokens cannot collapse to
+    # the same signed value when they are created within the same second.
+    token = consent_serializer().dumps({
+        "accepted": True,
+        "version": "1",
+        "consent_id": consent_id,
+    })
+    guest_token = guest_serializer().dumps({"guest_id": guest_id, "version": "1"})
     return {
         "status": "ACCEPTED",
         "consent_token": token,
+        "guest_token": guest_token,
         "consent_id": consent_id,
         "expires_in_seconds": consent_ttl_seconds(),
     }
@@ -326,6 +420,71 @@ def require_consent():
         raise ApiError("invalid_consent", "同意记录无效，请重新确认后再继续。", 401)
     if not isinstance(payload, dict) or payload.get("accepted") is not True or payload.get("version") != "1":
         raise ApiError("invalid_consent", "同意记录无效，请重新确认后再继续。", 401)
+
+
+def _owner_context():
+    """Return the primary owner and an optional verified guest predecessor."""
+    guest_token = request.headers.get("X-Guest-Token", "").strip()
+    guest_id = _guest_id_from_token(guest_token) if guest_token else None
+    consent = request.headers.get("X-Consent-Token", "")
+    guest_owner = (
+        "guest:" + guest_id
+        if guest_id
+        else "guest:legacy:" + hashlib.sha256(consent.encode("utf-8")).hexdigest()[:24]
+    )
+    user, _token = current_session()
+    if user:
+        return "user:%s" % user["id"], guest_owner
+    return guest_owner, None
+
+
+def _task_owner_key():
+    return _owner_context()[0]
+
+
+def ensure_session_access(session_id, allow_create=False):
+    """Bind or verify a workflow session without revealing another owner's data."""
+    session_id = str(session_id or "").strip()
+    if not session_id or len(session_id) > 128 or not re.fullmatch(r"[A-Za-z0-9_-]+", session_id):
+        raise ApiError("invalid_session", "会话标识无效。", 422)
+    primary, guest_predecessor = _owner_context()
+    current = get_session_owner(session_id)
+    if current is None and allow_create:
+        if bind_session_owner(session_id, primary):
+            return session_id
+        current = get_session_owner(session_id)
+    if current == primary:
+        return session_id
+    if guest_predecessor and current == guest_predecessor:
+        if bind_session_owner(session_id, primary, previous_owner=guest_predecessor):
+            return session_id
+    raise ApiError("session_not_found", "会话不存在或无权访问。", 404)
+
+
+def enforce_usage(bucket, limit, window_seconds, owner_key=None):
+    """Apply a database-backed limit shared across serverless instances."""
+    owner = owner_key or _task_owner_key()
+    result = consume_usage(owner, bucket, limit, window_seconds)
+    if not result["allowed"]:
+        error = ApiError("rate_limited", "操作过于频繁，请稍后再试。", 429)
+        error.retry_after = result.get("retry_after", 1)
+        raise error
+    return result
+
+
+def _client_rate_key():
+    """Hash the network identifier before using it as a quota owner key."""
+    source = request.headers.get("X-Forwarded-For", "").split(",", 1)[0].strip()
+    source = source or request.remote_addr or "anonymous"
+    return "ip:" + hashlib.sha256(source.encode("utf-8")).hexdigest()[:24]
+
+
+def _claim_guest_resources(user_id):
+    """Transfer only resources backed by a valid guest token after login."""
+    token = request.headers.get("X-Guest-Token", "").strip()
+    guest_id = _guest_id_from_token(token, strict=False)
+    if guest_id:
+        transfer_owner_data("guest:" + guest_id, "user:%s" % user_id)
 
 
 def request_route():
@@ -377,15 +536,19 @@ def read_uploaded_document(label, error_code):
         file_size = os.path.getsize(temporary_path)
         if file_size > MAX_FILE_BYTES:
             raise ApiError("payload_too_large", "文件不能超过 10 MB。", 413)
+        validate_upload(temporary_path, extension)
         if extension == ".pdf":
             text = extract_pdf(temporary_path)
         elif extension == ".docx":
             text = extract_docx(temporary_path)
         else:
             text = extract_txt(temporary_path)
-        return validate_document_text(text, label, error_code), uploaded.filename, extension, file_size
+        safe_filename = ("resume" if error_code == "invalid_resume_text" else "job-description") + extension
+        return validate_document_text(text, label, error_code), safe_filename, extension, file_size
     except ApiError:
         raise
+    except UploadSecurityError as exc:
+        raise ApiError(exc.code, exc.message, 422)
     except SystemExit:
         if extension == ".pdf":
             # 扫描件 OCR 兜底：配置 OCR_API_KEY/OCR_SECRET_KEY 时自动逐页识别
@@ -421,15 +584,6 @@ def read_uploaded_job():
     return read_uploaded_document("职位说明（JD）", "invalid_jd_text")
 
 
-def _task_owner_key():
-    """服务端派生任务归属：登录用户 user:<id>，游客 guest:<consent hash>。"""
-    user, _token = current_session()
-    if user:
-        return "user:%s" % user["id"]
-    consent = request.headers.get("X-Consent-Token", "")
-    return "guest:" + hashlib.sha256(consent.encode("utf-8")).hexdigest()[:24]
-
-
 # Routing
 # ------------------------------------------------------------------ #
 
@@ -448,12 +602,26 @@ def route_api(**_ignored):
             "wf04/asr", "wf04/stream",
             "wf02/optimize", "wf02/apply-rewrite",
             "wf07/cover-letter", "wf07/applications",
-        } or route.startswith("history/") or route.startswith("tasks/"):
+        } or route.startswith("history/") or route.startswith("tasks/") or route.startswith("f2/"):
             return ("", 204)
         raise ApiError("not_found", "接口不存在。", 404)
+    if route.startswith("f2/"):
+        if request.method == "GET" and route != "f2/health":
+            enforce_usage("f2_catalog_read", 240, 600, owner_key=_client_rate_key())
+        if route == "f2/match" and request.method == "POST":
+            require_consent()
+            enforce_usage("f2_match_hour", 30, 3600)
+            enforce_usage("f2_match_day", 100, 86400)
+            if not request.is_json:
+                raise ApiError("invalid_content_type", "专业匹配请求必须使用 JSON 格式。", 415)
+            body = request.get_json(silent=True)
+            if not isinstance(body, dict):
+                raise ApiError("invalid_request", "专业匹配请求格式无效。", 422)
+            ensure_session_access(body.get("session_id"), allow_create=True)
+        return route_f2_major()
 
     if route == "auth/register" and request.method == "POST":
-        body = request.get_json(silent=True) or {}
+        body = require_json_object("注册请求")
         phone = str(body.get("phone") or "").strip()
         email = str(body.get("email") or "").strip()
         password = str(body.get("password") or "")
@@ -466,33 +634,29 @@ def route_api(**_ignored):
             raise ApiError("weak_password", "密码至少 8 位且需包含字母和数字。", 422)
         if not (2 <= len(name) <= 16):
             raise ApiError("invalid_name", "账户名需 2-16 个字符。", 422)
-        try:
-            check_rate("register:" + (request.remote_addr or "anonymous"))
-        except AccountError as err:
-            raise ApiError(err.code, err.message, err.status)
+        enforce_usage("auth_register", 5, 3600, owner_key=_client_rate_key())
         try:
             user = register_user(phone, email, password, name)
         except AccountError as err:
             raise ApiError(err.code, err.message, err.status)
         token, _expires = create_session(user["id"], _session_ttl_days())
+        _claim_guest_resources(user["id"])
         resp, status = api_response(public_user(user), 201)
         _set_session_cookie(resp, token)
         return resp, status
 
     if route == "auth/login" and request.method == "POST":
-        body = request.get_json(silent=True) or {}
+        body = require_json_object("登录请求")
         identifier = str(body.get("account") or "").strip()
         password = str(body.get("password") or "")
         if not identifier or not password:
             raise ApiError("invalid_request", "请输入手机号/邮箱和密码。", 422)
-        try:
-            check_rate("login:" + (request.remote_addr or "anonymous"))
-        except AccountError as err:
-            raise ApiError(err.code, err.message, err.status)
+        enforce_usage("auth_login", 10, 900, owner_key=_client_rate_key())
         user = authenticate(identifier, password)
         if not user:
             raise ApiError("bad_credentials", "手机号/邮箱或密码不正确。", 401)
         token, _expires = create_session(user["id"], _session_ttl_days())
+        _claim_guest_resources(user["id"])
         resp, status = api_response(public_user(user))
         _set_session_cookie(resp, token)
         return resp, status
@@ -536,15 +700,14 @@ def route_api(**_ignored):
 
     if route == "history" and request.method == "POST":
         user = require_login()
-        if not request.is_json:
-            raise ApiError("invalid_content_type", "历史记录请求必须使用 JSON 格式。", 415)
-        body = request.get_json(silent=True) or {}
+        body = require_json_object("历史记录请求")
         session_id = str(body.get("session_id") or "").strip()
         event_type = str(body.get("event_type") or "").strip()
         title = str(body.get("title") or "").strip()
         status = str(body.get("status") or "done").strip()
         if not session_id:
             raise ApiError("session_required", "缺少会话标识。", 422)
+        ensure_session_access(session_id, allow_create=True)
         if event_type not in ("F1", "F2", "F3", "F4"):
             raise ApiError("invalid_type", "历史类型仅支持 F1-F4。", 422)
         if status not in ("done", "partial", "failed"):
@@ -568,13 +731,17 @@ def route_api(**_ignored):
 
     if route == "tasks" and request.method == "POST":
         require_consent()
-        body = request.get_json(silent=True) or {}
+        enforce_usage("task_create_hour", 30, 3600)
+        body = require_json_object("任务请求")
         task_type = str(body.get("task_type") or "")
         if task_type != "f2_match":
             raise ApiError("unsupported_task_type", "不支持的任务类型。", 422)
         payload = body.get("payload")
         if not isinstance(payload, dict):
             raise ApiError("invalid_request", "任务参数格式无效。", 422)
+        session_id = str(payload.get("session_id") or trace_id()).strip()
+        payload["session_id"] = session_id
+        ensure_session_access(session_id, allow_create=True)
         idempotency_key = str(body.get("idempotency_key") or "").strip()[:120] or None
         task = tasks_create(
             task_type,
@@ -623,21 +790,26 @@ def route_api(**_ignored):
 
     if route == "wf04/asr" and request.method == "POST":
         require_consent()
+        enforce_usage("asr_hour", 30, 3600)
+        enforce_usage("asr_day", 60, 86400)
         audio = request.get_data(cache=False)
         if not audio:
             raise ApiError("audio_required", "请上传音频数据。", 422)
         try:
             asr_result = build_asr_provider().transcribe(audio)
         except Exception as exc:
-            raise ApiError("asr_failed", str(exc), 502)
+            app.logger.warning("ASR provider failed: %s", type(exc).__name__)
+            raise ApiError("asr_failed", "语音识别服务暂不可用，请稍后重试。", 502)
         return api_response(asr_result)
 
     if route == "wf04/stream" and request.method == "POST":
         require_consent()
-        body = request.get_json(silent=True) or {}
+        enforce_usage("interview_turn_hour", 120, 3600)
+        body = require_json_object("面试请求")
         session_id = str(body.get("session_id") or "")
         if not session_id:
             raise ApiError("session_required", "缺少面试会话标识。", 422)
+        ensure_session_access(session_id)
         state, payload = load_session(session_id)
         if not payload:
             raise ApiError("session_not_found", "面试会话不存在或已过期。", 404)
@@ -706,10 +878,13 @@ def route_api(**_ignored):
 
     if route == "wf02/optimize" and request.method == "POST":
         require_consent()
-        body = request.get_json(silent=True) or {}
+        enforce_usage("model_generation_hour", 20, 3600)
+        enforce_usage("model_generation_day", 60, 86400)
+        body = require_json_object("简历优化请求")
         session_id = str(body.get("session_id") or "")
         if not session_id:
             raise ApiError("session_required", "缺少会话标识。", 422)
+        ensure_session_access(session_id)
         detail = get_resume_detail(session_id)
         if not detail or not detail.get("diagnoses"):
             raise ApiError("diagnosis_required", "请先完成 F1 简历诊断。", 422)
@@ -740,13 +915,14 @@ def route_api(**_ignored):
 
     if route == "wf02/apply-rewrite" and request.method == "POST":
         require_consent()
-        body = request.get_json(silent=True) or {}
+        body = require_json_object("改写确认请求")
         session_id = str(body.get("session_id") or "")
         candidate = str(body.get("candidate_text") or "").strip()
         suggestion_id = str(body.get("suggestion_id") or "")
         issue = str(body.get("issue") or "")
         if not session_id or len(candidate) < 5:
             raise ApiError("invalid_request", "缺少会话标识或改写内容。", 422)
+        ensure_session_access(session_id)
         saved = save_rewrite(session_id, suggestion_id, issue, candidate)
         if saved is None:
             raise ApiError("save_failed", "改写内容保存失败。", 500)
@@ -755,10 +931,13 @@ def route_api(**_ignored):
 
     if route == "wf07/cover-letter" and request.method == "POST":
         require_consent()
-        body = request.get_json(silent=True) or {}
+        enforce_usage("model_generation_hour", 20, 3600)
+        enforce_usage("model_generation_day", 60, 86400)
+        body = require_json_object("求职信请求")
         session_id = str(body.get("session_id") or "")
         if not session_id:
             raise ApiError("session_required", "缺少会话标识。", 422)
+        ensure_session_access(session_id)
         return api_response(
             generate_cover_letter(
                 session_id,
@@ -773,8 +952,9 @@ def route_api(**_ignored):
 
     if route == "wf07/applications" and request.method == "POST":
         require_consent()
-        body = request.get_json(silent=True) or {}
+        body = require_json_object("申请记录请求")
         session_id = str(body.get("session_id") or "")
+        ensure_session_access(session_id)
         application = create_application(
             session_id=session_id,
             owner_key=_task_owner_key(),
@@ -802,16 +982,20 @@ def route_api(**_ignored):
             "workflows": {
                 "wf01": "available", "wf02": "available", "wf03": "available",
                 "wf04": "available", "wf05": "available", "wf06": "available",
+                "wf07": "available", "f2_major": "available",
             },
         })
     if route == "wf01/consent" and request.method == "POST":
+        enforce_usage("consent_hour", 30, 3600, owner_key=_client_rate_key())
         return api_response(issue_consent())
 
     if route == "wf01/upload" and request.method == "POST":
         require_consent()
+        enforce_usage("upload_hour", 20, 3600)
         source_text, filename, extension, file_size = read_uploaded_resume()
         cleaned_text, _mapping = deidentify(source_text)
-        session_id = request.headers.get("X-Trace-Id", uuid.uuid4().hex)
+        session_id = trace_id()
+        ensure_session_access(session_id, allow_create=True)
         try:
             save_resume(
                 session_id=session_id,
@@ -831,13 +1015,16 @@ def route_api(**_ignored):
         })
     if route == "wf02/diagnose" and request.method == "POST":
         require_consent()
+        enforce_usage("model_generation_hour", 20, 3600)
+        enforce_usage("model_generation_day", 60, 86400)
         if not request.is_json:
             raise ApiError("invalid_content_type", "诊断请求必须使用 JSON 格式。", 415)
         body = request.get_json(silent=True)
         if not isinstance(body, dict):
             raise ApiError("invalid_request", "诊断请求格式无效。", 422)
         resume_text = validate_text(body.get("resumeText"))
-        session_id = body.get("session_id") or request.headers.get("X-Trace-Id", uuid.uuid4().hex)
+        session_id = body.get("session_id") or trace_id()
+        ensure_session_access(session_id, allow_create=True)
         # A diagnosis must always be attachable: ensure a resume row exists even
         # when the client diagnoses pasted text without a preceding upload.
         if get_resume_detail(session_id) is None:
@@ -879,14 +1066,17 @@ def route_api(**_ignored):
 
     if route == "wf03/upload" and request.method == "POST":
         require_consent()
+        enforce_usage("upload_hour", 20, 3600)
         source_text, _filename, _ext, _size = read_uploaded_job()
-        session_id = request.headers.get("X-Trace-Id", uuid.uuid4().hex)
+        session_id = request.form.get("session_id") or trace_id()
+        ensure_session_access(session_id, allow_create=True)
         return api_response({"jdText": source_text, "jobProfile": None, "session_id": session_id})
     if route == "wf03/jd" and request.method == "POST":
         require_consent()
-        session_id = request.headers.get("X-Trace-Id", uuid.uuid4().hex)
+        session_id = trace_id()
         if request.files.get("file"):
             jd_text, _filename, _ext, _size = read_uploaded_job()
+            session_id = request.form.get("session_id") or session_id
         else:
             if not request.is_json:
                 raise ApiError("invalid_content_type", "JD 解析请求必须使用 JSON 格式。", 415)
@@ -894,6 +1084,8 @@ def route_api(**_ignored):
             if not isinstance(body, dict):
                 raise ApiError("invalid_request", "JD 解析请求格式无效。", 422)
             jd_text = validate_job_text(body.get("jdText"))
+            session_id = body.get("session_id") or session_id
+        ensure_session_access(session_id, allow_create=True)
         return api_response({"jobProfile": build_job_profile(jd_text), "session_id": session_id})
     if route == "wf03/match" and request.method == "POST":
         require_consent()
@@ -902,7 +1094,8 @@ def route_api(**_ignored):
         body = request.get_json(silent=True)
         if not isinstance(body, dict):
             raise ApiError("invalid_request", "岗位匹配请求格式无效。", 422)
-        session_id = body.get("session_id") or request.headers.get("X-Trace-Id", uuid.uuid4().hex)
+        session_id = body.get("session_id") or trace_id()
+        ensure_session_access(session_id, allow_create=True)
         match = match_job_profile(
             validate_text(body.get("resumeText")),
             validate_job_profile(body.get("jobProfile")),
@@ -915,19 +1108,26 @@ def route_api(**_ignored):
 
     if route == "wf04/start" and request.method == "POST":
         require_consent()
+        enforce_usage("interview_start_hour", 20, 3600)
         if not request.is_json:
             raise ApiError("invalid_content_type", "面试请求必须使用 JSON 格式。", 415)
         body = request.get_json(silent=True)
         if not isinstance(body, dict):
             raise ApiError("invalid_request", "面试请求格式无效。", 422)
+        body["session_id"] = body.get("session_id") or ("iv_" + uuid.uuid4().hex[:16])
+        ensure_session_access(body["session_id"], allow_create=True)
         return api_response(start_interview(body))
     if route == "wf04/answer" and request.method == "POST":
         require_consent()
+        enforce_usage("interview_turn_hour", 120, 3600)
         if not request.is_json:
             raise ApiError("invalid_content_type", "面试请求必须使用 JSON 格式。", 415)
         body = request.get_json(silent=True)
         if not isinstance(body, dict):
             raise ApiError("invalid_request", "面试请求格式无效。", 422)
+        if not body.get("session_id"):
+            raise ApiError("session_required", "缺少面试会话标识。", 422)
+        ensure_session_access(body.get("session_id"))
         return api_response(answer_interview(body))
     if route == "wf04/end" and request.method == "POST":
         require_consent()
@@ -936,6 +1136,9 @@ def route_api(**_ignored):
         body = request.get_json(silent=True)
         if not isinstance(body, dict):
             raise ApiError("invalid_request", "面试请求格式无效。", 422)
+        if not body.get("session_id"):
+            raise ApiError("session_required", "缺少面试会话标识。", 422)
+        ensure_session_access(body.get("session_id"))
         return api_response(end_interview(body))
 
     if route == "wf05/ability" and request.method == "POST":
@@ -948,6 +1151,9 @@ def route_api(**_ignored):
         session_id = body.get("session_id", "")
         if not session_id:
             raise ApiError("session_required", "缺少会话标识。", 422)
+        # A never-seen/deleted id contains no data and may be safely bound so
+        # the domain layer can return its existing "insufficient evidence" response.
+        ensure_session_access(session_id, allow_create=True)
         ability, result = build_ability_profile(session_id)
         return api_response({
             "ability": ability,
@@ -971,10 +1177,15 @@ def route_api(**_ignored):
         session_id = body.get("session_id", "")
         if not session_id:
             raise ApiError("session_required", "缺少会话标识。", 422)
+        ensure_session_access(session_id)
+        owner_key = _task_owner_key()
         try:
-            delete_session_data(session_id)
+            deleted = delete_session_data(session_id, owner_key=owner_key)
         except Exception:
             app.logger.exception("DB delete session failed")
+            raise ApiError("delete_failed", "数据删除失败，请稍后重试。", 500)
+        if not deleted:
+            raise ApiError("session_not_found", "会话不存在或无权访问。", 404)
         return api_response({
             "status": "DELETED",
             "deleted_at": __import__("datetime").datetime.now().isoformat(),
@@ -982,6 +1193,7 @@ def route_api(**_ignored):
         })
 
     if route == "admin/resumes" and request.method == "GET":
+        enforce_usage("admin_read", 10, 900, owner_key=_client_rate_key())
         password = request.headers.get("X-Admin-Password", "")
         if not admin_password_ok(password):
             raise ApiError("forbidden", "访问被拒绝。", 403)
@@ -998,6 +1210,7 @@ def route_api(**_ignored):
             "warning": "Vercel /tmp 是临时文件系统；服务重启后数据会丢失。请定期导出。",
         })
     if route == "admin/export" and request.method == "GET":
+        enforce_usage("admin_export", 3, 3600, owner_key=_client_rate_key())
         password = request.headers.get("X-Admin-Password", "")
         if not admin_password_ok(password):
             raise ApiError("forbidden", "访问被拒绝。", 403)
@@ -1020,6 +1233,8 @@ for _rule in (
     "/api/wf04/asr", "/api/wf04/stream",
     "/api/wf02/optimize", "/api/wf02/apply-rewrite",
     "/api/wf07/cover-letter", "/api/wf07/applications",
+    "/api/f2/health", "/api/f2/majors/tree", "/api/f2/majors/search",
+    "/api/f2/majors/<code>", "/api/f2/match", "/api/f2/intent",
 ):
     app.add_url_rule(_rule, endpoint="route_" + _rule.replace("/", "_") or "root", view_func=route_api,
                      methods=["GET", "POST", "DELETE", "OPTIONS"])

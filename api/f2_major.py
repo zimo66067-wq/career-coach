@@ -5,7 +5,7 @@
     python api/f2_major.py           # 127.0.0.1:8123，同时托管 ui/prototype 静态页
 
 Vercel：
-    vercel.json 中将 /api/f2/* 重写到 /api/f2_major?_route=...
+    vercel.json 中将 /api/f2/* 重写到统一的 api/index.py 入口。
 """
 import json
 import os
@@ -276,7 +276,13 @@ def mode_b_result(profile, resume_text, jd_text):
 
 
 def route_api(**kwargs):
+    # The old standalone serverless path bypassed the unified consent, quota,
+    # ownership and error middleware. Keep only the documented /api/f2/* API.
+    if request.path.rstrip("/") in {"/api/f2_major", "/api/f2_major.py"}:
+        return api_err("接口不存在。", 404, "not_found")
     route = request.args.get("_route") or request.path
+    if route.startswith("f2/"):
+        route = route[len("f2/") :]
     if route.startswith("/api/f2/"):
         route = route[len("/api/f2/") :]
 
@@ -288,7 +294,10 @@ def route_api(**kwargs):
         return api_ok({"version": MAJORS_DATA["version"], "counts": MAJORS_DATA["counts"], "categories": MAJORS_DATA["categories"]})
     if route == "majors/search" and request.method == "GET":
         q = (request.args.get("q") or "").strip().lower()
-        limit = min(int(request.args.get("limit", 30)), 100)
+        try:
+            limit = min(max(int(request.args.get("limit", 30)), 1), 100)
+        except (TypeError, ValueError):
+            return api_err("limit 必须是 1-100 的整数。", 422, "invalid_limit")
         if not q:
             return api_ok({"items": []})
         items = []
@@ -337,8 +346,7 @@ def route_api(**kwargs):
             mode_name = "A"
             mode_notice = "模式A：专业画像匹配（无 JD，按对口/衍生岗位画像推荐方向）。"
         major_info = MAJOR_INDEX[major_code]
-        return api_ok(
-            {
+        response_payload = {
                 "mode": mode_name,
                 "mode_notice": mode_notice,
                 "modeA": mode_result if mode_name == "A" else None,
@@ -356,7 +364,17 @@ def route_api(**kwargs):
                     "major_fit_notice": mode_result.get("major_fit_notice", ""),
                 },
             }
-        )
+        session_id = str(body.get("session_id") or "").strip()
+        if session_id:
+            from tools.database import save_match
+
+            score_m = mode_result.get("overall")
+            stored = dict(response_payload)
+            stored["score_M"] = score_m
+            stored["gaps"] = mode_result.get("gaps", [])
+            save_match(session_id, stored, score_m)
+            response_payload["session_id"] = session_id
+        return api_ok(response_payload)
     if route == "intent" and request.method == "GET":
         q = (request.args.get("q") or "").strip().lower()
         if not q:

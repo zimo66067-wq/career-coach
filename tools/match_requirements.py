@@ -26,6 +26,8 @@ import os
 import re
 import sys
 from collections import Counter
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 COVERED_TH = 0.55
 WEAK_TH = 0.30
@@ -223,8 +225,9 @@ class ZhipuEmbedder(EmbedderBase):
                 "智谱 embedding 未配置 ZHIPU_API_KEY；"
                 "请改用 --backend bm25（简化匹配）"
             )
-        from zhipuai import ZhipuAI
-        self.client = ZhipuAI(api_key=self.api_key)
+        self.base_url = os.environ.get(
+            "ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4"
+        ).rstrip("/")
         self.dim = 1024 if model == "embedding-2" else 2048
 
     def embed(self, texts):
@@ -233,8 +236,27 @@ class ZhipuEmbedder(EmbedderBase):
         batch_size = 16  # 智谱API批量限制
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
-            resp = self.client.embeddings.create(model=self.model, input=batch)
-            all_embeddings.extend([item.embedding for item in resp.data])
+            payload = json.dumps(
+                {"model": self.model, "input": batch}, ensure_ascii=False
+            ).encode("utf-8")
+            request = Request(
+                self.base_url + "/embeddings",
+                data=payload,
+                headers={
+                    "Authorization": "Bearer " + self.api_key,
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            try:
+                with urlopen(request, timeout=30) as response:
+                    body = json.loads(response.read().decode("utf-8"))
+                rows = sorted(body["data"], key=lambda item: item.get("index", 0))
+                all_embeddings.extend([item["embedding"] for item in rows])
+            except (HTTPError, URLError) as exc:
+                raise RuntimeError("zhipu_embedding_unavailable") from exc
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError("zhipu_invalid_embedding_response") from exc
         return all_embeddings
 
     @staticmethod

@@ -227,11 +227,11 @@ class TestDegradedQuestionBank:
 class TestModelRouterRouting:
 
     def test_task_prompts_complete(self):
-        """路由表完整: 7 个任务"""
+        """路由表完整: 9 个任务"""
         expected = {
             "resume_diagnosis", "resume_report", "jd_extract",
             "jd_match_explain", "interview_question", "interview_review",
-            "seven_day_plan",
+            "seven_day_plan", "resume_rewrite", "cover_letter",
         }
         assert set(TASK_PROMPTS.keys()) == expected
 

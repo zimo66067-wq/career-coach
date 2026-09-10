@@ -1,7 +1,16 @@
 /*
- * GitHub Pages production API configuration.
+ * API origin selection.
  *
- * Vercel serves the API; GitHub Pages serves this static interface.  Do not
- * place model keys, tokens, or other secrets in this file.
+ * Vercel production and Preview deployments call their own API so Preview
+ * tests exercise the code being reviewed. GitHub Pages uses the production
+ * Vercel API. An explicit value injected before this file always wins.
  */
-window.DUMATE_API_BASE = window.DUMATE_API_BASE || "https://career-coach-omega-three.vercel.app";
+(function () {
+  if (window.DUMATE_API_BASE) return;
+  var loc = window.location || {};
+  var hostname = String(loc.hostname || "");
+  var isVercel = /\.vercel\.app$/i.test(hostname);
+  window.DUMATE_API_BASE = isVercel && loc.origin
+    ? loc.origin
+    : "https://career-coach-omega-three.vercel.app";
+})();

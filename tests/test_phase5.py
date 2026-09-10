@@ -3,7 +3,6 @@
 and the apply loop (cover letter -> confirm -> application tracking CRUD)."""
 import io
 import json
-import time
 import tempfile
 import uuid
 from pathlib import Path
@@ -204,8 +203,8 @@ def test_apply_loop_rejects_other_owner(monkeypatch):
 
     # a different guest token cannot see or delete the record
     raw2 = raw_client(monkeypatch)
-    time.sleep(1.1)  # consent token 秒级时间戳：错开避免同秒生成相同 token
     token2 = issue_consent(raw2)
+    assert token2 != token
     other_listed = authed(raw2, token2, "get", "/api/wf07/applications")
     assert other_listed.json["applications"] == []
     other_deleted = authed(raw2, token2, "delete", "/api/wf07/applications?id=%s" % app_id)

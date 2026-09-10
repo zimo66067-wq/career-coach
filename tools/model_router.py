@@ -32,11 +32,13 @@ from urllib.request import Request, urlopen
 TASK_PROMPTS = {
     "resume_diagnosis": "prompts/resume/diagnose.md",
     "resume_report": "prompts/resume/report-deep.md",
+    "resume_rewrite": "prompts/resume/rewrite.md",
     "jd_extract": "prompts/match/jd-extract.md",
     "jd_match_explain": "prompts/match/explain.md",
     "interview_question": "prompts/interview/interviewer.md",
     "interview_review": "prompts/interview/review.md",
     "seven_day_plan": "prompts/plan/seven-day.md",
+    "cover_letter": "prompts/apply/cover-letter.md",
 }
 
 
@@ -67,11 +69,13 @@ def extract_system_prompt(content):
 MODEL_PARAMS = {
     "resume_diagnosis":     {"temperature": 0.1, "max_tokens": 2048, "timeout": 50},
     "resume_report":        {"temperature": 0.3, "max_tokens": 4096, "timeout": 30},
+    "resume_rewrite":       {"temperature": 0.2, "max_tokens": 512, "timeout": 20},
     "jd_extract":           {"temperature": 0.1, "max_tokens": 2048, "timeout": 20},
     "jd_match_explain":     {"temperature": 0.3, "max_tokens": 2048, "timeout": 20},
     "interview_question":   {"temperature": 0.4, "max_tokens": 1024, "timeout": 15},
     "interview_review":     {"temperature": 0.3, "max_tokens": 4096, "timeout": 30},
     "seven_day_plan":       {"temperature": 0.2, "max_tokens": 2048, "timeout": 20},
+    "cover_letter":         {"temperature": 0.3, "max_tokens": 1024, "timeout": 20},
 }
 
 # ------------------------------------------------------------------ #
@@ -92,6 +96,10 @@ DEGRADED_OUTPUTS = {
         "note": "model_unavailable_degraded: report skeleton, manual review required",
         "sections": ["structure", "clarity", "achievement_evidence",
                      "skill_evidence", "ats_readability"],
+    },
+    "resume_rewrite": {
+        "note": "model_unavailable_degraded: use deterministic rewrite template",
+        "candidate": "",
     },
     "jd_extract": {
         "note": "model_unavailable_degraded: use tools/match_requirements.py text parsing",
@@ -116,6 +124,10 @@ DEGRADED_OUTPUTS = {
             {"day": i, "title": "TBD", "minutes": 35, "artifact": "TBD", "actions": []}
             for i in range(1, 8)
         ],
+    },
+    "cover_letter": {
+        "note": "model_unavailable_degraded: use deterministic cover-letter template",
+        "candidate": "",
     },
 }
 
@@ -496,57 +508,5 @@ def parse_model_output(output):
         return parsed if isinstance(parsed, (dict, list)) else text
 
 
-class ZhipuChatRouter(ModelRouter):
-    """智谱 Chat 模型路由器（替代千帆，用于 7 种生成任务）。
-
-    同时负责 Embedding（通过 ZhipuEmbedder）和 Chat（通过 zhipuai SDK）。
-    千帆 AK/SK 无法换取模型调用所需的 access_token，因此智谱同时承担两者。
-
-    环境变量:
-      - ZHIPU_API_KEY（必填）
-      - ZHIPU_BASE_URL（可选，默认 https://open.bigmodel.cn/api/paas/v4）
-    """
-
-    def __init__(self, primary_model=None, fallback_model=None, enable_log=True):
-        super().__init__(primary_model, fallback_model, enable_log)
-        self.api_key = os.environ.get("ZHIPU_API_KEY")
-        self.base_url = os.environ.get(
-            "ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4"
-        ).rstrip("/")
-        if not self.api_key:
-            raise ValueError(
-                "ZhipuChatRouter: ZHIPU_API_KEY not set; "
-                "configure it to enable Zhipu model calls"
-            )
-        from zhipuai import ZhipuAI
-        self.client = ZhipuAI(api_key=self.api_key)
-
-    def _try_call(self, model, prompt, user_input, params, context):
-        """Call Zhipu Chat API (OpenAI-compatible endpoint via SDK)."""
-        messages = []
-        if prompt:
-            messages.append({"role": "system", "content": prompt})
-
-        content = user_input or ""
-        if context:
-            content += "\n\ncontext_json:\n" + json.dumps(
-                context, ensure_ascii=False, separators=(",", ":")
-            )
-        messages.append({"role": "user", "content": content})
-
-        try:
-            resp = self.client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=params["temperature"],
-                max_tokens=params["max_tokens"],
-                stream=False,
-            )
-        except Exception as exc:
-            raise RuntimeError("zhipu_chat_error: %s" % type(exc).__name__) from exc
-
-        try:
-            output = resp.choices[0].message.content
-        except (AttributeError, IndexError, KeyError) as exc:
-            raise ValueError("zhipu_invalid_response") from exc
-        return parse_model_output(output)
+class ZhipuChatRouter(ZhipuModelRouter):
+    """Backward-compatible name for the SDK-free HTTP chat router."""

@@ -19,14 +19,24 @@
         ? window.DataBridge._cache.get("consentToken") : null;
     } catch (e) { return null; }
   }
+  function guestToken() {
+    try {
+      var context = window.DataBridge && typeof window.DataBridge.getSessionContext === "function"
+        ? window.DataBridge.getSessionContext() : null;
+      return context && context.guestToken;
+    } catch (e) { return null; }
+  }
 
   function post(path, body) {
     var headers = { "Content-Type": "application/json" };
     var token = consentToken();
     if (token) headers["X-Consent-Token"] = token;
+    var guest = guestToken();
+    if (guest) headers["X-Guest-Token"] = guest;
     return fetch(API + path, {
       method: "POST",
       headers: headers,
+      credentials: "include",
       body: JSON.stringify(body)
     }).then(function (r) { return r.json(); })
       .catch(function () { return { error: "network", message: "网络错误，请确认后端服务已启动。" }; });

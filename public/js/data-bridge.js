@@ -23,7 +23,8 @@
     deleteData:      '/api/wf06/delete',
     consent:         '/api/wf01/consent',
     coverLetter:     '/api/wf07/cover-letter',
-    applications:    '/api/wf07/applications'
+    applications:    '/api/wf07/applications',
+    majorMatch:      '/api/f2/match'
   };
 
   // 后端会依次尝试主模型与备用模型（Vercel 函数上限为 60 秒）。
@@ -114,6 +115,8 @@
       var consentToken = getCache('consentToken');
       if (consentToken) headers['X-Consent-Token'] = consentToken;
     }
+    var guestToken = getCache('guestToken');
+    if (guestToken) headers['X-Guest-Token'] = guestToken;
     headers['X-Trace-Id'] = traceId;
 
     var body = options.body;
@@ -139,7 +142,7 @@
         resolve({ error: 'timeout', message: '请求超时', trace_id: traceId, degraded: true });
       }, TIMEOUT_MS);
 
-      var fetchOpts = { method: options.method || 'POST', headers: headers, body: body };
+      var fetchOpts = { method: options.method || 'POST', headers: headers, body: body, credentials: 'include' };
       if (controller) fetchOpts.signal = controller.signal;
 
       fetch(url, fetchOpts)
@@ -193,6 +196,27 @@
       method: 'POST',
       body: { session_id: sessionId, company: company, position: position }
     });
+  }
+
+  async function matchMajor(majorCode, resumeText, jdText) {
+    var traceId = genTraceId();
+    var sessionId = getCache('sessionId') || traceId;
+    var res = await request(ENDPOINTS.majorMatch, {
+      body: {
+        majorCode: majorCode,
+        resumeText: resumeText,
+        jdText: jdText || '',
+        session_id: sessionId
+      },
+      _traceId: traceId
+    });
+    if (!res.error) {
+      res.score_M = res.score_M != null ? res.score_M : (res.scores && res.scores.overall);
+      res.gaps = res.gaps || (res.modeB && res.modeB.gaps) || [];
+      setCache('matchResult', res);
+      setCache('sessionId', res.session_id || sessionId);
+    }
+    return res;
   }
 
   function saveApplication(sessionId, company, position, coverLetter) {
@@ -330,8 +354,10 @@
   // 上传 JD 文件 -> {jdText, trace_id}
   async function uploadJD(file) {
     var traceId = genTraceId();
+    var sessionId = getCache('sessionId') || traceId;
     var formData = new FormData();
     formData.append('file', file);
+    formData.append('session_id', sessionId);
     var res = await request(ENDPOINTS.uploadJD, {
       body: formData,
       _traceId: traceId
@@ -341,7 +367,8 @@
     // 否则可能把上一份岗位要求错配给用户的新职位。
     if (res.error) return res;
     setCache('jobText', res.jdText);
-    return { jdText: res.jdText, trace_id: res.trace_id || traceId };
+    setCache('sessionId', res.session_id || sessionId);
+    return { jdText: res.jdText, trace_id: res.trace_id || traceId, session_id: res.session_id || sessionId };
   }
 
   // ── 带进度上传（XHR onprogress）─────────────────────────
@@ -355,6 +382,8 @@
           var consentToken = getCache('consentToken');
           if (consentToken) xhr.setRequestHeader('X-Consent-Token', consentToken);
         }
+        var guestToken = getCache('guestToken');
+        if (guestToken) xhr.setRequestHeader('X-Guest-Token', guestToken);
         xhr.setRequestHeader('X-Trace-Id', traceId);
         if (typeof onProgress === 'function' && xhr.upload) {
           xhr.upload.addEventListener('progress', function (ev) {
@@ -397,6 +426,9 @@
         };
         var formData = new FormData();
         formData.append('file', file);
+        if (endpoint === ENDPOINTS.uploadJD) {
+          formData.append('session_id', getCache('sessionId') || traceId);
+        }
         xhr.send(formData);
       } catch (err) {
         resolve({ error: 'network', message: '上传失败：' + ((err && err.message) || '未知错误'), trace_id: traceId, degraded: true });
@@ -431,10 +463,12 @@
   // 上传 JD（带进度）-> {jdText, trace_id}
   async function uploadJDWithProgress(file, onProgress) {
     var traceId = genTraceId();
+    var sessionId = getCache('sessionId') || traceId;
     var res = await uploadWithXhr(ENDPOINTS.uploadJD, file, onProgress, traceId);
     if (res.error) return res;
     setCache('jobText', res.jdText);
-    return { jdText: res.jdText, trace_id: res.trace_id || traceId };
+    setCache('sessionId', res.session_id || sessionId);
+    return { jdText: res.jdText, trace_id: res.trace_id || traceId, session_id: res.session_id || sessionId };
   }
   // ── 任务中心（阶段3：客户端驱动分片）────────────────────
   // 创建任务；同 owner + idempotency_key 幂等返回同一任务
@@ -479,8 +513,9 @@
   // 提交 JD -> {jobProfile, trace_id}
   async function submitJD(jdText) {
     var traceId = genTraceId();
+    var sessionId = getCache('sessionId') || traceId;
     var res = await request(ENDPOINTS.submitJD, {
-      body: { jdText: jdText },
+      body: { jdText: jdText, session_id: sessionId },
       _traceId: traceId
     });
 
@@ -497,8 +532,9 @@
   // 匹配 JD -> {matchResult, trace_id}
   async function matchJD(resumeText, jobProfile) {
     var traceId = genTraceId();
+    var sessionId = getCache('sessionId') || traceId;
     var res = await request(ENDPOINTS.matchJD, {
-      body: { resumeText: resumeText, jobProfile: jobProfile },
+      body: { resumeText: resumeText, jobProfile: jobProfile, session_id: sessionId },
       _traceId: traceId
     });
 
@@ -523,8 +559,18 @@
   // 开始面试 -> {session_id, firstQuestion, trace_id}
   async function startInterview(jobProfile, resumeProfile, matchGaps) {
     var traceId = genTraceId();
+    var sessionId = getCache('sessionId') || traceId;
+    jobProfile = jobProfile && Object.keys(jobProfile).length ? jobProfile : (getCache('jobProfile') || {});
+    resumeProfile = resumeProfile && Object.keys(resumeProfile).length ? resumeProfile : (getCache('resumeProfile') || {});
+    if (!Array.isArray(matchGaps) || !matchGaps.length) {
+      var cachedMatch = getCache('matchResult') || {};
+      matchGaps = Array.isArray(cachedMatch.gaps)
+        ? cachedMatch.gaps
+        : ((cachedMatch.modeB && cachedMatch.modeB.gaps) || []);
+    }
     var res = await request(ENDPOINTS.startInterview, {
       body: {
+        session_id: sessionId,
         jobProfile: jobProfile,
         resumeProfile: resumeProfile,
         matchGaps: matchGaps || []
@@ -538,6 +584,7 @@
       return {
         session_id: res.session_id,
         firstQuestion: res.firstQuestion,
+        targets: res.targets || [],
         trace_id: res.trace_id || traceId
       };
     }
@@ -706,12 +753,17 @@
   async function submitConsent(consentText) {
     var traceId = genTraceId();
     var res = await request(ENDPOINTS.consent, {
-      body: { accepted: true, consent_version: '1' },
+      body: {
+        accepted: true,
+        consent_version: '1',
+        guest_token: getCache('guestToken') || ''
+      },
       _traceId: traceId
     });
 
     if (!res.error) {
       if (res.consent_token) setCache('consentToken', res.consent_token);
+      if (res.guest_token) setCache('guestToken', res.guest_token);
       sessionStorage.removeItem('cb_session_deleted');
       return {
         consent_id: res.consent_id,
@@ -788,6 +840,7 @@
     diagnoseResume: diagnoseResume,
     submitJD: submitJD,
     matchJD: matchJD,
+    matchMajor: matchMajor,
     startInterview: startInterview,
     submitAnswer: submitAnswer,
     endInterview: endInterview,
@@ -816,6 +869,13 @@
 
     // 会话状态
     isSessionDeleted: isSessionDeleted,
+    getSessionContext: function () {
+      return {
+        sessionId: getCache('sessionId'),
+        consentToken: getCache('consentToken'),
+        guestToken: getCache('guestToken')
+      };
+    },
 
     // 缓存工具
     _cache: { get: getCache, set: setCache },
