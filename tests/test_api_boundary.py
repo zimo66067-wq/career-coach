@@ -176,6 +176,7 @@ def test_missing_file_rejected(client):
 
 
 def test_docx_and_pdf_upload_routes(client, monkeypatch):
+    monkeypatch.setattr(api_module, "validate_upload", lambda _path, _extension: {})
     monkeypatch.setattr(api_module, "extract_docx", lambda _path: RESUME)
     monkeypatch.setattr(api_module, "extract_pdf", lambda _path: RESUME)
     docx = upload_bytes(client, "resume.docx", b"docx-bytes")
@@ -371,6 +372,7 @@ def test_health_reflects_model_configuration(monkeypatch):
     assert response.json["workflows"] == {
         "wf01": "available", "wf02": "available", "wf03": "available",
         "wf04": "available", "wf05": "available", "wf06": "available",
+        "wf07": "available", "f2_major": "available",
     }
 
 

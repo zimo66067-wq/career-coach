@@ -8,6 +8,7 @@ Supports two dialects:
 import json
 import os
 import sqlite3
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -40,6 +41,12 @@ class _PsycopgConnection:
 
     def close(self):
         self._conn.close()
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
 
 _INIT_SQL = """
 CREATE TABLE IF NOT EXISTS resumes (
@@ -173,33 +180,101 @@ CREATE TABLE IF NOT EXISTS applications (
 );
 
 CREATE INDEX IF NOT EXISTS idx_applications_owner ON applications(owner_key, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS session_owners (
+    session_id TEXT PRIMARY KEY,
+    owner_key  TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_owners_owner ON session_owners(owner_key, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS usage_events (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_key     TEXT NOT NULL,
+    bucket        TEXT NOT NULL,
+    created_epoch INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_events_window ON usage_events(owner_key, bucket, created_epoch);
+"""
+
+
+_INIT_SQL_PG = """
+CREATE TABLE IF NOT EXISTS resumes (
+    id BIGSERIAL PRIMARY KEY, session_id TEXT NOT NULL UNIQUE, client_ip TEXT,
+    user_agent TEXT, filename TEXT, file_type TEXT, file_size INTEGER,
+    resume_text TEXT, created_at TEXT NOT NULL, has_diagnosis INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_resumes_session ON resumes(session_id);
+CREATE INDEX IF NOT EXISTS idx_resumes_created ON resumes(created_at);
+CREATE TABLE IF NOT EXISTS matches (
+    id BIGSERIAL PRIMARY KEY, session_id TEXT NOT NULL UNIQUE,
+    match_json TEXT NOT NULL, score_m DOUBLE PRECISION, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_matches_session ON matches(session_id);
+CREATE TABLE IF NOT EXISTS interview_sessions (
+    id BIGSERIAL PRIMARY KEY, session_id TEXT NOT NULL UNIQUE, state TEXT NOT NULL,
+    payload TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_session ON interview_sessions(session_id);
+CREATE TABLE IF NOT EXISTS abilities (
+    id BIGSERIAL PRIMARY KEY, session_id TEXT NOT NULL UNIQUE,
+    ability_json TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_abilities_session ON abilities(session_id);
+CREATE TABLE IF NOT EXISTS diagnoses (
+    id BIGSERIAL PRIMARY KEY, resume_id BIGINT NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
+    score_r DOUBLE PRECISION, diagnosis_mode TEXT, diagnosis_notice TEXT,
+    model_trace_id TEXT, diagnosis_json TEXT, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS users (
+    id BIGSERIAL PRIMARY KEY, phone TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL, display_name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'user', created_at TEXT NOT NULL, last_login_at TEXT
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL, expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE TABLE IF NOT EXISTS history_events (
+    id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    session_id TEXT NOT NULL, event_type TEXT NOT NULL, title TEXT NOT NULL,
+    status TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_history_user ON history_events(user_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT PRIMARY KEY, task_type TEXT NOT NULL, idempotency_key TEXT,
+    owner_key TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending',
+    progress INTEGER NOT NULL DEFAULT 0, total_steps INTEGER NOT NULL DEFAULT 1,
+    current_step INTEGER NOT NULL DEFAULT 0, payload TEXT, result_json TEXT,
+    error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_key, created_at DESC);
 CREATE TABLE IF NOT EXISTS resume_rewrites (
-    id             BIGSERIAL PRIMARY KEY,
-    session_id     TEXT NOT NULL,
-    suggestion_id  TEXT,
-    issue          TEXT,
-    candidate_text TEXT NOT NULL,
-    status         TEXT NOT NULL DEFAULT 'pending',
-    created_at     TEXT NOT NULL,
-    applied_at     TEXT
+    id BIGSERIAL PRIMARY KEY, session_id TEXT NOT NULL, suggestion_id TEXT,
+    issue TEXT, candidate_text TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL, applied_at TEXT
 );
-
+CREATE INDEX IF NOT EXISTS idx_rewrites_session ON resume_rewrites(session_id, status);
 CREATE TABLE IF NOT EXISTS applications (
-    id           BIGSERIAL PRIMARY KEY,
-    session_id   TEXT NOT NULL,
-    owner_key    TEXT NOT NULL,
-    company      TEXT NOT NULL,
-    position     TEXT NOT NULL,
-    cover_letter TEXT NOT NULL,
-    status       TEXT NOT NULL DEFAULT 'applied',
-    created_at   TEXT NOT NULL
+    id BIGSERIAL PRIMARY KEY, session_id TEXT NOT NULL, owner_key TEXT NOT NULL,
+    company TEXT NOT NULL, position TEXT NOT NULL, cover_letter TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'applied', created_at TEXT NOT NULL
 );
-
 CREATE INDEX IF NOT EXISTS idx_applications_owner ON applications(owner_key, created_at DESC);
-
-
-
+CREATE TABLE IF NOT EXISTS session_owners (
+    session_id TEXT PRIMARY KEY, owner_key TEXT NOT NULL,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_session_owners_owner ON session_owners(owner_key, updated_at DESC);
+CREATE TABLE IF NOT EXISTS usage_events (
+    id BIGSERIAL PRIMARY KEY, owner_key TEXT NOT NULL, bucket TEXT NOT NULL,
+    created_epoch BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_usage_events_window ON usage_events(owner_key, bucket, created_epoch);
 """
 
 
@@ -244,13 +319,21 @@ def init_db():
         conn.close()
 
 
+def _insert_returning_id(conn, sql, params):
+    """Execute an insert and return its id on SQLite and PostgreSQL."""
+    if dialect() == "postgres":
+        row = conn.execute(f"{sql.rstrip()} RETURNING id", params).fetchone()
+        return row["id"]
+    return conn.execute(sql, params).lastrowid
+
+
 def save_resume(session_id, client_ip, user_agent, filename, file_type,
                 file_size, resume_text):
     """Persist a de-identified resume upload.  Returns the row id."""
     init_db()
     conn = _get_conn()
     try:
-        cur = conn.execute(
+        conn.execute(
             """
             INSERT INTO resumes (session_id, client_ip, user_agent, filename,
                                  file_type, file_size, resume_text, created_at)
@@ -264,7 +347,10 @@ def save_resume(session_id, client_ip, user_agent, filename, file_type,
             (session_id, client_ip, user_agent, filename, file_type,
              file_size, resume_text, _utc_iso()),
         )
-        return cur.lastrowid
+        row = conn.execute(
+            "SELECT id FROM resumes WHERE session_id = ?", (session_id,)
+        ).fetchone()
+        return row["id"] if row else None
     finally:
         conn.close()
 
@@ -532,11 +618,149 @@ def load_ability(session_id):
         conn.close()
 
 
-def delete_session_data(session_id):
-    """WF-06: remove all session data (resume, diagnosis, match, interview, ability)."""
+def get_session_owner(session_id):
+    """Return the server-side owner key bound to a workflow session."""
     init_db()
     conn = _get_conn()
     try:
+        row = conn.execute(
+            "SELECT owner_key FROM session_owners WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        return row["owner_key"] if row else None
+    finally:
+        conn.close()
+
+
+def bind_session_owner(session_id, owner_key, previous_owner=None):
+    """Claim a session or transfer it from an explicitly verified prior owner."""
+    init_db()
+    conn = _get_conn()
+    now = _utc_iso()
+    try:
+        conn.execute(
+            """
+            INSERT INTO session_owners (session_id, owner_key, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(session_id) DO NOTHING
+            """,
+            (session_id, owner_key, now, now),
+        )
+        row = conn.execute(
+            "SELECT owner_key FROM session_owners WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        current = row["owner_key"] if row else None
+        if current == owner_key:
+            conn.execute(
+                "UPDATE session_owners SET updated_at = ? WHERE session_id = ?",
+                (now, session_id),
+            )
+            return True
+        if previous_owner and current == previous_owner:
+            cur = conn.execute(
+                """
+                UPDATE session_owners SET owner_key = ?, updated_at = ?
+                WHERE session_id = ? AND owner_key = ?
+                """,
+                (owner_key, now, session_id, previous_owner),
+            )
+            return bool(getattr(cur, "rowcount", 0))
+        return False
+    finally:
+        conn.close()
+
+
+def transfer_owner_data(previous_owner, new_owner):
+    """Move anonymous resources to a user after verified authentication."""
+    if not previous_owner or previous_owner == new_owner:
+        return 0
+    init_db()
+    conn = _get_conn()
+    changed = 0
+    try:
+        conn.execute("BEGIN")
+        for table in ("session_owners", "applications", "tasks"):
+            cur = conn.execute(
+                f"UPDATE {table} SET owner_key = ? WHERE owner_key = ?",
+                (new_owner, previous_owner),
+            )
+            changed += max(0, int(getattr(cur, "rowcount", 0) or 0))
+        conn.commit()
+        return changed
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def consume_usage(owner_key, bucket, limit, window_seconds, now_epoch=None):
+    """Atomically consume one quota unit shared by all application instances."""
+    init_db()
+    conn = _get_conn()
+    now_epoch = int(now_epoch if now_epoch is not None else time.time())
+    cutoff = now_epoch - int(window_seconds)
+    lock_key = f"{owner_key}:{bucket}"
+    try:
+        if dialect() == "postgres":
+            conn.execute("BEGIN")
+            conn.execute("SELECT pg_advisory_xact_lock(hashtext(?))", (lock_key,))
+        else:
+            conn.execute("BEGIN IMMEDIATE")
+        # A short-window bucket must never erase events retained by a longer
+        # daily window. Cleanup is scoped to the same owner and bucket.
+        conn.execute(
+            """
+            DELETE FROM usage_events
+            WHERE owner_key = ? AND bucket = ? AND created_epoch < ?
+            """,
+            (owner_key, bucket, cutoff),
+        )
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS c, MIN(created_epoch) AS oldest
+            FROM usage_events
+            WHERE owner_key = ? AND bucket = ? AND created_epoch >= ?
+            """,
+            (owner_key, bucket, cutoff),
+        ).fetchone()
+        used = int(row["c"] if row else 0)
+        oldest = row["oldest"] if row else None
+        if used >= int(limit):
+            conn.commit()
+            retry_after = max(1, int(window_seconds) - (now_epoch - int(oldest or now_epoch)))
+            return {"allowed": False, "remaining": 0, "retry_after": retry_after}
+        conn.execute(
+            "INSERT INTO usage_events (owner_key, bucket, created_epoch) VALUES (?, ?, ?)",
+            (owner_key, bucket, now_epoch),
+        )
+        conn.commit()
+        return {
+            "allowed": True,
+            "remaining": max(0, int(limit) - used - 1),
+            "retry_after": 0,
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def delete_session_data(session_id, owner_key=None):
+    """WF-06: transactionally remove all data for an owned workflow session."""
+    init_db()
+    conn = _get_conn()
+    try:
+        conn.execute("BEGIN")
+        owner = conn.execute(
+            "SELECT owner_key FROM session_owners WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        if owner_key is not None and (not owner or owner["owner_key"] != owner_key):
+            conn.rollback()
+            return False
         resume_row = conn.execute(
             "SELECT id FROM resumes WHERE session_id = ?", (session_id,)
         ).fetchone()
@@ -552,7 +776,15 @@ def delete_session_data(session_id):
             "DELETE FROM interview_sessions WHERE session_id = ?", (session_id,)
         )
         conn.execute("DELETE FROM abilities WHERE session_id = ?", (session_id,))
+        conn.execute("DELETE FROM resume_rewrites WHERE session_id = ?", (session_id,))
+        conn.execute("DELETE FROM applications WHERE session_id = ?", (session_id,))
+        conn.execute("DELETE FROM history_events WHERE session_id = ?", (session_id,))
+        conn.execute("DELETE FROM session_owners WHERE session_id = ?", (session_id,))
+        conn.commit()
         return True
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -566,7 +798,8 @@ def create_user(phone, email, password_hash, display_name, role="user"):
     init_db()
     conn = _get_conn()
     try:
-        cur = conn.execute(
+        return _insert_returning_id(
+            conn,
             """
             INSERT INTO users (phone, email, password_hash, display_name,
                                role, created_at)
@@ -574,7 +807,6 @@ def create_user(phone, email, password_hash, display_name, role="user"):
             """,
             (phone, email, password_hash, display_name, role, _utc_iso()),
         )
-        return cur.lastrowid
     finally:
         conn.close()
 
@@ -659,7 +891,8 @@ def add_history_event(user_id, session_id, event_type, title, status):
     init_db()
     conn = _get_conn()
     try:
-        cur = conn.execute(
+        return _insert_returning_id(
+            conn,
             """
             INSERT INTO history_events (user_id, session_id, event_type,
                                         title, status, created_at)
@@ -667,7 +900,6 @@ def add_history_event(user_id, session_id, event_type, title, status):
             """,
             (user_id, session_id, event_type, title, status, _utc_iso()),
         )
-        return cur.lastrowid
     finally:
         conn.close()
 
@@ -754,7 +986,8 @@ def save_rewrite(session_id, suggestion_id, issue, candidate_text):
     init_db()
     conn = _get_conn()
     try:
-        cur = conn.execute(
+        rewrite_id = _insert_returning_id(
+            conn,
             """
             INSERT INTO resume_rewrites (session_id, suggestion_id, issue,
                                          candidate_text, status, created_at)
@@ -763,7 +996,7 @@ def save_rewrite(session_id, suggestion_id, issue, candidate_text):
             (session_id, suggestion_id, issue, candidate_text, _utc_iso()),
         )
         row = conn.execute(
-            "SELECT * FROM resume_rewrites WHERE id = ?", (cur.lastrowid,)
+            "SELECT * FROM resume_rewrites WHERE id = ?", (rewrite_id,)
         ).fetchone()
         return dict(row) if row is not None else None
     finally:
@@ -817,7 +1050,8 @@ def save_application(session_id, owner_key, company, position, cover_letter, sta
     init_db()
     conn = _get_conn()
     try:
-        cur = conn.execute(
+        application_id = _insert_returning_id(
+            conn,
             """
             INSERT INTO applications (session_id, owner_key, company, position,
                                       cover_letter, status, created_at)
@@ -826,7 +1060,7 @@ def save_application(session_id, owner_key, company, position, cover_letter, sta
             (session_id, owner_key, company, position, cover_letter, status, _utc_iso()),
         )
         row = conn.execute(
-            "SELECT * FROM applications WHERE id = ?", (cur.lastrowid,)
+            "SELECT * FROM applications WHERE id = ?", (application_id,)
         ).fetchone()
         return dict(row) if row is not None else None
     finally:

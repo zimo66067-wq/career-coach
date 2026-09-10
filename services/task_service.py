@@ -87,6 +87,21 @@ def _f2_assemble_result(payload, rows, major_code):
     }
 
 
+def _persist_result(payload, assembled):
+    session_id = str(payload.get("session_id") or "").strip()
+    if not session_id:
+        return assembled
+    from tools.database import save_match
+
+    score_m = assembled["scores"].get("overall")
+    stored = dict(assembled)
+    stored["score_M"] = score_m
+    stored["gaps"] = assembled.get("modeB", {}).get("gaps", [])
+    save_match(session_id, stored, score_m)
+    assembled["session_id"] = session_id
+    return assembled
+
+
 def _f2_match_chunk(step, payload, result):
     """F2 模式B 分片：step0 解析 JD 与分词，随后每片判定 8 条要求，最后汇总。"""
     from api import f2_major
@@ -106,7 +121,9 @@ def _f2_match_chunk(step, payload, result):
         fragment = {"__requirements": requirements, "__resume_tokens": resume_tokens}
         if not requirements:
             fragment["__rows"] = []
-            fragment["__result"] = _f2_assemble_result(payload, [], major_code)
+            fragment["__result"] = _persist_result(
+                payload, _f2_assemble_result(payload, [], major_code)
+            )
             return 100, fragment, True, total
         return round((step + 1) / total * 100), fragment, False, total
 
@@ -128,6 +145,8 @@ def _f2_match_chunk(step, payload, result):
     done = start + _F2_TASK_CHUNK >= len(requirements)
     fragment = {"__rows": rows}
     if done:
-        fragment["__result"] = _f2_assemble_result(payload, rows, major_code)
+        fragment["__result"] = _persist_result(
+            payload, _f2_assemble_result(payload, rows, major_code)
+        )
     progress = 100 if done else round((step + 1) / total * 100)
     return progress, fragment, done, total

@@ -52,7 +52,8 @@ jobs:
 
       - name: Run browser contract tests
         run: |
-          node --test tests/test_public_page_states.js tests/test_resume_upload.js tests/test_job_upload.js tests/test_publish_mirror.js tests/test_f3_chat_ui.js tests/test_frontend_chain.js
+          # 自动覆盖 tests 下全部前端合同，避免新增业务链路测试未进入门禁。
+          node --test tests/*.js
 
       # --- 步骤5: Schema 校验（对所有 fixtures 执行 validate_schema） ---
       - name: Schema validation
@@ -138,11 +139,11 @@ jobs:
           print('Sensitive information scan passed.')
           PY
 
-      # --- 步骤7: 依赖安全扫描（可选，pip-audit） ---
+      # --- 步骤7: 依赖安全扫描（发布门禁，发现已知漏洞即失败） ---
       - name: Dependency security scan (pip-audit)
-        continue-on-error: true
         run: |
-          pip install pip-audit
+          python -m pip install pip-audit
           echo "=== Scanning dependencies for known vulnerabilities ==="
-          pip-audit -r tools/requirements.txt || true
-          echo "=== pip-audit complete (non-blocking) ==="
+          pip-audit -r requirements.txt
+          pip-audit -r tools/requirements.txt
+          echo "=== pip-audit complete ==="

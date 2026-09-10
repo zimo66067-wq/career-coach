@@ -154,7 +154,8 @@ def delete_history(user_id, event_id):
     event = get_history_event(event_id, user_id)
     if not event:
         raise AccountError("not_found", "记录不存在或无权访问。", 404)
-    delete_session_data(event["session_id"])
+    if not delete_session_data(event["session_id"], owner_key=f"user:{user_id}"):
+        raise AccountError("not_found", "记录不存在或无权访问。", 404)
     delete_history_event(event_id, user_id)
 
 

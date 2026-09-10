@@ -25,6 +25,13 @@
         ? window.DataBridge._cache.get("consentToken") : null;
     } catch (e) { return null; }
   }
+  function guestToken() {
+    try {
+      var context = window.DataBridge && typeof window.DataBridge.getSessionContext === "function"
+        ? window.DataBridge.getSessionContext() : null;
+      return context && context.guestToken;
+    } catch (e) { return null; }
+  }
 
   function saveSnapshot() {
     try { sessionStorage.setItem(SNAP_KEY, JSON.stringify(state)); } catch (e) {}
@@ -149,9 +156,13 @@
     var headers = { "Content-Type": "application/json" };
     var token = consentToken();
     if (token) headers["X-Consent-Token"] = token;
+    var guest = guestToken();
+    if (guest) headers["X-Guest-Token"] = guest;
+    headers["X-Trace-Id"] = state.sessionId;
     fetch(url, {
       method: "POST",
       headers: headers,
+      credentials: "include",
       body: JSON.stringify({ session_id: state.sessionId, answer_text: turn.answer })
     }).then(function (r) {
       if (!r.ok || !r.body) { throw new Error("HTTP " + r.status); }
@@ -227,7 +238,11 @@
     if (!DB || typeof DB.startInterview !== "function") return;
     setView("processing");
     ensureConsent(DB).then(function () {
-      return DB.startInterview({}, {}, []);
+      var resumeProfile = DB._cache ? DB._cache.get("resumeProfile") : null;
+      var jobProfile = DB._cache ? DB._cache.get("jobProfile") : null;
+      var matchResult = DB._cache ? DB._cache.get("matchResult") : null;
+      var gaps = matchResult && Array.isArray(matchResult.gaps) ? matchResult.gaps : [];
+      return DB.startInterview(jobProfile || {}, resumeProfile || {}, gaps);
     }).then(function (res) {
       if (!res || res.error || !res.firstQuestion) {
         setView("error");

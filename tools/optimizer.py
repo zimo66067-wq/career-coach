@@ -62,6 +62,31 @@ def _evidence_from_profile(profile):
     return out
 
 
+def _model_candidate(output, evidence):
+    if isinstance(output, dict):
+        output = next(
+            (output.get(key) for key in ("candidate", "content", "text") if output.get(key)),
+            "",
+        )
+    candidate = str(output or "").strip()
+    if not (10 <= len(candidate) <= 300):
+        return ""
+    if evidence:
+        compact_candidate = re.sub(r"\s+", "", candidate)
+        grounded = False
+        for quote in evidence:
+            compact_quote = re.sub(r"\s+", "", quote)
+            if any(
+                compact_quote[i:i + 4] in compact_candidate
+                for i in range(max(0, len(compact_quote) - 3))
+            ):
+                grounded = True
+                break
+        if not grounded:
+            return ""
+    return candidate
+
+
 def rewrite_suggestion(suggestion, resume_profile=None, model_router=None):
     """生成改写候选。
 
@@ -75,6 +100,7 @@ def rewrite_suggestion(suggestion, resume_profile=None, model_router=None):
     severity = str(suggestion.get("severity") or "P2")
     suggestion_id = str(suggestion.get("id") or "")
     rule = _pick_rule(issue)
+    evidence = _evidence_from_profile(resume_profile)
 
     if model_router is not None:
         try:
@@ -84,21 +110,24 @@ def rewrite_suggestion(suggestion, resume_profile=None, model_router=None):
                 "\n诊断问题：%s\n建议：%s"
                 % (issue, suggestion_text)
             )
-            result = model_router.call(system="", user=prompt)
+            result = model_router.call(
+                "resume_rewrite",
+                prompt,
+                context={"resume_profile": resume_profile or {}},
+            )
             if result.get("status") == "success" and result.get("output"):
-                candidate = str(result["output"]).strip()[:300]
-                basis = "model"
-                return {
-                    "candidate": candidate,
-                    "pending_confirm": True,
-                    "basis": basis,
-                    "suggestion_id": suggestion_id,
-                    "severity": severity,
-                }
+                candidate = _model_candidate(result["output"], evidence)
+                if candidate:
+                    return {
+                        "candidate": candidate,
+                        "pending_confirm": True,
+                        "basis": "model",
+                        "suggestion_id": suggestion_id,
+                        "severity": severity,
+                    }
         except Exception:
             pass
 
-    evidence = _evidence_from_profile(resume_profile)
     if rule is not None:
         body = rule["template"].format(issue=issue)
     else:

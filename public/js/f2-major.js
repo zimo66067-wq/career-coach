@@ -296,10 +296,10 @@
 
   function startMatch() {
     var major = state.selected;
-    if (!major) { showError("???????"); return; }
+    if (!major) { showError("请先选择一个专业。"); return; }
     var resumeText = $("f2Resume").value.trim();
     var jdText = $("f2Jd").value.trim();
-    if (resumeText.length < 20) { showError("????????????????? ?20 ???"); return; }
+    if (resumeText.length < 20) { showError("简历内容过短，请至少输入 20 个字符。"); return; }
     $("f2Error").classList.add("zy-hidden");
     $("f2Loading").classList.remove("zy-hidden");
     if (jdText.length >= 20) {
@@ -312,24 +312,31 @@
   function finishMatch(data) {
     $("f2Loading").classList.add("zy-hidden");
     setF2TaskProgress(0, false);
-    if (!data || data.error) { showError((data && data.message) || "????"); return; }
+    if (!data || data.error) { showError((data && data.message) || "匹配失败，请稍后重试。"); return; }
     state.lastResult = data;
+    var bridge = window.DataBridge;
+    if (bridge && bridge._cache) {
+      data.score_M = data.score_M != null ? data.score_M : (data.scores && data.scores.overall);
+      data.gaps = data.gaps || (data.modeB && data.modeB.gaps) || [];
+      bridge._cache.set("matchResult", data);
+      if (data.session_id) bridge._cache.set("sessionId", data.session_id);
+    }
     renderReport(data);
     setStep(4);
     saveHistory(data);
   }
 
   function startMatchDirect(major, resumeText, jdText) {
-    fetch(API + "/api/f2/match", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ majorCode: major.code, resumeText: resumeText, jdText: jdText })
-    })
-      .then(function (r) { return r.json(); })
+    var bridge = window.DataBridge;
+    if (!bridge || typeof bridge.matchMajor !== "function") {
+      showError("数据服务尚未初始化，请刷新页面后重试。");
+      return;
+    }
+    bridge.matchMajor(major.code, resumeText, jdText)
       .then(function (data) { finishMatch(data); })
       .catch(function (err) {
         $("f2Loading").classList.add("zy-hidden");
-        showError("?????" + err.message + "??????????? 8123 ???");
+        showError("匹配请求失败：" + err.message + "。请检查网络后重试。");
       });
   }
 
@@ -337,25 +344,28 @@
     var bridge = window.DataBridge;
     if (!bridge || typeof bridge.createTask !== "function") {
       $("f2Loading").classList.add("zy-hidden");
-      showError("??????????????????");
+      showError("任务服务尚未初始化，请刷新页面后重试。");
       return;
     }
     setF2TaskProgress(0, true);
     var idempotencyKey = "f2-" + major.code + "-" + Date.now();
+    var context = typeof bridge.getSessionContext === "function" ? bridge.getSessionContext() : {};
+    var taskSessionId = context.sessionId || ("t" + Date.now());
     bridge.createTask("f2_match", {
       major_code: major.code,
       resume_text: resumeText,
-      jd_text: jdText
+      jd_text: jdText,
+      session_id: taskSessionId
     }, idempotencyKey)
       .then(function (task) {
-        if (!task || task.error) { throw { message: (task && task.message) || "??????" }; }
+        if (!task || task.error) { throw { message: (task && task.message) || "任务创建失败。" }; }
         return bridge.pollTask(task.id, function (t) {
           setF2TaskProgress(t.progress || 0, true);
         });
       })
       .then(function (task) {
-        if (!task || task.error) { throw { message: (task && task.message) || "????" }; }
-        if (task.state === "failed") { throw { message: task.error_message || "????" }; }
+        if (!task || task.error) { throw { message: (task && task.message) || "任务状态不可用。" }; }
+        if (task.state === "failed") { throw { message: task.error_message || "任务执行失败。" }; }
         var result = task.result_json || task;
         var report = result.__result || result;
         finishMatch(report);
@@ -363,7 +373,7 @@
       .catch(function (err) {
         $("f2Loading").classList.add("zy-hidden");
         setF2TaskProgress(0, false);
-        showError("?????" + ((err && err.message) || "????") + "??????????? 8123 ???");
+        showError("匹配请求失败：" + ((err && err.message) || "未知错误") + "。请检查网络后重试。");
       });
   }
 

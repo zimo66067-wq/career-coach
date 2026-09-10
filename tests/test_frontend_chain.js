@@ -62,7 +62,7 @@ function loadBridge(search, fetchImpl, initialStorage, apiBase) {
 
 function routeResponse(url) {
   if (url.endsWith('/api/wf01/consent')) {
-    return { status: 'ACCEPTED', consent_token: 'tok-123', expires_in_seconds: 120 };
+    return { status: 'ACCEPTED', consent_token: 'tok-123', guest_token: 'guest-123', expires_in_seconds: 120 };
   }
   if (url.endsWith('/api/wf01/upload')) {
     return { resumeText: '我的简历正文，长度满足诊断要求。', resumeProfile: null };
@@ -90,8 +90,8 @@ test('生产态默认空态且演示数据被阻断', () => {
 
 test('F1->F2 全流程：同意令牌传递、调用顺序与缓存', async () => {
   const calls = [];
-  const fetchImpl = function (url) {
-    calls.push(url);
+  const fetchImpl = function (url, opts) {
+    calls.push({ url: url, opts: opts });
     return Promise.resolve({ ok: true, json: function () { return Promise.resolve(routeResponse(url)); } });
   };
   const env = loadBridge('', fetchImpl, {}, 'https://api.example.test');
@@ -114,13 +114,16 @@ test('F1->F2 全流程：同意令牌传递、调用顺序与缓存', async () =
   assert.equal(matched.matchResult.score_M, 60);
 
   assert.deepEqual(
-    calls.map((u) => u.replace('https://api.example.test', '')),
+    calls.map((call) => call.url.replace('https://api.example.test', '')),
     ['/api/wf01/consent', '/api/wf01/upload', '/api/wf02/diagnose',
      '/api/wf03/upload', '/api/wf03/jd', '/api/wf03/match']
   );
   assert.equal(JSON.parse(env.storage['cb_cache_resumeText']).data, '我的简历正文，长度满足诊断要求。');
   assert.equal(env.storage['cb_cache_jobProfile'] !== undefined, true);
   assert.equal(env.storage['cb_cache_matchResult'] !== undefined, true);
+  assert.equal(DB.getSessionContext().guestToken, 'guest-123');
+  assert.ok(calls.slice(1).every((call) => call.opts.credentials === 'include'));
+  assert.ok(calls.slice(1).every((call) => call.opts.headers['X-Guest-Token'] === 'guest-123'));
   assert.equal(DB.getMockData('resumeProfile'), null, '生产态禁止读取演示数据');
 });
 

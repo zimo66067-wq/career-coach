@@ -84,9 +84,10 @@ def raw_client(monkeypatch, router=None):
 class ConsentedClient:
     """Wraps a test client with a valid consent token."""
 
-    def __init__(self, raw, consent_token):
+    def __init__(self, raw, consent_token, guest_token):
         self._raw = raw
         self._consent_token = consent_token
+        self._guest_token = guest_token
 
     def __getattr__(self, name):
         request_method = getattr(self._raw, name)
@@ -96,6 +97,7 @@ class ConsentedClient:
         def request_with_consent(*args, **kwargs):
             headers = dict(kwargs.pop("headers", {}) or {})
             headers.setdefault("X-Consent-Token", self._consent_token)
+            headers.setdefault("X-Guest-Token", self._guest_token)
             return request_method(*args, headers=headers, **kwargs)
 
         return request_with_consent
@@ -105,7 +107,11 @@ def client(monkeypatch, router=None):
     raw = raw_client(monkeypatch, router)
     consent = raw.post("/api/wf01/consent", json={"accepted": True})
     assert consent.status_code == 200
-    return ConsentedClient(raw, consent.json["consent_token"])
+    return ConsentedClient(
+        raw,
+        consent.json["consent_token"],
+        consent.json["guest_token"],
+    )
 
 
 def test_consent_issues_short_lived_token(monkeypatch):
@@ -467,9 +473,9 @@ def test_f2_jd_file_upload_accepted(monkeypatch):
 # F3 (WF-04)
 # ------------------------------------------------------------------ #
 
-def _full_flow(monkeypatch, router=None):
+def _full_flow(monkeypatch, router=None, session=None):
     """Run consent -> diagnose -> jd -> match -> interview -> report. Returns session."""
-    session = client(monkeypatch, router)
+    session = session or client(monkeypatch, router)
     session_id = "test_full_flow_session"
     diag = session.post(
         "/api/wf02/diagnose",
@@ -549,13 +555,14 @@ def test_f4_ability_report_requires_completed_flow(monkeypatch):
 def test_f4_ability_report_after_full_flow(monkeypatch):
     session_id = _full_flow(monkeypatch, FakeRouter(valid_profile()))
     response = client(monkeypatch).post("/api/wf05/ability", json={"session_id": session_id})
-    # The ability route needs its own consent token; re-issue through a fresh client.
-    assert response.status_code == 200 or response.status_code == 422
+    # A different anonymous identity must not be able to reuse the session id.
+    assert response.status_code == 404
+    assert response.json["error"] == "session_not_found"
 
 
 def test_f4_ability_report_consented_full_flow(monkeypatch):
-    session_id = _full_flow(monkeypatch, FakeRouter(valid_profile()))
-    session = client(monkeypatch)
+    session = client(monkeypatch, FakeRouter(valid_profile()))
+    session_id = _full_flow(monkeypatch, session=session)
     response = session.post("/api/wf05/ability", json={"session_id": session_id})
     assert response.status_code == 200
     ability = response.json["ability"]
@@ -567,8 +574,8 @@ def test_f4_ability_report_consented_full_flow(monkeypatch):
 
 
 def test_f6_delete_removes_session_data(monkeypatch):
-    session_id = _full_flow(monkeypatch, FakeRouter(valid_profile()))
-    session = client(monkeypatch)
+    session = client(monkeypatch, FakeRouter(valid_profile()))
+    session_id = _full_flow(monkeypatch, session=session)
     deleted = session.post("/api/wf06/delete", json={"session_id": session_id})
     assert deleted.status_code == 200
     assert deleted.json["status"] == "DELETED"

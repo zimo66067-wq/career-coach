@@ -55,11 +55,18 @@
 
   function api(path, options) {
     options = options || {};
+    var guestToken = null;
+    try {
+      var context = window.DataBridge && typeof window.DataBridge.getSessionContext === 'function'
+        ? window.DataBridge.getSessionContext() : null;
+      guestToken = context && context.guestToken;
+    } catch (e) { guestToken = null; }
     var opts = {
       method: options.method || 'GET',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' }
     };
+    if (guestToken) opts.headers['X-Guest-Token'] = guestToken;
     if (options.body) opts.body = JSON.stringify(options.body);
     return fetch(API_BASE + '/api' + path, opts).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (data) {

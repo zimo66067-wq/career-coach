@@ -91,6 +91,7 @@ def consented_client(monkeypatch, router=None):
     consent = raw.post("/api/wf01/consent", json={"accepted": True})
     assert consent.status_code == 200
     token = consent.json["consent_token"]
+    guest_token = consent.json["guest_token"]
 
     class Consented:
         def __getattr__(self, name):
@@ -99,6 +100,7 @@ def consented_client(monkeypatch, router=None):
             def call(*args, **kwargs):
                 headers = dict(kwargs.pop("headers", {}) or {})
                 headers.setdefault("X-Consent-Token", token)
+                headers.setdefault("X-Guest-Token", guest_token)
                 return method(*args, headers=headers, **kwargs)
 
             return call
@@ -173,9 +175,9 @@ def test_http_f2_chain_full(monkeypatch):
     assert body["session_id"] == session_id
 
 
-def test_http_full_product_chain_f1_to_f4_and_delete(monkeypatch):
+def test_http_full_product_chain_f1_to_f5_and_delete(monkeypatch):
     """端到端：同意 -> F1 上传/诊断 -> F2 解析/确认/匹配 -> F3 面试
-    -> F4 能力报告 -> F6 删除闭环，全程经 HTTP 接口无断裂。"""
+    -> F4 能力报告 -> F5 求职申请 -> F6 删除闭环，全程经 HTTP 接口无断裂。"""
     client = consented_client(monkeypatch, FakeRouter(grounded_profile()))
 
     # F1
@@ -249,6 +251,31 @@ def test_http_full_product_chain_f1_to_f4_and_delete(monkeypatch):
     assert len(body["radar_option"]["radar"]["indicator"]) == 6
     assert len(body["ability"]["plan"]) == 7
 
+    # F5：生成求职信 -> 用户确认并保存申请 -> 列表可追踪
+    cover = client.post(
+        "/api/wf07/cover-letter",
+        json={"session_id": session_id, "company": "示例科技", "position": "后端开发工程师"},
+    )
+    assert cover.status_code == 200
+    assert cover.json["pending_confirm"] is True
+    candidate = cover.json["candidate"]
+    assert len(candidate) >= 10
+
+    created = client.post(
+        "/api/wf07/applications",
+        json={
+            "session_id": session_id,
+            "company": "示例科技",
+            "position": "后端开发工程师",
+            "cover_letter": candidate,
+        },
+    )
+    assert created.status_code == 201
+    assert created.json["application"]["status"] == "applied"
+    listed = client.get("/api/wf07/applications")
+    assert listed.status_code == 200
+    assert len(listed.json["applications"]) == 1
+
     # F6：删除闭环 -> 数据不可再用
     deleted = client.post("/api/wf06/delete", json={"session_id": session_id})
     assert deleted.status_code == 200
@@ -257,6 +284,7 @@ def test_http_full_product_chain_f1_to_f4_and_delete(monkeypatch):
     after_delete = client.post("/api/wf05/ability", json={"session_id": session_id})
     assert after_delete.status_code == 422
     assert after_delete.json["error"] == "insufficient_evidence"
+    assert client.get("/api/wf07/applications").json["applications"] == []
 
 
 # ---------------------------------------------------------------- #
