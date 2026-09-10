@@ -178,11 +178,14 @@ def apply_cors(response):
 
 
 @app.before_request
-def reject_cross_site_cookie_writes():
-    """Reject cross-site state changes that try to ride an authenticated cookie."""
+def reject_cross_site_writes():
+    """Reject browser state changes from an untrusted Origin.
+
+    Header-authenticated guest requests need the same protection as cookie
+    sessions: a leaked consent/guest token must not make a hostile browser
+    origin acceptable. Non-browser clients that omit Origin remain supported.
+    """
     if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
-        return None
-    if not request.cookies.get("zy_session"):
         return None
     origin = request.headers.get("Origin", "").strip()
     if origin and not origin_allowed(origin):

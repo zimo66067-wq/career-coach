@@ -178,6 +178,39 @@ def test_cross_site_cookie_write_is_rejected(isolated_db, monkeypatch):
     assert response.json["error"] == "csrf_rejected"
 
 
+def test_cross_site_guest_token_delete_is_rejected(isolated_db, monkeypatch):
+    monkeypatch.setenv("DUMATE_CONSENT_SECRET", "security-test-secret")
+    api_module.app.config.update(TESTING=True)
+    client = api_module.app.test_client()
+    consent = _consent(client)
+    headers = _material_headers(consent, **{"X-Trace-Id": "csrf_guest_session"})
+    uploaded = client.post(
+        "/api/wf01/upload",
+        data={"file": (io.BytesIO(RESUME.encode("utf-8")), "resume.txt")},
+        content_type="multipart/form-data",
+        headers=headers,
+    )
+    assert uploaded.status_code == 200
+    session_id = uploaded.json["session_id"]
+
+    blocked_headers = _material_headers(consent, Origin="https://attacker.example")
+    blocked = client.post(
+        "/api/wf06/delete",
+        json={"session_id": session_id},
+        headers=blocked_headers,
+    )
+    assert blocked.status_code == 403
+    assert blocked.json["error"] == "csrf_rejected"
+    assert database.get_resume_detail(session_id) is not None
+
+    deleted = client.post(
+        "/api/wf06/delete",
+        json={"session_id": session_id},
+        headers=_material_headers(consent),
+    )
+    assert deleted.status_code == 200
+
+
 def test_sensitive_json_endpoints_reject_array_bodies(isolated_db, monkeypatch):
     monkeypatch.setenv("DUMATE_CONSENT_SECRET", "security-test-secret")
     api_module.app.config.update(TESTING=True)
