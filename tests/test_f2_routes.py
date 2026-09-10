@@ -100,6 +100,32 @@ def test_f2_direct_match_persists_score_for_f4(tmp_path, monkeypatch):
     assert stored["score_M"] == response.json["scores"]["overall"]
 
 
+def test_f2_mode_b_persists_the_common_f4_contract(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    headers = _consent(client)
+    sid = "f2_mode_b_session"
+    response = client.post(
+        "/api/f2/match",
+        json={"majorCode": "080901", "resumeText": RESUME, "jdText": JD, "session_id": sid},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json["mode"] == "B"
+    assert response.json["requirements"]
+    assert response.json["subscores"]
+    assert {row["type"] for row in response.json["requirements"]} <= {
+        "hard", "responsibility", "preferred", "terminology"
+    }
+    assert set(response.json["subscores"]) <= {
+        "hard", "responsibility", "preferred", "terminology"
+    }
+    assert "term" in response.json["modeB"]["subscores"]
+    stored = load_match(sid)
+    assert stored["requirements"] == response.json["requirements"]
+    assert stored["subscores"] == response.json["subscores"]
+    assert stored["gaps"] == response.json["gaps"]
+
+
 def test_f2_chunked_match_persists_and_is_owner_isolated(tmp_path, monkeypatch):
     client = _client(tmp_path, monkeypatch)
     owner = _consent(client)
@@ -128,7 +154,13 @@ def test_f2_chunked_match_persists_and_is_owner_isolated(tmp_path, monkeypatch):
     assert task["state"] == "done"
     report = task["result_json"]["__result"]
     assert report["session_id"] == sid
-    assert load_match(sid)["score_M"] == report["scores"]["overall"]
+    stored = load_match(sid)
+    assert stored["score_M"] == report["scores"]["overall"]
+    assert stored["requirements"] == report["requirements"]
+    assert stored["subscores"] == report["subscores"]
+    assert {row["type"] for row in stored["requirements"]} <= {
+        "hard", "responsibility", "preferred", "terminology"
+    }
 
     attacker = _consent(client)
     blocked = client.post(
