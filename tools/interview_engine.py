@@ -17,6 +17,7 @@ import json
 import os
 import re
 import random
+from difflib import SequenceMatcher
 from typing import Optional
 
 # ------------------------------------------------------------------ #
@@ -44,6 +45,38 @@ SENSITIVE_PATTERNS = [
     r"退伍|服役|军事|兵役|当兵",
     r"工会|工会会员|工会身份",
 ]
+
+# ------------------------------------------------------------------ #
+# 危险模型输出检测（提示注入 / 凭据与隐私索取）
+#
+# 与 SENSITIVE_PATTERNS 含义不同：后者拦截歧视性 HR 提问；本组拦截
+# 被注入或被操纵的模型输出，防止面试链路变成泄露系统提示、密钥或
+# 索取候选人身份证/银行卡等个人信息的通道。安全闸门一律 fail closed。
+# ------------------------------------------------------------------ #
+_ASK_VERBS = (
+    r"(提供|上传|粘贴|输入|填写|告知|告诉|说出|报出|发送|提交|索取|要求|"
+    r"给我|发我|留下|出示|展示|泄露|补充|交代)"
+)
+
+UNSAFE_QUESTION_PATTERNS = (
+    # 1) 提示注入：要求忽略/绕过/覆盖规则、系统提示或安全约束
+    r"(忽略|忽视|无视|绕过|跳过|覆盖|推翻|取消|忘记|丢弃)[^。！？!?]{0,10}"
+    r"(规则|指令|要求|设定|提示|约束|限制|策略|安全|角色|身份)",
+    r"(ignore|disregard|forget|bypass|override)[^.!?]{0,24}"
+    r"(rule|instruction|prompt|policy|guideline|safety|system)",
+    # 2) 直接索取内部配置或凭据
+    r"(系统提示词?|开发者消息|内部指令|隐藏指令|system\s*prompt|developer\s*message)",
+    r"(api[\s_\-]*key|apikey|私钥|访问令牌|\.env\b|数据库连接串|数据库备份)",
+    # 3) 带请求动词的凭据索取（避免误伤「密码学」「token 机制」等技术提问）
+    _ASK_VERBS + r"[^。！？!?]{0,12}"
+    r"(密码(?!学|算法)|口令|验证码|密钥|令牌|token|凭据|账号|环境变量|连接串)",
+    # 4) 带请求动词的 PII 索取
+    _ASK_VERBS + r"[^。！？!?]{0,12}"
+    r"(身份证|手机号|手机号码|电话号码|邮箱|住址|家庭地址|家庭住址|银行卡|"
+    r"微信号|微信|qq|支付宝|护照|社保)",
+    # 5) 无动词也需拦截的高危短语
+    r"身份证号(码)?|银行卡号|护照号|社保号",
+)
 
 # ------------------------------------------------------------------ #
 # STAR 缺口检测关键词（启发式）
@@ -96,6 +129,9 @@ QUESTION_TYPES = [
 MAX_MAIN_QUESTIONS = 5
 MAX_FOLLOWUPS_PER_QUESTION = 1
 
+# ASR 置信度低于该阈值时先要求用户确认转写，不得推进面试状态机
+ASR_MIN_CONFIDENCE = 0.75
+
 
 class InterviewEngine:
     """文字自适应面试引擎。
@@ -116,6 +152,10 @@ class InterviewEngine:
         self.router = model_router
         # 预编译敏感词正则
         self._sensitive_re = [re.compile(p) for p in SENSITIVE_PATTERNS]
+        # 预编译危险模型输出正则（大小写不敏感以覆盖 API key / token 等英文写法）
+        self._unsafe_re = [
+            re.compile(p, re.IGNORECASE) for p in UNSAFE_QUESTION_PATTERNS
+        ]
 
     # ================================================================ #
     # 公开接口
@@ -174,6 +214,7 @@ class InterviewEngine:
             "question_type_index": 0,
             "used_gaps": [],
             "degraded": False,
+            "unsafe_blocked": False,
             "router_error": None,
         }
         session["state"] = "ASK"
@@ -193,6 +234,9 @@ class InterviewEngine:
 
         turn_id = len(session["turns"]) + 1
         gap = self._pick_gap(session)
+        recent_turns = self._recent_turn_context(session)
+        answer_anchor = self._latest_answer_anchor(session)
+        is_adaptive = bool(recent_turns)
 
         # 尝试动态生成
         question_text = None
@@ -203,38 +247,95 @@ class InterviewEngine:
                 result = self.router.call(
                     "interview_question",
                     self._build_question_input(session, gap),
-                    context={"gap": gap, "turn_id": turn_id},
+                    # context 只保留有界标量。结构化、已截断且已脱敏的内容
+                    # 全部位于 user_input JSON 中；这里绝不回传原始 gap 或
+                    # 原始 recent_turns，避免未脱敏 PII 与超长输入外发。
+                    context={
+                        "turn_id": turn_id,
+                        "adaptive": is_adaptive,
+                        "must_reference_previous_answer": is_adaptive,
+                    },
                 )
                 if result["status"] == "success" and result.get("output"):
                     output = result["output"]
-                    if isinstance(output, str):
-                        question_text = output.strip()
-                    elif isinstance(output, dict):
-                        question_text = output.get("question", "").strip()
-                        targets = output.get("targets", [])
+                    if isinstance(output, dict):
+                        raw_question = output.get("question", "")
+                        if isinstance(raw_question, str):
+                            question_text = self._compact_text(raw_question, 220)
+                        raw_targets = output.get("targets", [])
+                        if isinstance(raw_targets, list):
+                            targets = [
+                                self._compact_text(item, 80) for item in raw_targets
+                                if isinstance(item, str) and item.strip()
+                            ][:8]
             except Exception as exc:
                 # Keep the safe question-bank fallback, but retain a non-sensitive
                 # diagnostic marker instead of silently swallowing provider errors.
                 session["router_error"] = type(exc).__name__
 
-        # 降级: 岗位题库
+        # 安全闸门 A：模型输出必须通过危险内容检查（在拼接回答 anchor 之前）
+        if question_text and self._check_unsafe_generated_question(question_text):
+            question_text = None
+            targets = []
+            session["degraded"] = True
+            session["unsafe_blocked"] = True
+
+        if question_text and self._is_repeated_question(session, question_text):
+            question_text = None
+            targets = []
+
+        if question_text and is_adaptive:
+            question_text = self._ensure_adaptive_question(
+                question_text, answer_anchor, gap
+            )
+            # 安全闸门 B：拼接 anchor 之后再次检查，防止 anchor 回显注入语句
+            if question_text and self._check_unsafe_generated_question(question_text):
+                question_text = None
+                targets = []
+                session["degraded"] = True
+                session["unsafe_blocked"] = True
+
+        # 降级: 首题使用岗位题库；后续题必须从上一轮回答继续深挖。
         if not question_text:
-            question_text, targets = self._fallback_question_bank(session, gap)
+            if is_adaptive:
+                question_text, targets = self._adaptive_fallback_question(
+                    session, gap
+                )
+            else:
+                question_text, targets = self._fallback_question_bank(session, gap)
             session["degraded"] = True
 
         # 敏感词检测 -> 替换
         if self._check_sensitive(question_text):
-            question_text, targets = self._fallback_generic_by_index(
-                session["current_main"]
-            )
+            if is_adaptive:
+                question_text, targets = self._adaptive_fallback_question(
+                    session, gap, omit_anchor=True
+                )
+            else:
+                question_text, targets = self._fallback_generic_by_index(
+                    session["current_main"]
+                )
             session["degraded"] = True
+
+        # 安全闸门 C：降级/替换后的题目也必须干净；否则使用硬编码安全题。
+        if self._check_unsafe_generated_question(question_text):
+            question_text, targets = self._hardcoded_safe_question(session)
+            session["degraded"] = True
+            session["unsafe_blocked"] = True
 
         if not targets:
             targets = [gap["id"]] if gap else ["generic"]
 
+        # basis 必须是“已脱敏回答的逐字子串”，且必须真的出现在最终题目里。
+        # 如果安全闸门把题目换成了不引用回答的兜底题，就不能再声称有 basis。
+        basis = answer_anchor if is_adaptive else ""
+        if basis and basis not in question_text:
+            basis = ""
+
         # Persist the emitted question for turn recording and follow-up review.
         session["_current_question"] = question_text
         session["_current_targets"] = targets
+        session["_current_question_basis"] = basis
 
         # 记录已用 gap
         if gap:
@@ -252,6 +353,8 @@ class InterviewEngine:
             "targets": targets,
             "turn_id": turn_id,
             "done": False,
+            "adaptive": is_adaptive,
+            "basis": basis or None,
         }
 
     def submit_answer(self, session, answer_text, asr_confidence=None):
@@ -267,10 +370,10 @@ class InterviewEngine:
                    follow_up, subscores}
         """
         turn_id = len(session["turns"]) + 1
-        answer = answer_text or ""
+        answer = self._deidentify_answer(answer_text or "")
 
         # ASR 置信度检查
-        if asr_confidence is not None and asr_confidence < 0.75:
+        if asr_confidence is not None and asr_confidence < ASR_MIN_CONFIDENCE:
             return {
                 "turn_id": turn_id,
                 "answer": answer,
@@ -320,13 +423,27 @@ class InterviewEngine:
             "subscores": subscores,
         }
 
-    def submit_followup_answer(self, session, answer_text):
+    def submit_followup_answer(self, session, answer_text, asr_confidence=None):
         """提交追问回答。
 
         追问回答也纳入 turn 序列，但不生成新的追问（每题最多 1 次追问）。
+        低 ASR 置信度时与主回答一致：不消费追问、不记录 turn。
         """
+        answer = self._deidentify_answer(answer_text or "")
+
+        if asr_confidence is not None and asr_confidence < ASR_MIN_CONFIDENCE:
+            return {
+                "turn_id": len(session["turns"]) + 1,
+                "answer": answer,
+                "answer_quote": "",
+                "missing_elements": [],
+                "follow_up": None,
+                "subscores": None,
+                "needs_confirmation": True,
+                "asr_confidence": asr_confidence,
+            }
+
         turn_id = len(session["turns"]) + 1
-        answer = answer_text or ""
         answer_quote = self._extract_quote(answer)
         missing_elements = self._detect_star_gaps(answer)
 
@@ -427,21 +544,239 @@ class InterviewEngine:
             return session["match_gaps"][idx]
         return None
 
+    @staticmethod
+    def _compact_text(value, limit=240):
+        text = re.sub(r"\s+", " ", str(value or "")).strip()
+        if len(text) <= limit:
+            return text
+        return text[:limit].rstrip("，,。；;：: ") + "…"
+
+    @staticmethod
+    def _limited(value, limit):
+        """Hard character bound without the display ellipsis of _compact_text."""
+        return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
+
+    def _safe_job_title(self, session, limit=120):
+        """De-identify and bound the job title before it reaches the model."""
+        job = session.get("job_profile") or {}
+        raw = job.get("title", "") if isinstance(job, dict) else ""
+        cleaned = self._deidentify_answer(str(raw or ""))
+        return self._limited(cleaned, limit)
+
+    def _safe_gap_payload(self, gap):
+        """Bounded, de-identified projection of a single match gap."""
+        gap = gap or {}
+        return {
+            "id": self._limited(gap.get("id", ""), 64),
+            "type": self._limited(gap.get("type", ""), 32),
+            "text": self._limited(
+                self._deidentify_answer(str(gap.get("text", ""))), 160
+            ),
+            "status": self._limited(gap.get("status", ""), 16),
+        }
+
+    @staticmethod
+    def _deidentify_answer(value):
+        text = str(value or "")
+        try:
+            from tools.deidentify import deidentify
+        except ImportError:
+            from deidentify import deidentify
+        cleaned, _mapping = deidentify(text)
+        return cleaned
+
+    @staticmethod
+    def _question_core(value):
+        text = re.sub(r"\s+", "", str(value or ""))
+        text = re.sub(r"^你刚才提到「.*?」。", "", text)
+        text = re.sub(r"^结合你上一轮的回答，", "", text)
+        text = re.sub(r"^围绕岗位要求「.*?」，", "", text)
+        text = re.sub(r"^沿着这一经历，", "", text)
+        return re.sub(r"[，。！？；：,.!?;:]", "", text)
+
+    def _is_repeated_question(self, session, candidate):
+        core = self._question_core(candidate)
+        if not core:
+            return True
+        previous = {
+            self._question_core(turn.get("question", ""))
+            for turn in session.get("turns", [])
+        }
+        for prior in previous:
+            if not prior:
+                continue
+            if core == prior:
+                return True
+            # Exact comparison misses cosmetic rewrites such as adding
+            # "具体" or changing punctuation.  Treat highly similar long
+            # questions as repeats so the fallback can choose another angle.
+            if min(len(core), len(prior)) >= 12:
+                if SequenceMatcher(None, core, prior).ratio() >= 0.88:
+                    return True
+        return False
+
+    def _safe_answer_anchor(self, answer, preferred_quote=""):
+        """Return a short verbatim, non-sensitive anchor from one answer."""
+        raw = str(answer or "")
+        answer = self._compact_text(raw, 500)
+        if not answer:
+            return ""
+        quote = self._compact_text(preferred_quote, 80)
+        if not quote or quote not in answer:
+            quote = self._compact_text(self._extract_quote(answer), 80)
+        quote = quote.strip("“”\"'「」《》 ")
+        # 危险 anchor（用户回答里自带注入语句）同样不得回显为题目
+        if self._check_sensitive(quote) or self._check_unsafe_generated_question(quote):
+            return ""
+        if len(quote) > 42:
+            # Keep the anchor a literal substring of the stored answer.  An
+            # appended ellipsis would turn a display abbreviation into fake
+            # verbatim evidence and break the answer-quote invariant.
+            quote = quote[:42].rstrip("，,。；;：: ")
+        # 最终不变量：anchor 必须是原始回答的逐字子串
+        if not quote or quote not in raw:
+            return ""
+        return quote
+
+    def _latest_answer_anchor(self, session):
+        for turn in reversed(session.get("turns", [])):
+            anchor = self._safe_answer_anchor(
+                turn.get("answer", ""), turn.get("answer_quote", "")
+            )
+            if anchor:
+                return anchor
+        return ""
+
+    def _recent_turn_context(self, session, limit=4):
+        """Build bounded, structured history for adaptive question generation."""
+        history = []
+        for turn in session.get("turns", [])[-limit:]:
+            # Re-sanitize persisted history as well.  This covers sessions
+            # created before answer-time de-identification was introduced.
+            answer = self._compact_text(
+                self._deidentify_answer(turn.get("answer", "")), 220
+            )
+            if not answer:
+                continue
+            history.append({
+                "question": self._compact_text(turn.get("question", ""), 160),
+                "answer": answer,
+                "answer_quote": self._safe_answer_anchor(
+                    answer, turn.get("answer_quote", "")
+                ),
+                "missing_elements": list(turn.get("missing_elements") or [])[:6],
+                "targets": list(turn.get("targets") or [])[:6],
+            })
+        return history
+
+    def _ensure_adaptive_question(self, question, anchor, gap=None):
+        """Make the dependency on the previous answer explicit and testable."""
+        question = self._compact_text(question, 220)
+        if anchor and anchor in question:
+            return question
+        if anchor:
+            prefix = "你刚才提到「%s」。" % anchor
+        else:
+            prefix = "结合你上一轮的回答，"
+        if gap and gap.get("text"):
+            gap_text = self._deidentify_answer(str(gap["text"]))
+            if (
+                self._check_unsafe_generated_question(gap_text)
+                or self._check_sensitive(gap_text)
+            ):
+                bridge = "沿着这一经历，"
+            else:
+                bridge = "围绕岗位要求「%s」，" % self._limited(gap_text, 48)
+        else:
+            bridge = "沿着这一经历，"
+        return self._compact_text(prefix + bridge + question, 280)
+
+    def _adaptive_fallback_question(self, session, gap=None, omit_anchor=False):
+        """Generate a deterministic next question from the latest answer."""
+        latest = next(
+            (turn for turn in reversed(session.get("turns", [])) if turn.get("answer")),
+            {},
+        )
+        anchor = "" if omit_anchor else self._safe_answer_anchor(
+            latest.get("answer", ""), latest.get("answer_quote", "")
+        )
+        prefix = (
+            "你刚才提到「%s」。" % anchor
+            if anchor else "结合你上一轮的回答，"
+        )
+        missing = list(latest.get("missing_elements") or [])
+        safe_gap = gap
+        if gap and (
+            self._check_sensitive(str(gap.get("text", "")))
+            or self._check_unsafe_generated_question(str(gap.get("text", "")))
+        ):
+            safe_gap = None
+        focus_templates = {
+            "action": "其中由你亲自完成的关键动作是什么，为什么选择这种做法？",
+            "result": "这项工作的最终结果是什么，它怎样影响了项目或团队？",
+            "metric": "这个结果用什么基准和数据验证，数据由谁、以什么方式统计？",
+            "situation": "当时最关键的业务背景和约束条件是什么？",
+            "task": "你本人承担的目标、边界和决策责任分别是什么？",
+            "reflection": "如果重新做一次，你会调整哪个决策，为什么？",
+        }
+        for key in ("action", "result", "metric", "situation", "task", "reflection"):
+            if key in missing:
+                candidate = prefix + focus_templates[key]
+                if not self._is_repeated_question(session, candidate):
+                    return candidate, list(
+                        latest.get("targets") or ["previous_answer"]
+                    )
+
+        if safe_gap and safe_gap.get("text"):
+            question = (
+                "目标岗位还要求「%s」。请说明这段经历与该要求的联系，"
+                "以及你会如何迁移或深化原有做法？"
+            ) % self._compact_text(safe_gap["text"], 48)
+            candidate = prefix + question
+            if not self._is_repeated_question(session, candidate):
+                targets = [
+                    safe_gap.get("id")
+                    or safe_gap.get("type")
+                    or "previous_answer"
+                ]
+                return candidate, targets
+
+        targets = list(latest.get("targets") or ["previous_answer"])
+        depth_questions = [
+            "当时最关键的取舍是什么，还有哪些替代方案，为什么没有选择它们？",
+            "如果将当时的业务规模扩大十倍，原方案会先在哪里失效，你会如何验证和调整？",
+            "这段经历中哪一项证据最能证明你的个人贡献，如果被质疑，你会怎样交叉验证？",
+        ]
+        for question in depth_questions:
+            candidate = prefix + question
+            if not self._is_repeated_question(session, candidate):
+                return candidate, targets
+        # The five-question cap makes exhausting all strategies unlikely.  If
+        # it happens, rotate deterministically while retaining the answer
+        # anchor instead of falling back to an unrelated generic question.
+        question = depth_questions[session.get("current_main", 0) % len(depth_questions)]
+        return prefix + question, targets
+
     def _build_question_input(self, session, gap):
-        """构建传给模型的问题生成输入。"""
-        job = session.get("job_profile", {})
-        resume = session.get("resume_profile", {})
+        """构建传给模型的问题生成输入。
+
+        所有自由文本都经过脱敏与长度硬截断后再序列化，且包含重复的
+        recent_turns 只以受限结构化形式出现一次。
+        """
         qtype = QUESTION_TYPES[
             session["question_type_index"] % len(QUESTION_TYPES)
         ]
         session["question_type_index"] += 1
-        parts = [
-            "job_title: %s" % job.get("title", "unknown"),
-            "gap: %s (%s)" % (gap.get("text", ""), gap.get("status", "")),
-            "question_type: %s" % qtype,
-            "previous_turns: %d" % len(session["turns"]),
-        ]
-        return "\n".join(parts)
+        payload = {
+            "task": "generate_next_interview_question",
+            "job_title": self._safe_job_title(session),
+            "target_gap": self._safe_gap_payload(gap),
+            "question_type": qtype,
+            "main_question_number": session.get("current_main", 0) + 1,
+            "recent_turns": self._recent_turn_context(session),
+            "must_reference_previous_answer": bool(session.get("turns")),
+        }
+        return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
     def _detect_star_gaps(self, answer_text):
         """检测 STAR 缺口（关键词启发式）。
@@ -479,6 +814,37 @@ class InterviewEngine:
             if pat.search(question_text):
                 return True
         return False
+
+    def _check_unsafe_generated_question(self, text):
+        """危险内容检测：提示注入 / 凭据索取 / PII 索取。
+
+        与 :meth:`_check_sensitive` 是两个不同含义的闸门。凡是进入面试
+        链路的文本（模型输出、岗位标题、gap、回答 anchor）都必须先过这里，
+        命中即拒绝，fail closed。
+        """
+        if not text:
+            return False
+        text = str(text)
+        for pat in self._unsafe_re:
+            if pat.search(text):
+                return True
+        return False
+
+    def _hardcoded_safe_question(self, session):
+        """最终兜底：不依赖任何外部输入的安全题。"""
+        title = self._safe_job_title(session, limit=40)
+        if (
+            title
+            and not self._check_unsafe_generated_question(title)
+            and not self._check_sensitive(title)
+        ):
+            question = (
+                "围绕「%s」这一岗位，请挑一段你最有代表性的相关经历，"
+                "说明当时的背景、你本人采取的行动，以及可以验证的结果。"
+            ) % title
+            return question, ["job_fit_evidence"]
+        entry = GENERIC_QUESTIONS[0]
+        return entry["question"], list(entry["targets"])
 
     def _extract_quote(self, answer_text):
         """从回答中提取最相关的句子作为 answer_quote。
@@ -561,9 +927,17 @@ class InterviewEngine:
 
         for elem in missing_elements:
             if elem in followup_map:
+                anchor = self._safe_answer_anchor(answer_text)
+                prefix = (
+                    "你刚才提到「%s」。" % anchor
+                    if anchor else "结合你刚才的回答，"
+                )
                 return {
-                    "question": followup_map[elem],
-                    "reason": "missing_%s: answer lacks %s element" % (elem, elem),
+                    "question": prefix + followup_map[elem],
+                    "reason": (
+                        "missing_%s: anchored_to_previous_answer; answer lacks %s element"
+                        % (elem, elem)
+                    ),
                 }
 
         return None

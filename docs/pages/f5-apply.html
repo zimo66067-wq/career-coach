@@ -27,6 +27,10 @@
   .f5-del { margin-left: auto; border: 1px solid var(--zy-line-2, rgba(22,30,52,.16)); background: #fff; color: var(--zy-missing, #d32424); border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
   .f5-item-body { margin: 0; white-space: pre-wrap; line-height: 1.7; font-size: 13px; color: var(--zy-ink-2, #4b5261); }
   .f5-empty { color: var(--zy-ink-3, #7a8699); padding: 28px 0; text-align: center; }
+  .f5-boundary { margin: 18px 0; padding: 16px 18px; border: 1px solid rgba(180,83,9,.32); border-radius: var(--zy-r-md, 12px); background: #fffaf0; color: var(--zy-ink-2, #4b5261); }
+  .f5-boundary h2 { margin: 0 0 8px; color: var(--zy-ink, #1b1e26); font-size: 16px; }
+  .f5-boundary ul { margin: 0; padding-left: 20px; line-height: 1.75; }
+  .f5-boundary strong { color: #92400e; }
 </style>
 </head>
 <body data-page="f5">
@@ -45,6 +49,14 @@
 <div class="wrap" id="main">
   <h1 class="page-title">F5 投递管理</h1>
   <p class="page-sub">生成求职信 → 人工确认 → 保存到申请跟踪</p>
+  <section class="f5-boundary" id="f5CapabilityBoundary" role="note" aria-labelledby="f5BoundaryTitle">
+    <h2 id="f5BoundaryTitle">当前能力边界</h2>
+    <ul>
+      <li>当前只会根据已完成的 F1 简历诊断、你手动填写的目标公司和职位生成求职信候选；确认后保存为申请记录。</li>
+      <li><strong>当前不提供公司或单位搜索，也不会核验单位主体、招聘状态或职位真伪。</strong>请先通过单位官网、权威登记信息和招聘原页面完成核验。</li>
+      <li>“面经知识库”仅提供通用面试问答，不是单位或职位数据库；模型不会被当作企业事实来源。</li>
+    </ul>
+  </section>
   <div class="f5-card">
     <div class="f5-row">
       <label>目标公司<input id="f5Company" type="text" placeholder="如：字节跳动"></label>

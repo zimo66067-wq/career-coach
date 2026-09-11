@@ -103,6 +103,9 @@ from services.diagnosis_service import (  # noqa: E402
     diagnose_resume,
 )
 from services.interview_service import (  # noqa: E402
+    _advance_interview,
+    _coerce_asr_confidence,
+    _validated_answer_text,
     answer_interview,
     build_ability_profile,
     build_interview_router,
@@ -817,35 +820,28 @@ def route_api(**_ignored):
         if not payload:
             raise ApiError("session_not_found", "面试会话不存在或已过期。", 404)
         engine = InterviewEngine(model_router=build_interview_router())
-        engine.start(
-            payload.get("job_profile", {}),
-            payload.get("resume_profile", {}),
-            payload.get("match_gaps", []),
-        )
         engine_session = payload
-        answer_text = str(body.get("answer_text", "") or "").strip()
-        if len(answer_text) < 1:
-            raise ApiError("invalid_answer", "回答内容不能为空。", 422)
-        asr_confidence = body.get("asr_confidence")
+        answer_text = _validated_answer_text(body)
+        asr_confidence = _coerce_asr_confidence(body.get("asr_confidence"))
 
-        # 打字对话状态机：
+        # 打字对话状态机（与 /wf04/answer 共用同一编排）：
         # 1) 有待回答追问 -> 本次输入为追问回答，记录后进入下一主问题；
         # 2) 主回答生成追问 -> 等待用户回答追问；
-        # 3) 主回答无追问 -> 直接进入下一主问题。
-        pending_followup = bool(engine_session.get("_current_followup"))
-        next_question = None
-        if pending_followup:
-            result = engine.submit_followup_answer(engine_session, answer_text)
-            next_question = engine.next_question(engine_session)
-        else:
-            result = engine.submit_answer(engine_session, answer_text, asr_confidence)
-            follow_up = result.get("follow_up") if isinstance(result.get("follow_up"), dict) else None
-            if not follow_up:
-                next_question = engine.next_question(engine_session)
+        # 3) 主回答无追问 -> 直接进入下一主问题；
+        # 4) 低 ASR 置信度 -> 不记录、不追问、不推进，只要求用户确认转写。
+        result, next_question = _advance_interview(
+            engine, engine_session, answer_text, asr_confidence
+        )
         update_session(session_id, engine_session.get("state", "ASK"), engine_session)
 
+        needs_confirmation = bool(result.get("needs_confirmation"))
         follow_up = result.get("follow_up") if isinstance(result.get("follow_up"), dict) else None
-        if next_question:
+        if needs_confirmation:
+            full_text = (
+                "这次语音转写的置信度偏低，为避免误记你的回答，我没有把它计入本轮。"
+                "请确认或修改转写文本后重新提交。"
+            )
+        elif next_question:
             if next_question.get("done"):
                 full_text = "本轮面试已完成，正在生成综合报告…"
             else:
@@ -868,7 +864,7 @@ def route_api(**_ignored):
             yield "data: " + json.dumps(
                 {"type": "done", "turn": result, "followUp": follow_up,
                  "evaluation": evaluation, "nextQuestion": next_question,
-                 "done": True},
+                 "needs_confirmation": needs_confirmation, "done": True},
                 ensure_ascii=False,
             ) + "\n\n"
 

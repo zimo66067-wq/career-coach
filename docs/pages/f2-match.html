@@ -40,7 +40,7 @@
       <h3>第一步 · 选择你的本科专业</h3>
       <p class="f2-hint">支持三级联动或直接搜索（教育部《本科专业目录（2025年）》：12 门类 / 93 专业类 / 845 专业）。</p>
       <div class="f2-search-box">
-        <input id="f2Search" type="search" placeholder="搜索专业名称或代码，如：计算机、080901" autocomplete="off">
+        <input id="f2Search" type="search" maxlength="64" placeholder="支持专业代码、错字近似或求职方向，如：080901、计算机科学与技木、写代码" autocomplete="off">
         <div class="f2-search-results zy-hidden" id="f2SearchResults" role="listbox"></div>
       </div>
       <div class="f2-cascade">
@@ -64,7 +64,7 @@
       </div>
       <div class="f2-intent">
         <label>不确定专业？按求职意向找专业
-          <input id="f2Intent" type="search" placeholder="如：程序员、数据分析、律师" autocomplete="off">
+          <input id="f2Intent" type="search" maxlength="64" placeholder="如：程序员、数据分析、律师" autocomplete="off">
         </label>
         <div class="f2-intent-results" id="f2IntentResults"></div>
       </div>

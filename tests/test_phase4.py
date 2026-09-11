@@ -387,4 +387,160 @@ def test_wf04_stream_advances_to_next_question_after_followup(monkeypatch):
     assert done2["nextQuestion"] is not None
     assert done2["nextQuestion"].get("question")
     assert done2["nextQuestion"].get("done") is False
+    assert done2["nextQuestion"].get("adaptive") is True
+    assert done2["nextQuestion"].get("basis")
+    assert done2["nextQuestion"]["basis"] in followup_answer
+    assert done2["nextQuestion"]["basis"] in done2["nextQuestion"]["question"]
     assert done2["evaluation"] is not None
+
+
+# ---------------------------------------------------------------- #
+# 低 ASR 置信度：不得推进状态机（P0）
+# ---------------------------------------------------------------- #
+
+def _start_minimal(raw, token, sid, gaps=None):
+    started = authed_post(
+        raw, token, "/api/wf04/start",
+        {
+            "jobProfile": {"title": "后端开发工程师", "requirements": []},
+            "resumeProfile": {"score_R": 70.0},
+            "matchGaps": gaps if gaps is not None else [
+                {"id": "G1", "type": "hard", "text": "接口性能优化", "status": "weak"},
+                {"id": "G2", "type": "responsibility", "text": "故障复盘", "status": "weak"},
+            ],
+            "session_id": sid,
+        },
+    )
+    assert started.status_code == 200
+    return started.json
+
+
+def test_wf04_stream_low_confidence_does_not_advance_state_machine(monkeypatch):
+    raw = raw_client(monkeypatch)
+    token = issue_consent(raw)
+    sid = "iv_lowconf_" + uuid.uuid4().hex[:8]
+    _start_minimal(raw, token, sid)
+
+    streamed = authed_post(
+        raw, token, "/api/wf04/stream",
+        {"session_id": sid, "answer_text": "语音转写结果，置信度偏低。", "asr_confidence": 0.4},
+    )
+    assert streamed.status_code == 200
+    done = _parse_sse_done(streamed.get_data(as_text=True))
+    assert done["needs_confirmation"] is True
+    assert done["nextQuestion"] is None
+    assert done["followUp"] is None
+
+    _state, payload = database.load_session(sid)
+    assert payload["turns"] == [], "低置信度不得记录轮次"
+    assert payload["current_main"] == 1, "低置信度不得推进主问题"
+
+
+def test_wf04_stream_low_confidence_keeps_pending_followup(monkeypatch):
+    raw = raw_client(monkeypatch)
+    token = issue_consent(raw)
+    sid = "iv_lowconf_fu_" + uuid.uuid4().hex[:8]
+    _start_minimal(raw, token, sid)
+
+    vague = "我负责后端开发，使用 Python 和 Flask 完成接口，遇到问题就修复。"
+    first = authed_post(
+        raw, token, "/api/wf04/stream", {"session_id": sid, "answer_text": vague}
+    )
+    done1 = _parse_sse_done(first.get_data(as_text=True))
+    assert done1["followUp"] is not None
+    assert done1["nextQuestion"] is None
+
+    _state, before = database.load_session(sid)
+    turns_before = len(before["turns"])
+    pending_before = before["_current_followup"]
+    assert pending_before
+
+    low = authed_post(
+        raw, token, "/api/wf04/stream",
+        {"session_id": sid, "answer_text": "语音转写结果。", "asr_confidence": 0.3},
+    )
+    done2 = _parse_sse_done(low.get_data(as_text=True))
+    assert done2["needs_confirmation"] is True
+    assert done2["nextQuestion"] is None
+
+    _state, after = database.load_session(sid)
+    assert len(after["turns"]) == turns_before, "低置信度不得消费追问回答"
+    assert after["_current_followup"] == pending_before
+
+    # 低置信度之后，正常回答仍被当作追问回答消费，并推进到下一主问题
+    good = (
+        "结果：接口上线后响应时间从 800ms 降到 200ms，性能提升 75%，日处理 100 万条记录。"
+    )
+    resumed = authed_post(
+        raw, token, "/api/wf04/stream", {"session_id": sid, "answer_text": good}
+    )
+    done3 = _parse_sse_done(resumed.get_data(as_text=True))
+    assert done3["nextQuestion"] is not None
+    assert done3["nextQuestion"]["adaptive"] is True
+
+
+# ---------------------------------------------------------------- #
+# F3 输入边界
+# ---------------------------------------------------------------- #
+
+def test_wf04_answer_rejects_oversized_answer(monkeypatch):
+    raw = raw_client(monkeypatch)
+    token = issue_consent(raw)
+    sid = "iv_big_" + uuid.uuid4().hex[:8]
+    _start_minimal(raw, token, sid)
+
+    response = authed_post(
+        raw, token, "/api/wf04/answer",
+        {"session_id": sid, "answer_text": "答" * 4001},
+    )
+    assert response.status_code == 422
+    assert response.json["error"] == "answer_too_long"
+
+
+def test_wf04_answer_rejects_non_numeric_asr_confidence(monkeypatch):
+    raw = raw_client(monkeypatch)
+    token = issue_consent(raw)
+    sid = "iv_badconf_" + uuid.uuid4().hex[:8]
+    _start_minimal(raw, token, sid)
+
+    response = authed_post(
+        raw, token, "/api/wf04/answer",
+        {"session_id": sid, "answer_text": "正常回答内容。", "asr_confidence": "high"},
+    )
+    assert response.status_code == 422
+    assert response.json["error"] == "invalid_asr_confidence"
+
+
+def test_wf04_start_rejects_non_object_match_gaps(monkeypatch):
+    raw = raw_client(monkeypatch)
+    token = issue_consent(raw)
+
+    response = authed_post(
+        raw, token, "/api/wf04/start",
+        {
+            "jobProfile": {"title": "后端", "requirements": []},
+            "matchGaps": ["不是对象"],
+            "session_id": "iv_badgap_" + uuid.uuid4().hex[:8],
+        },
+    )
+    assert response.status_code == 422
+    assert response.json["error"] == "invalid_match_gaps"
+
+
+def test_wf04_start_rejects_oversized_match_gaps(monkeypatch):
+    raw = raw_client(monkeypatch)
+    token = issue_consent(raw)
+
+    response = authed_post(
+        raw, token, "/api/wf04/start",
+        {
+            "jobProfile": {"title": "后端", "requirements": []},
+            "matchGaps": [
+                {"id": "G%d" % i, "type": "hard", "text": "缺口%d" % i, "status": "weak"}
+                for i in range(21)
+            ],
+            "session_id": "iv_manygap_" + uuid.uuid4().hex[:8],
+        },
+    )
+    assert response.status_code == 422
+    assert response.json["error"] == "invalid_match_gaps"

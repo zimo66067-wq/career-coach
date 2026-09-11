@@ -54,11 +54,91 @@ def build_interview_router():
         return None
 
 
+# 单条回答的独立长度上限：超出在入库/送模型之前直接拒绝
+MAX_ANSWER_CHARS = 4000
+# matchGaps 的条数上限，防止超长数组拖垮会话初始化
+MAX_MATCH_GAPS = 20
+
+
+def _coerce_asr_confidence(value):
+    """Validate asr_confidence so a non-numeric value cannot 500 the route."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        raise ApiError("invalid_asr_confidence", "asr_confidence 必须是 0-1 的数字。", 422)
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        raise ApiError("invalid_asr_confidence", "asr_confidence 必须是 0-1 的数字。", 422)
+    if confidence < 0 or confidence > 1:
+        raise ApiError("invalid_asr_confidence", "asr_confidence 必须是 0-1 的数字。", 422)
+    return confidence
+
+
+def _validated_answer_text(body):
+    answer_text = str(body.get("answer_text", "") or "").strip()
+    if len(answer_text) < 1:
+        raise ApiError("invalid_answer", "回答内容不能为空。", 422)
+    if len(answer_text) > MAX_ANSWER_CHARS:
+        raise ApiError(
+            "answer_too_long",
+            "回答内容过长，请控制在 %d 字以内。" % MAX_ANSWER_CHARS,
+            422,
+        )
+    return answer_text
+
+
+def _validated_match_gaps(body):
+    """Only accept a bounded list of plain objects as match gaps."""
+    raw_gaps = body.get("matchGaps")
+    if raw_gaps is None:
+        return []
+    if not isinstance(raw_gaps, list):
+        raise ApiError("invalid_match_gaps", "matchGaps 必须是数组。", 422)
+    if len(raw_gaps) > MAX_MATCH_GAPS:
+        raise ApiError(
+            "invalid_match_gaps",
+            "matchGaps 条目过多，最多 %d 条。" % MAX_MATCH_GAPS,
+            422,
+        )
+    gaps = []
+    for item in raw_gaps:
+        if not isinstance(item, dict):
+            raise ApiError("invalid_match_gaps", "matchGaps 每项必须是对象。", 422)
+        gaps.append(item)
+    return gaps
+
+
+def _advance_interview(engine, engine_session, answer_text, asr_confidence):
+    """Shared state machine for /wf04/answer and /wf04/stream.
+
+    Returns (result, next_question).  A low-confidence ASR answer must not
+    record a turn, must not create a follow-up and must not advance the
+    main-question counter — neither for a main answer nor for a pending
+    follow-up.
+    """
+    pending_followup = bool(engine_session.get("_current_followup"))
+    next_question = None
+    if pending_followup:
+        result = engine.submit_followup_answer(
+            engine_session, answer_text, asr_confidence
+        )
+        if not result.get("needs_confirmation"):
+            next_question = engine.next_question(engine_session)
+    else:
+        result = engine.submit_answer(engine_session, answer_text, asr_confidence)
+        if not result.get("needs_confirmation"):
+            follow_up = result.get("follow_up")
+            if not isinstance(follow_up, dict):
+                next_question = engine.next_question(engine_session)
+    return result, next_question
+
+
 def start_interview(body):
     engine = InterviewEngine(model_router=build_interview_router())
     job_profile = body.get("jobProfile") if isinstance(body.get("jobProfile"), dict) else {}
     resume_profile = body.get("resumeProfile") if isinstance(body.get("resumeProfile"), dict) else {}
-    match_gaps = body.get("matchGaps") if isinstance(body.get("matchGaps"), list) else []
+    match_gaps = _validated_match_gaps(body)
     session = engine.start(job_profile, resume_profile, match_gaps)
     first = engine.next_question(session)
     if not first or first.get("question") is None:
@@ -81,23 +161,19 @@ def answer_interview(body):
     if not payload:
         raise ApiError("session_not_found", "面试会话不存在或已过期。", 404)
     engine = InterviewEngine(model_router=build_interview_router())
-    engine.start(
-        payload.get("job_profile", {}),
-        payload.get("resume_profile", {}),
-        payload.get("match_gaps", []),
-    )
-    # Rebuild the engine session object from the stored payload in-place.
     engine_session = payload
-    answer_text = str(body.get("answer_text", "") or "").strip()
-    if len(answer_text) < 1:
-        raise ApiError("invalid_answer", "回答内容不能为空。", 422)
-    asr_confidence = body.get("asr_confidence")
-    result = engine.submit_answer(engine_session, answer_text, asr_confidence)
+    answer_text = _validated_answer_text(body)
+    asr_confidence = _coerce_asr_confidence(body.get("asr_confidence"))
+    result, next_question = _advance_interview(
+        engine, engine_session, answer_text, asr_confidence
+    )
     update_session(session_id, engine_session.get("state", "ASK"), engine_session)
     return {
         "session_id": session_id,
         "turn": result,
-        "followUp": result.get("follow_up"),
+        "followUp": result.get("follow_up") if isinstance(result.get("follow_up"), dict) else None,
+        "nextQuestion": next_question,
+        "needs_confirmation": bool(result.get("needs_confirmation")),
     }
 
 
