@@ -1,7 +1,7 @@
 # F5 单位与职位检索知识库扩展规划
 
 - 日期：2026-09-11
-- 状态：规划完成，尚未接入外部数据源
+- 状态：**阶段 0 与阶段 1 已交付**（2026-09-12）；阶段 2–4 未开始，尚未接入任何外部数据源
 - 范围：单位发现、职位检索、求职信增强、申请跟踪
 
 ## 1. 当前能力与边界
@@ -151,6 +151,21 @@ F5 页面分成四步：
 - 页面保留手动输入，并明确标记未核验。
 
 验收：无外部 API 时不伪造数据；归属隔离、删除闭环和失败降级通过。
+
+> **交付状态（2026-09-12）**
+>
+> 已交付：
+>
+> - 表：`organizations`、`organization_aliases`、`organization_profiles`、`source_snapshots`、`job_postings`、`job_posting_versions`、`job_embeddings`（SQLite 与 PostgreSQL 双方言，`ON CONFLICT` 幂等 upsert）。
+> - provider 契约：`tools/providers/organization.py`，默认 `UnconfiguredOrganizationProvider`；结果必须携带 `source_provider` / `source_url` / `source_updated_at` / `verified_at` / `verification_state`，缺项在写入与返回两处都会被剔除。
+> - 服务与错误合同：`services/organization_service.py`，未配置时返回 `status="unconfigured"` 的显式状态（而不是裸空列表），`discover` 返回 422 `discovery_unavailable`。
+> - API：`/api/f5/organizations/{status|suggest|discover|detail|jobs}`，已登记本地路由与 `vercel.json` 重写。
+> - 页面：新增「单位与职位检索：尚未接入授权数据源」状态区与「未经平台核验」提示，并保留手动填写路径；**没有**任何单位搜索框。
+> - 测试：`tests/test_organization_index.py` 16 项 + `tests/test_phase5_contract.js` 页面契约 1 项。
+>
+> 未交付（仍属后续阶段）：`applications` 的阶段字段扩展（§4.3）、别名/拼音/错字模糊召回、BM25+向量+RRF 混合检索、真实数据源接入、缓存与预算治理、纠错举报链路。
+>
+> 因此「能否检索全面或小众单位」的答案**仍然是不能**：索引为空，且只有获得终端展示与缓存授权的数据源才允许写入。
 
 ### 阶段 2：获授权的单位名称检索
 

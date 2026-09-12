@@ -119,6 +119,28 @@ test('f5-apply.html states the current organization-search boundary', () => {
   assert.match(html, /模型不会被当作企业事实来源/);
 });
 
+test('f5-apply.html declares the F5 index as unconfigured and never as working search', () => {
+  const html = read('pages/f5-apply.html');
+  const docsHtml = fs.readFileSync(path.join(root, 'docs', 'pages', 'f5-apply.html'), 'utf8');
+
+  assert.equal(html, docsHtml, 'public/docs F5 page must stay mirrored');
+  assert.match(html, /id="f5OrgSearchStatus"/);
+  assert.match(html, /尚未接入授权数据源/);
+  assert.match(html, /当前不提供单位搜索或职位检索，也不会生成任何单位信息/);
+  assert.match(html, /语言模型不参与生成单位事实/);
+  // the five business decisions that gate phase 2/3
+  assert.match(html, /覆盖地域与单位类型/);
+  assert.match(html, /单位数据授权方案/);
+  assert.match(html, /实时职位来源/);
+  assert.match(html, /月度外部数据预算/);
+  assert.match(html, /虚假招聘复核责任人/);
+  // manual entry must stay explicitly unverified
+  assert.match(html, /id="f5ManualNotice"/);
+  assert.match(html, /未经平台核验/);
+  // and there must be no organization search control claiming to work
+  assert.doesNotMatch(html, /id="f5Org(Search|Query|Keyword)"/);
+});
+
 test('f5-apply.js smoke-loads without load-time crashes', () => {
   const source = read('js/f5-apply.js');
   const context = makeContext();

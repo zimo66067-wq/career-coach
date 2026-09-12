@@ -57,7 +57,16 @@
       <li>“面经知识库”仅提供通用面试问答，不是单位或职位数据库；模型不会被当作企业事实来源。</li>
     </ul>
   </section>
+  <section class="f5-boundary" id="f5OrgSearchStatus" role="note" aria-labelledby="f5OrgSearchTitle">
+    <h2 id="f5OrgSearchTitle">单位与职位检索：尚未接入授权数据源</h2>
+    <ul>
+      <li><strong>当前不提供单位搜索或职位检索，也不会生成任何单位信息。</strong>本页没有单位搜索框，请勿把下方手动输入当作检索结果。</li>
+      <li>单位、别名、职位与来源快照索引表和数据源接口契约已建立，但索引为空：只有获得终端展示与缓存授权的数据源才允许写入，语言模型不参与生成单位事实。</li>
+      <li>开放检索前需先确定五项决策：覆盖地域与单位类型；单位数据授权方案；实时职位来源及其展示、摘要、缓存与跳转权利；月度外部数据预算与缓存策略；单位纠错与虚假招聘复核责任人。</li>
+    </ul>
+  </section>
   <div class="f5-card">
+    <p class="f5-msg" id="f5ManualNotice">下方公司与职位由你手动填写，<strong>未经平台核验</strong>；请以单位官网、权威登记信息和招聘原页面为准。</p>
     <div class="f5-row">
       <label>目标公司<input id="f5Company" type="text" placeholder="如：字节跳动"></label>
       <label>目标职位<input id="f5Position" type="text" placeholder="如：后端开发工程师"></label>

@@ -208,6 +208,26 @@
     {
       "source": "/api/wf07/applications",
       "destination": "/api?_route=wf07/applications"
+    },
+    {
+      "source": "/api/f5/organizations/status",
+      "destination": "/api?_route=f5/organizations/status"
+    },
+    {
+      "source": "/api/f5/organizations/suggest",
+      "destination": "/api?_route=f5/organizations/suggest"
+    },
+    {
+      "source": "/api/f5/organizations/discover",
+      "destination": "/api?_route=f5/organizations/discover"
+    },
+    {
+      "source": "/api/f5/organizations/detail",
+      "destination": "/api?_route=f5/organizations/detail"
+    },
+    {
+      "source": "/api/f5/organizations/jobs",
+      "destination": "/api?_route=f5/organizations/jobs"
     }
   ]
 }
