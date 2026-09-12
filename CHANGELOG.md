@@ -4,6 +4,29 @@
 
 ## [Unreleased]
 
+### Changed - 2026-09-11 自适应面试、专业容错检索与 F5 边界透明化
+- F3 第二个及后续主问题强制携带最近回答上下文，并在模型与规则降级路径中引用脱敏后的回答原句；新增重复题、高相似题、敏感字段回流和模型输出类型防护
+- F2 专业搜索从字面包含升级为代码规范化、名称编辑距离、专业类、岗位意向与专业画像联合排序；返回匹配原因并处理请求乱序、空结果和错误状态
+- F5 页面明确当前仅支持手填公司/职位后的求职信与申请跟踪，不提供或核验单位/职位搜索；新增单位实体与职位时效双索引扩展规划
+- 回归门禁：pytest 420/420、Node 51/51；requirements 与 tools/requirements 依赖审计均未发现已知漏洞；git diff --check 通过
+
+### Security - 2026-09-11 F3 发布阻断项清零（fail closed）
+- 新增 `_check_unsafe_generated_question()`，与 HR 敏感词闸门分离：拦截提示注入（忽略/绕过/覆盖规则与系统提示）、凭据索取（系统提示词、API key、.env、环境变量、令牌、密钥、验证码）与 PII 索取（身份证、手机号、银行卡等）；在拼接回答 anchor 前后各检查一次，降级题再检查一次，最终回落硬编码安全题
+- `_safe_answer_anchor()` 拒绝危险注入短句，并强制 anchor 必须是原始回答的逐字子串；若最终题目不再包含 anchor，`basis` 置空，保证 basis ⊆ question 不变量
+- 送模型上下文闭环：`job_title` 先脱敏再截断 120 字；`target_gap` 按 id≤64/type≤32/text≤160/status≤16 硬截断；`router.call()` 的 context 只保留 `turn_id` 与布尔标记，不再回传原始 gap 与 recent_turns，杜绝未脱敏 PII 与超长输入外发
+- 中文姓名去标识化补全：新增「姓名：」「我叫/我是/本人叫/名字是」自述规则与“整行仅姓名”兜底规则（含称谓词与常见非姓名词保护），不再把邻近词一并吞掉
+- 低 ASR 置信度不再推进状态机：主回答与待回答追问两条路径均不记录 turn、不生成追问、不递增主问题计数，SSE 返回 `nextQuestion=null` 与 `needs_confirmation=true`
+- F3 输入边界：`answer_text` 上限 4000 字（422 `answer_too_long`）、`matchGaps` 限 20 条且逐项校验为对象（422 `invalid_match_gaps`）、`asr_confidence` 非数字返回 422；`/wf04/answer` 与 `/wf04/stream` 共用同一编排；页面 textarea 同步 `maxlength=4000`
+- 新增回归测试：恶意 router 输出、恶意 answer anchor、恶意 gap 文本、10k 字 title/gap 的 payload 有界与脱敏断言、低置信度状态机不推进
+
+### Fixed - 2026-09-11 F2 兼容与 UI 闭环
+- `total` 改为截断前候选数（`search_majors_with_total()`），`limit=1&q=计算机` 返回 `items=1` 且 `total>1`
+- 第二个“意向输入”框补齐与主搜索同级的防护：requestVersion/AbortController 防乱序、加载/空结果/4xx-5xx/`query_too_long`/网络失败状态，修复长输入 422 后对不存在 `items` 调用 `.map()` 与旧结果残留
+- 主搜索区分业务错误与网络错误：只展示 `query_too_long` 等安全可预期文案，5xx/网络统一通用提示
+- 两个搜索框加 `maxlength="64"`；失焦后使在途请求失效，慢响应不再把下拉框重新弹出
+- 两字查询只接受名称前缀命中：「数学」仍能召回「数学与应用数学」，但「计科」不再跨词命中「材料设计科学与工程」(080415)；补充简称 `电科 → 080702`、`数媒 → 080906 / 130508`
+- 保持 `public/` 与 `docs/` 的 F2/F3/F5 页面与脚本哈希一致
+
 ### Changed - 2026-08-12 合并 main 与阶段0上线
 - 合并 main（9bf4912）：Vercel 静态托管（root→public rewrites）、首页登录/注册、F2 JD 上传匹配 UI、低分分析（low_score_analysis / insufficient_evidence）、生产 API 域更新
 - 保留阶段0真 API 账号/历史（docs/public 双镜像），游客零历史、仅本人可见；data-bridge F2 恢复真实契约（resumeText → /api/wf03/match），失败不复用旧缓存

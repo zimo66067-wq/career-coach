@@ -110,6 +110,15 @@ test('f5-apply.html contains the apply workflow controls', () => {
   assert.match(html, /待确认/);
 });
 
+test('f5-apply.html states the current organization-search boundary', () => {
+  const html = read('pages/f5-apply.html');
+  assert.match(html, /id="f5CapabilityBoundary"/);
+  assert.match(html, /当前不提供公司或单位搜索/);
+  assert.match(html, /不会核验单位主体、招聘状态或职位真伪/);
+  assert.match(html, /面经知识库.+不是单位或职位数据库/);
+  assert.match(html, /模型不会被当作企业事实来源/);
+});
+
 test('f5-apply.js smoke-loads without load-time crashes', () => {
   const source = read('js/f5-apply.js');
   const context = makeContext();

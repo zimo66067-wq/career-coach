@@ -11,6 +11,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -33,9 +34,17 @@ TYPE_LABELS = {
 
 INTENT_MAP = {
     "程序员": ["080901", "080902"],
+    "写代码": ["080901", "080902"],
+    "编程": ["080901", "080902"],
     "开发": ["080901", "080902", "080703"],
+    "后端": ["080901", "080902"],
+    "前端": ["080901", "080902", "080906"],
+    "软件开发": ["080902", "080901"],
+    "cs": ["080901", "080902"],
     "算法": ["080901", "080717", "070101"],
     "人工智能": ["080717", "080901"],
+    "ai": ["080717", "080901"],
+    "机器学习": ["080717", "080901", "071203"],
     "大模型": ["080717", "080901"],
     "数据分析": ["080910", "071201", "120102"],
     "数据": ["080910", "071201", "120102"],
@@ -67,6 +76,13 @@ INTENT_MAP = {
     "建筑": ["081001"],
     "化工": ["081301"],
     "电子": ["080701", "080703"],
+    "芯片": ["080710", "080701"],
+    "芯片设计": ["080710", "080701"],
+    "集成电路": ["080710", "083204"],
+    "集成电路设计": ["080710", "080701"],
+    "新能源": ["080503", "080414", "080504", "080216", "080501"],
+    "电池": ["080414", "080504", "080401", "081304"],
+    "储能": ["080504", "080414", "080501"],
     "通信": ["080703", "080701"],
     "安全": ["080904", "080901"],
     "产品经理": ["120102", "080902", "120201"],
@@ -76,6 +92,25 @@ INTENT_MAP = {
     "心理": ["071101"],
     "统计": ["071201", "070101"],
 }
+
+# Common names are explicit data, not fuzzy guesses.  Exact alias handling
+# keeps short abbreviations useful without matching unrelated two-character
+# fragments across the whole 845-major catalog.
+MAJOR_ALIAS_MAP = {
+    "计科": ["080901"],
+    "软工": ["080902"],
+    "信安": ["080904"],
+    "网安": ["080904"],
+    "大数据": ["080910"],
+    "集成电路": ["080710", "083204"],
+    "电科": ["080702"],
+    "数媒": ["080906", "130508"],
+}
+
+INTENT_CONTEXT_MARKERS = (
+    "想做", "从事", "求职", "就业", "岗位", "职位", "职业", "方向",
+    "工程师", "专员", "经理", "工作", "实习", "研发", "设计", "分析", "运营",
+)
 
 
 def load_majors():
@@ -101,6 +136,229 @@ def load_profiles():
 
 MAJORS_DATA, MAJOR_INDEX = load_majors()
 PROFILE_INDEX = load_profiles()
+
+MAX_SEARCH_QUERY_CHARS = 64
+
+
+def normalize_major_query(value):
+    """Normalize user search text without interpreting it as a regex."""
+    text = unicodedata.normalize("NFKC", str(value or "")).lower()
+    return re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "", text)
+
+
+def damerau_levenshtein(left, right):
+    """Small standard-library edit distance with adjacent transpositions."""
+    if left == right:
+        return 0
+    if not left:
+        return len(right)
+    if not right:
+        return len(left)
+    rows = len(left) + 1
+    cols = len(right) + 1
+    distance = [[0] * cols for _ in range(rows)]
+    for i in range(rows):
+        distance[i][0] = i
+    for j in range(cols):
+        distance[0][j] = j
+    for i in range(1, rows):
+        for j in range(1, cols):
+            cost = 0 if left[i - 1] == right[j - 1] else 1
+            distance[i][j] = min(
+                distance[i - 1][j] + 1,
+                distance[i][j - 1] + 1,
+                distance[i - 1][j - 1] + cost,
+            )
+            if (
+                i > 1 and j > 1
+                and left[i - 1] == right[j - 2]
+                and left[i - 2] == right[j - 1]
+            ):
+                distance[i][j] = min(
+                    distance[i][j], distance[i - 2][j - 2] + cost
+                )
+    return distance[-1][-1]
+
+
+def _text_similarity(left, right):
+    if not left or not right:
+        return 0.0
+    return 1.0 - damerau_levenshtein(left, right) / max(len(left), len(right))
+
+
+def _profile_search_terms(code):
+    profile = PROFILE_INDEX.get(code) or {}
+    terms = []
+    if profile.get("summary"):
+        terms.append(profile["summary"])
+    for group in ("direct", "derivative"):
+        for direction in profile.get(group, []) or []:
+            terms.extend([
+                direction.get("occupation", ""),
+                direction.get("description", ""),
+            ])
+            terms.extend(direction.get("titles") or [])
+            terms.extend(direction.get("keywords") or [])
+            terms.extend(direction.get("skills") or [])
+    return tuple(
+        dict.fromkeys(
+            normalized for normalized in map(normalize_major_query, terms)
+            if len(normalized) >= 2
+        )
+    )
+
+
+PROFILE_SEARCH_TERMS = {
+    code: _profile_search_terms(code) for code in PROFILE_INDEX
+}
+
+
+def _best_intent_score(query, code):
+    best = 0.0
+    for phrase, codes in INTENT_MAP.items():
+        if code not in codes:
+            continue
+        term = normalize_major_query(phrase)
+        rank_penalty = codes.index(code) * 0.005
+        if query == term:
+            strength = 0.93
+        elif term in query and _has_intent_context(query, term):
+            # Prefer the most specific matched phrase.  For example,
+            # “芯片设计” must outrank the generic “设计” intent.
+            strength = 0.82 + min(len(term), 8) * 0.01
+        elif 3 <= len(query) <= 12 and query in term:
+            strength = 0.80
+        elif (
+            3 <= len(query) <= 12
+            and len(term) >= 3
+            and abs(len(query) - len(term)) <= 2
+        ):
+            similarity = _text_similarity(query, term)
+            strength = 0.76 * similarity if similarity >= 0.72 else 0.0
+        else:
+            strength = 0.0
+        best = max(best, strength - rank_penalty)
+    return best
+
+
+def _has_intent_context(query, term):
+    """Require job-search context for an intent embedded in a longer word."""
+    remainder = query.replace(term, "", 1)
+    return any(marker in remainder for marker in INTENT_CONTEXT_MARKERS)
+
+
+def _score_major_candidate(query, code, info):
+    """Return (score, match_type, reason) for one catalog item."""
+    best = (0.0, "", "")
+
+    def consider(score, match_type, reason):
+        nonlocal best
+        if score > best[0]:
+            best = (score, match_type, reason)
+
+    if query == code:
+        consider(1.0, "code_exact", "专业代码完全匹配")
+    elif query.isdigit() and len(query) >= 2 and code.startswith(query):
+        consider(0.96, "code_prefix", "专业代码前缀匹配")
+    if query.isdigit():
+        return best
+
+    alias_codes = MAJOR_ALIAS_MAP.get(query, [])
+    if code in alias_codes:
+        consider(
+            0.975 - alias_codes.index(code) * 0.005,
+            "alias_exact",
+            "专业简称匹配",
+        )
+
+    name = normalize_major_query(info.get("name"))
+    class_name = normalize_major_query(info.get("class_name"))
+    category_name = normalize_major_query(info.get("category_name"))
+    if query == name:
+        consider(0.99, "name_exact", "专业名称完全匹配")
+    elif len(query) >= 3 and (query in name or name in query):
+        consider(0.94 if query in name else 0.91, "name_contains", "专业名称相关")
+    elif len(query) == 2 and name.startswith(query):
+        # 两字查询只接受“名称前缀”命中：「数学」仍能召回「数学与应用数学」，
+        # 但「计科」不会跨词命中「材料设计科学与工程」这类无关专业。
+        consider(0.93, "name_contains", "专业名称相关")
+
+    if 3 <= len(query) <= 16 and abs(len(query) - len(name)) <= 2:
+        similarity = _text_similarity(query, name)
+        if similarity >= 0.55:
+            consider(0.58 + 0.34 * similarity, "name_fuzzy", "专业名称近似")
+
+    if query == class_name:
+        consider(0.87, "class_exact", "专业类完全匹配")
+    elif query in class_name or (len(class_name) >= 2 and class_name in query):
+        consider(0.82, "class_related", "专业类相关")
+    if query == category_name:
+        consider(0.72, "category_exact", "学科门类匹配")
+    elif len(query) >= 2 and query in category_name:
+        consider(0.66, "category_related", "学科门类相关")
+
+    intent_score = _best_intent_score(query, code)
+    if intent_score:
+        consider(intent_score, "intent", "求职意向相关")
+
+    for term in PROFILE_SEARCH_TERMS.get(code, ()):
+        if query == term:
+            consider(0.84, "profile_exact", "专业画像关键词匹配")
+        elif len(query) >= 3 and query in term:
+            consider(0.78, "profile_related", "专业画像与意向相关")
+        elif len(term) >= 3 and term in query:
+            specificity = min(len(term), 10) * 0.005
+            consider(
+                0.72 + specificity,
+                "profile_related",
+                "专业画像与意向相关",
+            )
+    return best
+
+
+def search_majors(query, limit=30):
+    """Rank bounded catalog candidates across names, typos and intent terms."""
+    items, _total = search_majors_with_total(query, limit=limit)
+    return items
+
+
+def search_majors_with_total(query, limit=30):
+    """Return (ranked_items, total_candidates) for one query.
+
+    ``total`` counts every candidate above the score floor *before* the
+    ``limit`` slice, so the API can report the real candidate count while
+    still returning a bounded page.
+    """
+    normalized = normalize_major_query(query)
+    if not normalized:
+        return [], 0
+    results = []
+    for code, info in MAJOR_INDEX.items():
+        score, match_type, reason = _score_major_candidate(normalized, code, info)
+        if score < 0.55:
+            continue
+        item = dict(info)
+        item.update({
+            "_rank_score": score,
+            "match_score": round(score * 100),
+            "match_type": match_type,
+            "match_reason": reason,
+            "has_profile": code in PROFILE_INDEX,
+            "path": "%s / %s" % (info["category_name"], info["class_name"]),
+        })
+        results.append(item)
+    results.sort(
+        key=lambda item: (
+            -item["_rank_score"],
+            0 if item["has_profile"] else 1,
+            item["code"],
+        )
+    )
+    total = len(results)
+    limited = results[:limit]
+    for item in limited:
+        item.pop("_rank_score", None)
+    return limited, total
 
 
 def api_ok(payload, status=200):
@@ -314,18 +572,21 @@ def route_api(**kwargs):
     if route == "majors/tree" and request.method == "GET":
         return api_ok({"version": MAJORS_DATA["version"], "counts": MAJORS_DATA["counts"], "categories": MAJORS_DATA["categories"]})
     if route == "majors/search" and request.method == "GET":
-        q = (request.args.get("q") or "").strip().lower()
+        q = (request.args.get("q") or "").strip()
         try:
             limit = min(max(int(request.args.get("limit", 30)), 1), 100)
         except (TypeError, ValueError):
             return api_err("limit 必须是 1-100 的整数。", 422, "invalid_limit")
         if not q:
-            return api_ok({"items": []})
-        items = []
-        for code, info in MAJOR_INDEX.items():
-            if q in code or q in info["name"].lower() or q in info["class_name"].lower():
-                items.append(info)
-        return api_ok({"items": items[:limit], "total": len(items)})
+            return api_ok({"items": [], "total": 0})
+        if len(q) > MAX_SEARCH_QUERY_CHARS:
+            return api_err(
+                f"搜索词不能超过 {MAX_SEARCH_QUERY_CHARS} 个字符。",
+                422,
+                "query_too_long",
+            )
+        items, total = search_majors_with_total(q, limit=limit)
+        return api_ok({"items": items, "total": total})
     if route.startswith("majors/") and request.method == "GET":
         code = route.split("/")[-1]
         info = MAJOR_INDEX.get(code)
@@ -398,17 +659,17 @@ def route_api(**kwargs):
             response_payload["session_id"] = session_id
         return api_ok(response_payload)
     if route == "intent" and request.method == "GET":
-        q = (request.args.get("q") or "").strip().lower()
+        q = (request.args.get("q") or "").strip()
         if not q:
-            return api_ok({"items": []})
-        codes = INTENT_MAP.get(q) or [v for k, v in INTENT_MAP.items() if q in k]
-        flat = codes[0] if codes and isinstance(codes[0], list) else codes
-        items = []
-        for code in flat or []:
-            info = MAJOR_INDEX.get(code)
-            if info:
-                items.append({"code": code, "name": info["name"], "path": f"{info['category_name']} / {info['class_name']}", "has_profile": code in PROFILE_INDEX})
-        return api_ok({"items": items})
+            return api_ok({"items": [], "total": 0})
+        if len(q) > MAX_SEARCH_QUERY_CHARS:
+            return api_err(
+                f"搜索词不能超过 {MAX_SEARCH_QUERY_CHARS} 个字符。",
+                422,
+                "query_too_long",
+            )
+        items, total = search_majors_with_total(q, limit=12)
+        return api_ok({"items": items, "total": total})
     return api_err("接口不存在。", 404, "not_found")
 
 

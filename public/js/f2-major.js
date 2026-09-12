@@ -227,21 +227,71 @@
   }
 
   var searchTimer = null;
+  var searchRequestVersion = 0;
+  var searchAbortController = null;
+  var searchFocusVersion = 0;
+
+  // 只把可预期的业务错误直接展示给用户；网络/5xx 统一走通用文案，
+  // 避免把后端内部信息（或一次偶发网络失败）当成业务提示回显。
+  function businessErrorMessage(code, message) {
+    if (code === "query_too_long") return message || "搜索词过长，请精简后重试。";
+    if (code === "invalid_limit") return message || "搜索参数无效，请刷新页面后重试。";
+    return "";
+  }
+
+  function renderSearchStatus(box, message) {
+    box.innerHTML = '<div class="no-result" role="status">' + esc(message) + "</div>";
+    box.classList.remove("zy-hidden");
+  }
+
   function onSearchInput() {
     clearTimeout(searchTimer);
+    searchRequestVersion += 1;
+    var requestVersion = searchRequestVersion;
+    var focusVersion = searchFocusVersion;
     var q = $("f2Search").value.trim();
-    if (!q) { $("f2SearchResults").classList.add("zy-hidden"); return; }
+    var box = $("f2SearchResults");
+    if (searchAbortController) {
+      searchAbortController.abort();
+      searchAbortController = null;
+    }
+    if (!q) {
+      box.innerHTML = "";
+      box.classList.add("zy-hidden");
+      return;
+    }
+    renderSearchStatus(box, "正在搜索相关专业…");
     searchTimer = setTimeout(function () {
-      fetch(API + "/api/f2/majors/search?q=" + encodeURIComponent(q) + "&limit=20")
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          var box = $("f2SearchResults");
-          if (!data.items || !data.items.length) {
-            box.innerHTML = '<div class="no-result">未找到匹配专业</div>';
+      var fetchOptions = {};
+      if (typeof AbortController !== "undefined") {
+        searchAbortController = new AbortController();
+        fetchOptions.signal = searchAbortController.signal;
+      }
+      fetch(API + "/api/f2/majors/search?q=" + encodeURIComponent(q) + "&limit=20", fetchOptions)
+        .then(function (r) {
+          return r.json().catch(function () { return null; }).then(function (data) {
+            return { ok: r.ok, data: data };
+          });
+        })
+        .then(function (res) {
+          if (requestVersion !== searchRequestVersion) return;
+          if (focusVersion !== searchFocusVersion) return;
+          var data = res.data;
+          if (!res.ok || (data && data.error)) {
+            var known = businessErrorMessage(data && data.error, data && data.message);
+            renderSearchStatus(box, known || "搜索暂不可用，请稍后重试。");
+            return;
+          }
+          var items = data && Array.isArray(data.items) ? data.items : [];
+          if (!items.length) {
+            renderSearchStatus(box, "未找到相关专业。可尝试专业代码、近似名称或求职方向。");
           } else {
-            box.innerHTML = data.items.map(function (m) {
+            box.innerHTML = items.map(function (m) {
+              var reason = m.match_reason || "名称或代码匹配";
+              var profileState = m.has_profile === false ? " · 画像建设中" : "";
               return '<button type="button" data-code="' + esc(m.code) + '">' +
-                esc(m.name) + ' <span class="p">' + esc(m.code) + " · " + esc(m.category_name) + " / " + esc(m.class_name) + "</span></button>";
+                esc(m.name) + ' <span class="p">' + esc(m.code) + " · " + esc(m.category_name) + " / " + esc(m.class_name) +
+                " · " + esc(reason) + esc(profileState) + "</span></button>";
             }).join("");
             box.querySelectorAll("button").forEach(function (b) {
               b.addEventListener("click", function () {
@@ -254,24 +304,66 @@
           }
           box.classList.remove("zy-hidden");
         })
-        .catch(function () {});
+        .catch(function (err) {
+          if (requestVersion !== searchRequestVersion || (err && err.name === "AbortError")) return;
+          if (focusVersion !== searchFocusVersion) return;
+          renderSearchStatus(box, "搜索暂不可用，请检查网络后重试。");
+        });
     }, 220);
   }
 
   var intentTimer = null;
+  var intentRequestVersion = 0;
+  var intentAbortController = null;
+
+  function renderIntentStatus(box, message) {
+    box.innerHTML = '<div class="no-result" role="status">' + esc(message) + "</div>";
+  }
+
+  // 第二个“意向输入”框与主搜索同级防护：乱序丢弃、空结果、4xx/5xx、
+  // query_too_long 与网络失败都要有明确状态，且绝不调用未定义的 .map()。
   function onIntentInput() {
     clearTimeout(intentTimer);
+    intentRequestVersion += 1;
+    var requestVersion = intentRequestVersion;
     var q = $("f2Intent").value.trim();
     var box = $("f2IntentResults");
+    if (intentAbortController) {
+      intentAbortController.abort();
+      intentAbortController = null;
+    }
     if (!q) { box.innerHTML = ""; return; }
+    renderIntentStatus(box, "正在匹配岗位方向…");
     intentTimer = setTimeout(function () {
-      fetch(API + "/api/f2/intent?q=" + encodeURIComponent(q))
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          box.innerHTML = data.items.map(function (m) {
+      var fetchOptions = {};
+      if (typeof AbortController !== "undefined") {
+        intentAbortController = new AbortController();
+        fetchOptions.signal = intentAbortController.signal;
+      }
+      fetch(API + "/api/f2/intent?q=" + encodeURIComponent(q), fetchOptions)
+        .then(function (r) {
+          return r.json().catch(function () { return null; }).then(function (data) {
+            return { ok: r.ok, data: data };
+          });
+        })
+        .then(function (res) {
+          if (requestVersion !== intentRequestVersion) return;
+          var data = res.data;
+          if (!res.ok || (data && data.error)) {
+            var known = businessErrorMessage(data && data.error, data && data.message);
+            renderIntentStatus(box, known || "岗位方向搜索暂不可用，请稍后重试。");
+            return;
+          }
+          var items = data && Array.isArray(data.items) ? data.items : [];
+          if (!items.length) {
+            renderIntentStatus(box, "未找到相关专业方向。可尝试更具体的岗位名称，如：程序员、数据分析、律师。");
+            return;
+          }
+          box.innerHTML = items.map(function (m) {
+            var reason = m.match_reason ? " · " + m.match_reason : "";
             return '<button type="button" class="f2-chip" data-code="' + esc(m.code) + '">' +
               esc(m.name) + (m.has_profile ? "" : "（画像建设中）") +
-              "<small>" + esc(m.path) + "</small></button>";
+              "<small>" + esc(m.path) + esc(reason) + "</small></button>";
           }).join("");
           box.querySelectorAll("button").forEach(function (b) {
             b.addEventListener("click", function () {
@@ -282,7 +374,10 @@
             });
           });
         })
-        .catch(function () {});
+        .catch(function (err) {
+          if (requestVersion !== intentRequestVersion || (err && err.name === "AbortError")) return;
+          renderIntentStatus(box, "岗位方向搜索暂不可用，请检查网络后重试。");
+        });
     }, 220);
   }
 
@@ -557,7 +652,10 @@
     $("f2StartMatch").addEventListener("click", startMatch);
     $("f2ErrorRetry").addEventListener("click", startMatch);
     $("f2Search").addEventListener("input", onSearchInput);
+    $("f2Search").addEventListener("focus", function () { searchFocusVersion += 1; });
     $("f2Search").addEventListener("blur", function () {
+      // 失焦后使任何在途请求失效，避免慢响应把下拉框重新弹出来
+      searchFocusVersion += 1;
       setTimeout(function () { $("f2SearchResults").classList.add("zy-hidden"); }, 180);
     });
     $("f2Cat").addEventListener("change", onCatChange);

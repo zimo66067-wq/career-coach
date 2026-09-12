@@ -62,6 +62,170 @@ def test_f2_preflight_and_invalid_search_limit_are_bounded(tmp_path, monkeypatch
     assert invalid.json["error"] == "invalid_limit"
 
 
+def test_f2_search_tolerates_typo_and_explains_the_match(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.get("/api/f2/majors/search", query_string={"q": "计算机科学与技木"})
+
+    assert response.status_code == 200
+    assert response.json["items"][0]["code"] == "080901"
+    assert response.json["items"][0]["match_type"] == "name_fuzzy"
+    assert response.json["items"][0]["match_reason"] == "专业名称近似"
+    assert response.json["items"][0]["match_score"] >= 80
+
+
+def test_f2_search_understands_job_intent_in_a_sentence(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.get("/api/f2/majors/search", query_string={"q": "我想做程序员"})
+
+    assert response.status_code == 200
+    assert [item["code"] for item in response.json["items"][:2]] == ["080901", "080902"]
+    assert all(item["match_type"] == "intent" for item in response.json["items"][:2])
+    assert all(item["match_reason"] == "求职意向相关" for item in response.json["items"][:2])
+
+    niche = client.get("/api/f2/majors/search", query_string={"q": "我想做芯片设计"})
+    assert niche.status_code == 200
+    assert niche.json["items"][0]["code"] == "080710"
+
+    energy = client.get("/api/f2/majors/search", query_string={"q": "新能源电池研发"})
+    assert energy.status_code == 200
+    assert energy.json["items"][0]["code"] in {"080503", "080414", "080504"}
+
+
+def test_f2_search_supports_explicit_short_major_aliases(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+
+    computer = client.get("/api/f2/majors/search", query_string={"q": "计科"})
+    software = client.get("/api/f2/majors/search", query_string={"q": "软工"})
+
+    assert computer.json["items"][0]["code"] == "080901"
+    assert software.json["items"][0]["code"] == "080902"
+    assert computer.json["items"][0]["match_type"] == "alias_exact"
+    assert software.json["items"][0]["match_reason"] == "专业简称匹配"
+
+
+def test_f2_search_does_not_treat_embedded_words_as_job_intent(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+
+    invoice = client.get("/api/f2/majors/search", query_string={"q": "开发票"})
+    feeling = client.get("/api/f2/majors/search", query_string={"q": "安全感"})
+
+    assert invoice.status_code == 200 and invoice.json["items"] == []
+    assert feeling.status_code == 200 and feeling.json["items"] == []
+
+
+def test_f2_long_search_skips_quadratic_fuzzy_distance(monkeypatch):
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("long queries must not enter edit-distance matching")
+
+    monkeypatch.setattr(f2_major, "damerau_levenshtein", fail_if_called)
+    result = f2_major.search_majors("这是一个用于验证搜索成本有界的超长自然语言查询" * 2)
+    assert isinstance(result, list)
+
+
+def test_f2_search_normalizes_full_width_code_and_spacing(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.get("/api/f2/majors/search", query_string={"q": "０８０９ ０１"})
+
+    assert response.status_code == 200
+    assert response.json["items"][0]["code"] == "080901"
+    assert response.json["items"][0]["match_type"] == "code_exact"
+
+
+def test_f2_search_rejects_oversized_queries_and_treats_input_as_text(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+
+    oversized = client.get("/api/f2/majors/search", query_string={"q": "计" * 65})
+    literal = client.get("/api/f2/majors/search", query_string={"q": ".*(计算机)[a-z]+"})
+
+    assert oversized.status_code == 422
+    assert oversized.json["error"] == "query_too_long"
+    assert literal.status_code == 200
+    assert isinstance(literal.json["items"], list)
+
+
+def test_f2_total_counts_candidates_before_the_limit(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.get("/api/f2/majors/search", query_string={"q": "计算机", "limit": 1})
+
+    assert response.status_code == 200
+    body = response.json
+    assert len(body["items"]) == 1
+    assert body["total"] > len(body["items"]), "total 必须是截断前的候选数"
+
+
+def test_f2_intent_total_is_the_pre_limit_candidate_count(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+
+    response = client.get("/api/f2/intent", query_string={"q": "计算机"})
+
+    assert response.status_code == 200
+    body = response.json
+    assert body["items"]
+    assert body["total"] > len(body["items"])
+
+
+def test_f2_two_character_queries_use_explicit_aliases_only(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+
+    computer = client.get("/api/f2/majors/search", query_string={"q": "计科"})
+    assert [item["code"] for item in computer.json["items"]] == ["080901"]
+
+    electronics = client.get("/api/f2/majors/search", query_string={"q": "电科"})
+    assert electronics.json["items"][0]["code"] == "080702"
+
+    media = client.get("/api/f2/majors/search", query_string={"q": "数媒"})
+    media_codes = [item["code"] for item in media.json["items"]]
+    assert media_codes[0] == "080906"
+    assert "130508" in media_codes
+
+
+def test_f2_two_character_queries_keep_prefix_recall_without_cross_word_noise(
+    tmp_path, monkeypatch
+):
+    client = _client(tmp_path, monkeypatch)
+
+    # 前缀命中必须保留（「数学」→「数学与应用数学」）
+    math = client.get("/api/f2/majors/search", query_string={"q": "数学"})
+    assert math.json["items"][0]["code"] == "070101"
+
+    # 「计科」不得再跨词命中「材料设计科学与工程」(080415)
+    computer = client.get("/api/f2/majors/search", query_string={"q": "计科"})
+    codes = [item["code"] for item in computer.json["items"]]
+    assert "080415" not in codes
+
+
+def test_f2_search_tolerates_typos_and_intent_without_false_positives(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+
+    positives = {
+        "计算机科学与技术": "080901",
+        "软件工成": "080902",
+        "软件程工": "080902",
+        "会际学": "120203",
+        "想从事财务审计": "120203",
+    }
+    for query, expected in positives.items():
+        response = client.get("/api/f2/majors/search", query_string={"q": query})
+        assert response.status_code == 200, query
+        assert response.json["items"], query
+        assert response.json["items"][0]["code"] == expected, query
+
+    negatives = (
+        "我想开发票",
+        "我需要安全感",
+        "<script>alert(1)</script>",
+        "'; DROP TABLE majors;--",
+    )
+    for query in negatives:
+        response = client.get("/api/f2/majors/search", query_string={"q": query})
+        assert response.status_code == 200, query
+        assert response.json["items"] == [], query
+
+
 def test_legacy_f2_serverless_path_cannot_bypass_unified_middleware():
     with f2_major.app.test_request_context(
         "/api/f2_major?_route=match",

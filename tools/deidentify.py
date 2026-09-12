@@ -18,12 +18,83 @@ import sys
 RE_PHONE = re.compile(r"1[3-9]\d{9}")
 RE_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 RE_ID = re.compile(r"\d{17}[\dXx]")
-RE_NAME_FIELD = re.compile(r"(姓\s*名\s*[:：]\s*)([\u4e00-\u9fa5·]{2,4})")
 RE_NAME_TITLE = re.compile(r"(?:先生|女士|老师|同学)")
 
-# 常见姓氏启发式：2-3 字中文名（仅作兜底，误伤率可接受——合成样本场景）
+# ------------------------------------------------------------------ #
+# 中文姓名脱敏
+#
+# 三条规则叠加，全部只替换“姓名捕获组”，不破坏句意：
+#  1) RE_NAME_FIELD   —— 「姓名：张三」等显式字段（历史行为，保留）
+#  2) RE_NAME_SELF    —— 「我叫/我是/本人叫/名字是……」等自述句式
+#  3) RE_NAME_LINE    —— 整行只由一个姓名构成（简历抬头「王小明」）
+#
+# 规则 3 刻意收得很紧：只有“整行就是这个姓名”才脱敏，避免把
+# 「华为、腾讯」「周末」等普通岗位/公司词误删（交接文档 7.3 第 3 条）。
+# ------------------------------------------------------------------ #
+
+# 常见姓氏（单姓）
 SURNAMES = "赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜"
-RE_NAME_HEURISTIC = re.compile(r"(?<![\u4e00-\u9fa5])([" + SURNAMES + r"][\u4e00-\u9fa5]{1,2})(?=[\s，,。:：/]|$)")
+
+# 常见复姓
+COMPOUND_SURNAMES = (
+    "欧阳", "太史", "端木", "上官", "司马", "东方", "独孤", "南宫", "万俟", "闻人",
+    "夏侯", "诸葛", "尉迟", "皇甫", "公孙", "慕容", "宇文", "司徒", "司空", "令狐",
+    "轩辕", "拓跋", "百里", "呼延", "轩辕", "第五", "西门", "东郭", "南门", "羊舌",
+)
+
+# 称谓/职务词：命中则不视为姓名，避免把「王老师」「李经理」整体删掉
+NAME_TITLE_WORDS = (
+    "先生", "女士", "老师", "同学", "博士", "教授", "经理", "主任", "医生",
+    "护士", "主管", "总监", "总裁", "助理", "专员", "工程师", "顾问",
+)
+
+# 整行候选的常见非姓名词（公司/词汇），用于兜底规则的误伤保护
+NON_NAME_LINE_TOKENS = frozenset({
+    "华为", "华硕", "华夏", "华中", "华南", "华北", "华东", "华润", "华能", "华电",
+    "周末", "周报", "周边", "周期", "周年", "王国", "王者", "王子",
+    "张扬", "张江", "张贴", "张榜", "李白", "李子", "李宁", "孙子", "孙女",
+    "陈述", "陈设", "陈旧", "陈年", "杨树", "杨梅", "黄土", "黄金", "金融",
+    "金属", "金色", "韩国", "韩语", "楚国", "秦朝", "许可", "许多", "何时",
+    "何处", "和平", "和睦", "孔子", "孔明", "严格", "严肃", "严冬", "水星",
+    "水泥", "陶器", "陶瓷", "姜汤", "酱油", "卫生", "卫星", "沈阳", "周易",
+})
+
+_CN_CHAR = r"[\u4e00-\u9fa5]"
+_COMPOUND_ALT = "(?:" + "|".join(COMPOUND_SURNAMES) + ")"
+_NAME_BODY = (
+    r"(" + _COMPOUND_ALT + _CN_CHAR + r"{1,2}"
+    r"|[" + SURNAMES + r"]" + _CN_CHAR + r"{1,2})"
+)
+
+# 显式字段：姓名：X（长度同样受限，避免吞掉后续词）
+RE_NAME_FIELD = re.compile(r"(姓\s*名\s*[:：]\s*)" + _NAME_BODY)
+
+# 自述句式：我叫/我是/本人叫/本人是/名字叫/名字是/姓名：
+# 用「单姓+1~2字」或「复姓+1~2字」限定长度，避免把紧随其后的词一并吞掉
+# （例如「我是王小明负责后端」只能吃掉“王小明”，不能吃掉“负”）。
+RE_NAME_SELF = re.compile(
+    r"(我叫|我是|本人叫|本人是|名字叫|名字是|姓\s*名\s*[:：])\s*" + _NAME_BODY
+)
+
+# 兜底：整行只有一个姓名（允许前后空白）
+RE_NAME_LINE = re.compile(
+    r"^[ \t\u3000]*(?:" + _COMPOUND_ALT + _CN_CHAR + r"{1,2}"
+    r"|[" + SURNAMES + r"]" + _CN_CHAR + r"{1,3})[ \t\u3000]*$",
+    re.MULTILINE,
+)
+
+
+def _looks_like_name(candidate):
+    """保守判定一个候选串是否像中文姓名。"""
+    if not candidate or len(candidate) < 2:
+        return False
+    if candidate in NAME_TITLE_WORDS:
+        return False
+    if any(candidate.endswith(word) for word in NAME_TITLE_WORDS):
+        return False
+    if any(candidate.startswith(pair) for pair in COMPOUND_SURNAMES):
+        return True
+    return candidate[0] in SURNAMES
 
 
 def deidentify(text):
@@ -40,10 +111,32 @@ def deidentify(text):
     text = _tag_sub(RE_EMAIL, "[REDACTED_EMAIL]", text)
 
     def name_field_repl(m):
+        if not _looks_like_name(m.group(2)):
+            return m.group(0)
         mapping[m.group(2)] = "[REDACTED_NAME]"
         return m.group(1) + "[REDACTED_NAME]"
 
     text = RE_NAME_FIELD.sub(name_field_repl, text)
+
+    def name_self_repl(m):
+        if not _looks_like_name(m.group(2)):
+            return m.group(0)
+        mapping[m.group(2)] = "[REDACTED_NAME]"
+        return m.group(1) + "[REDACTED_NAME]"
+
+    text = RE_NAME_SELF.sub(name_self_repl, text)
+
+    def name_line_repl(m):
+        candidate = m.group(0).strip(" \t\u3000")
+        if candidate in NON_NAME_LINE_TOKENS:
+            return m.group(0)
+        if not _looks_like_name(candidate):
+            return m.group(0)
+        mapping[candidate] = "[REDACTED_NAME]"
+        return "[REDACTED_NAME]"
+
+    text = RE_NAME_LINE.sub(name_line_repl, text)
+
     text = RE_NAME_TITLE.sub("[REDACTED_TITLE]", text)
     return text, mapping
 
