@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+### Added - 2026-09-12 F5 单位/职位索引基础框架（阶段 1）
+- 新增双方言索引表：`organizations`、`organization_aliases`、`organization_profiles`、`source_snapshots`、`job_postings`、`job_posting_versions`、`job_embeddings`；单位与职位均以 `(source_provider, source_key)` / `(source_provider, external_job_id)` 幂等 upsert，职位内容哈希变化才追加版本
+- 新增 provider 契约 `tools/providers/organization.py`：默认 `UnconfiguredOrganizationProvider`，结果必须携带 `source_provider`、`source_url`、`source_updated_at`、`verified_at`、`verification_state`，缺项在写入与返回两处一律剔除；通过 `ORG_DATA_PROVIDER` 选择已注册且已授权的 provider
+- 新增 `services/organization_service.py`：未配置数据源时返回显式 `status="unconfigured"` 状态与提示，`discover` 返回 422 `discovery_unavailable`，`suggest` 强制 64 字与 1–20 条边界；即使索引内存在人为写入的行，未配置时也不对外返回
+- 新增 API `/api/f5/organizations/{status|suggest|discover|detail|jobs}`，并登记本地路由与 `vercel.json` 重写
+- F5 页面新增「单位与职位检索：尚未接入授权数据源」状态区与「未经平台核验」手动输入提示；**不提供**任何单位搜索框，也不生成单位事实
+- 新增回归测试 `tests/test_organization_index.py`（16 项）与 F5 页面契约断言（public/docs 镜像 + 五项决策 + 无搜索框）
+- 规划文档 `docs/f5-organization-job-search-plan-2026-09-11.md` 标记阶段 0/1 已交付，并明确阶段 2–4 未开始
+
 ### Changed - 2026-09-11 自适应面试、专业容错检索与 F5 边界透明化
 - F3 第二个及后续主问题强制携带最近回答上下文，并在模型与规则降级路径中引用脱敏后的回答原句；新增重复题、高相似题、敏感字段回流和模型输出类型防护
 - F2 专业搜索从字面包含升级为代码规范化、名称编辑距离、专业类、岗位意向与专业画像联合排序；返回匹配原因并处理请求乱序、空结果和错误状态

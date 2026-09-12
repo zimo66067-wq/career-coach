@@ -118,6 +118,13 @@ from services.match_service import (  # noqa: E402
     match_job_profile,
     validate_job_profile,
 )
+from services.organization_service import (  # noqa: E402
+    discover_organizations,
+    get_organization,
+    list_jobs_for,
+    provider_status,
+    suggest_organizations,
+)
 from services.task_service import _f2_match_chunk  # noqa: E402
 from tools.api_errors import ApiError  # noqa: E402
 from tools.contracts import MAX_TEXT_CHARS, MIN_TEXT_CHARS  # noqa: E402
@@ -608,7 +615,10 @@ def route_api(**_ignored):
             "wf04/asr", "wf04/stream",
             "wf02/optimize", "wf02/apply-rewrite",
             "wf07/cover-letter", "wf07/applications",
-        } or route.startswith("history/") or route.startswith("tasks/") or route.startswith("f2/"):
+            "f5/organizations/status", "f5/organizations/suggest",
+            "f5/organizations/discover", "f5/organizations/detail",
+            "f5/organizations/jobs",
+        } or route.startswith("history/") or route.startswith("tasks/") or route.startswith("f2/") or route.startswith("f5/"):
             return ("", 204)
         raise ApiError("not_found", "接口不存在。", 404)
     if route.startswith("f2/"):
@@ -625,6 +635,36 @@ def route_api(**_ignored):
                 raise ApiError("invalid_request", "专业匹配请求格式无效。", 422)
             ensure_session_access(body.get("session_id"), allow_create=True)
         return route_f2_major()
+
+    # F5 unit/job index (phase 1 foundation: contract + explicit degrade only).
+    if route.startswith("f5/organizations/"):
+        if request.method == "GET":
+            enforce_usage("f5_catalog_read", 240, 600, owner_key=_client_rate_key())
+        else:
+            require_consent()
+            enforce_usage("f5_discover", 30, 3600)
+        if route == "f5/organizations/status" and request.method == "GET":
+            return api_response(provider_status())
+        if route == "f5/organizations/suggest" and request.method == "GET":
+            return api_response(
+                suggest_organizations(
+                    request.args.get("q", ""),
+                    limit=request.args.get("limit", 10),
+                )
+            )
+        if route == "f5/organizations/discover" and request.method == "POST":
+            body = require_json_object("单位发现请求")
+            return api_response(discover_organizations(body))
+        if route == "f5/organizations/detail" and request.method == "GET":
+            return api_response(get_organization(request.args.get("id", "")))
+        if route == "f5/organizations/jobs" and request.method == "GET":
+            return api_response(
+                list_jobs_for(
+                    request.args.get("organization_id", ""),
+                    limit=request.args.get("limit", 20),
+                )
+            )
+        raise ApiError("not_found", "接口不存在。", 404)
 
     if route == "auth/register" and request.method == "POST":
         body = require_json_object("注册请求")
@@ -1234,6 +1274,9 @@ for _rule in (
     "/api/wf07/cover-letter", "/api/wf07/applications",
     "/api/f2/health", "/api/f2/majors/tree", "/api/f2/majors/search",
     "/api/f2/majors/<code>", "/api/f2/match", "/api/f2/intent",
+    "/api/f5/organizations/status", "/api/f5/organizations/suggest",
+    "/api/f5/organizations/discover", "/api/f5/organizations/detail",
+    "/api/f5/organizations/jobs",
 ):
     app.add_url_rule(_rule, endpoint="route_" + _rule.replace("/", "_") or "root", view_func=route_api,
                      methods=["GET", "POST", "DELETE", "OPTIONS"])
