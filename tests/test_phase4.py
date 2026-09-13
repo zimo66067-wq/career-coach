@@ -1,5 +1,5 @@
 ﻿# -*- coding: utf-8 -*-
-"""Phase 4 contract tests: knowledge base (BM25), mock ASR provider,
+"""Phase 4 contract tests: knowledge base (BM25),
 SSE interview follow-up stream, and resume rewrite (optimize + apply)."""
 import io
 import json
@@ -11,7 +11,6 @@ import api.index as api_module
 import tools.database as database
 import tools.knowledge as knowledge
 import tools.optimizer as optimizer
-from tools.providers.asr import MockASRProvider, build_asr_provider
 
 RESUME = (
     "项目经历：负责后端接口开发并完成上线验证，持续跟进问题闭环。"
@@ -105,58 +104,17 @@ def test_knowledge_service_empty_query_returns_notice():
 
 
 # ---------------------------------------------------------------- #
-# Knowledge API
+# Knowledge API —— 2026-09-13 已下线
 # ---------------------------------------------------------------- #
+# 「面经知识库」不再是独立产品：导航、页面与 /api/knowledge/* 均已删除。
+# 题库数据保留在 tools/knowledge.py，作为 Interview Engine 的内部数据源
+# （模块级行为仍由上面的 knowledge 测试覆盖）。这里固化 API 已下线。
 
-def test_knowledge_api_questions_and_search(monkeypatch):
+def test_knowledge_api_is_retired(monkeypatch):
     raw = raw_client(monkeypatch)
     token = issue_consent(raw)
-    questions = authed_get(raw, token, "/api/knowledge/questions")
-    assert questions.status_code == 200
-    body = questions.json
-    assert body["categories"] and body["items"] and body["total"] == len(body["items"])
-
-    searched = authed_get(raw, token, "/api/knowledge/search?q=%E8%87%AA%E6%88%91%E4%BB%8B%E7%BB%8D&limit=3")
-    assert searched.status_code == 200
-    assert searched.json["engine"] == "bm25"
-    assert len(searched.json["items"]) <= 3
-
-
-# ---------------------------------------------------------------- #
-# ASR provider + API
-# ---------------------------------------------------------------- #
-
-def test_build_asr_provider_defaults_to_mock(monkeypatch):
-    monkeypatch.delenv("ASR_PROVIDER", raising=False)
-    provider = build_asr_provider()
-    assert isinstance(provider, MockASRProvider)
-    result = provider.transcribe(b"RIFF----WAVE")
-    assert result["text"] == ""
-    assert result["provider"] == "mock"
-    assert result["degraded"] is True
-
-
-def test_mock_asr_api_requires_consent_and_returns_empty(monkeypatch):
-    raw = raw_client(monkeypatch)
-    rejected = raw.post(
-        "/api/wf04/asr",
-        data=b"RIFF----WAVE",
-        content_type="audio/wav; rate=16000",
-    )
-    assert rejected.status_code == 428
-
-    token = issue_consent(raw)
-    accepted = raw.post(
-        "/api/wf04/asr",
-        data=b"RIFF----WAVE",
-        content_type="audio/wav; rate=16000",
-        headers={"X-Consent-Token": token},
-    )
-    assert accepted.status_code == 200
-    body = accepted.json
-    assert body["text"] == ""
-    assert body["provider"] == "mock"
-    assert body["degraded"] is True
+    for path in ("/api/knowledge/questions", "/api/knowledge/search?q=test"):
+        assert authed_get(raw, token, path).status_code == 404
 
 
 # ---------------------------------------------------------------- #
@@ -298,9 +256,6 @@ def test_vercel_routes_cover_phase4_endpoints():
     config = json.loads(Path("vercel.json").read_text(encoding="utf-8"))
     routes = {item["source"]: item["destination"] for item in config["rewrites"]}
     expected = {
-        "/api/knowledge/search": "/api?_route=knowledge/search",
-        "/api/knowledge/questions": "/api?_route=knowledge/questions",
-        "/api/wf04/asr": "/api?_route=wf04/asr",
         "/api/wf04/stream": "/api?_route=wf04/stream",
         "/api/wf02/optimize": "/api?_route=wf02/optimize",
         "/api/wf02/apply-rewrite": "/api?_route=wf02/apply-rewrite",

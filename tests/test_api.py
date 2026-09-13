@@ -298,7 +298,7 @@ def test_wf04_to_wf06_full_session_flow(monkeypatch):
     ability = session.post("/api/wf05/ability", json={"session_id": sid})
     assert ability.status_code == 200
     assert len(ability.json["ability"]["plan"]) == 7
-    assert ability.json["radar_option"]["series"][0]["data"][0]["name"] == "C0 基线"
+    assert ability.json["radar_option"]["series"][0]["data"][0]["name"] == "当前证据快照"
 
     deleted = session.post("/api/wf06/delete", json={"session_id": sid})
     assert deleted.status_code == 200
@@ -569,7 +569,8 @@ def test_f4_ability_report_consented_full_flow(monkeypatch):
     assert ability["baseline"] >= 0
     assert len(ability["dimensions"]) == 6
     assert len(ability["plan"]) == 7
-    assert ability["scenario_day7"]["low"] <= ability["scenario_day7"]["high"]
+    assert "scenario_day7" not in ability
+    assert "C7_low" not in response.json and "C7_high" not in response.json
     assert response.json["radar_option"]["radar"]["indicator"]
 
 

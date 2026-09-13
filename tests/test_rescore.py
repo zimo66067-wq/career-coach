@@ -9,7 +9,7 @@ def test_handcalc_example(score_input):
     """与 contracts/scoring.md 第6节手算示例对拍（±0.5，实际应完全相等）"""
     result = rescore.compute(score_input)
     exp = score_input["expected"]
-    for k in ("R", "M", "I", "C0", "C7_low", "C7_high"):
+    for k in ("R", "M", "I", "C0"):
         assert abs(result[k] - exp[k]) <= 0.5, "%s: got %s expect %s" % (k, result[k], exp[k])
 
 
@@ -58,4 +58,4 @@ def test_c7_capped_at_100():
     }
     result = rescore.compute(data)
     assert result["C0"] == 100.0
-    assert result["C7_low"] == 100.0 and result["C7_high"] == 100.0
+    assert "C7_low" not in result and "C7_high" not in result

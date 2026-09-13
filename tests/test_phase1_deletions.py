@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
-"""Phase 1 deletion contract: the major-based match capability must stay gone.
+"""Phase 1 deletion contract: everything Phase 1 removed must stay gone.
 
 D1 removed the 专业→职业 matching surface (catalog search, intent ranking and
 mode A/B matching) together with the asynchronous chunked-task subsystem that
-existed only to drive it.  These tests pin that deletion down so a later change
-cannot quietly re-expose a route, a table or a page that no longer has a product
+existed only to drive it.  The rest of Phase 1 then removed the C7 predictive
+scoring, the standalone knowledge-base product, the whole voice/ASR chain and
+four dead routes.  These tests pin that down so a later change cannot quietly
+re-expose a route, a table, a page or a metric that no longer has a product
 reason to exist.
 """
 import json
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -161,12 +164,16 @@ def test_publish_trees_remain_byte_identical():
         "js/quick-demo.js",
         "js/data-bridge.js",
         "js/account.js",
+        "js/radar.js",
+        "js/mock-data.js",
         "pages/f1-resume.html",
         "pages/f3-interview.html",
         "pages/f4-report.html",
         "pages/f5-apply.html",
-        "pages/kb.html",
         "pages/states.html",
+        "assets/favicon.svg",
+        "assets/logo.svg",
+        "assets/vendor/echarts.min.js",
     ]
     for relative in pairs:
         public = (ROOT / "public" / relative).read_bytes()
@@ -180,5 +187,112 @@ def test_publish_trees_do_not_reference_the_retired_page():
             if not path.is_file() or path.suffix.lower() not in {".html", ".js"}:
                 continue
             body = path.read_text(encoding="utf-8", errors="ignore")
-            for needle in ("f2-match.html", "f2-major.js", "matchMajor", "quickDemoF2"):
+            for needle in ("f2-match.html", "f2-major.js", "matchMajor", "quickDemoF2",
+                           "kb.html", "kb.js", "voice.js", "VoiceHandler",
+                           "scenario_day7", "C7_low", "C7_high"):
                 assert needle not in body, "%s still references %s" % (path, needle)
+
+
+# ------------------------------------------------------------------ #
+# Phase 1 其余删除项（2026-09-13）
+# ------------------------------------------------------------------ #
+
+RETIRED_PHASE1B_FILES = [
+    "public/pages/kb.html", "public/js/kb.js",
+    "docs/pages/kb.html", "docs/js/kb.js",
+    "ui/prototype/pages/kb.html", "ui/prototype/js/kb.js",
+    "public/js/voice.js", "docs/js/voice.js", "ui/prototype/js/voice.js",
+    "tools/voice_handler.py", "tools/providers/asr.py",
+    "scripts/p0-04-voice-validation.py",
+    "public/voice-test-checklist.md", "docs/voice-test-checklist.md",
+    "tests/test_new_tools.py", "tests/test_voice_browser.py",
+    "tests/e2e_closed_loop_results.json",
+]
+
+
+def test_phase1b_retired_files_are_absent():
+    for relative in RETIRED_PHASE1B_FILES:
+        assert not (ROOT / relative).exists(), "%s must be deleted" % relative
+
+
+def test_retired_endpoints_for_phase1b_return_404(client):
+    client.post("/api/wf01/consent", json={"accepted": True})
+    for path in ("/api/knowledge/search", "/api/knowledge/questions", "/api/wf04/asr"):
+        assert client.get(path).status_code == 404, path
+        assert client.options(path).status_code == 404, path + " (preflight)"
+
+
+def test_c7_predictive_output_is_gone(client):
+    """C7 预测区间不得以任何形式回流：复算器、响应、合同、前端。"""
+    import rescore
+
+    fixture = json.loads(
+        (ROOT / "tests" / "fixtures-synthetic" / "abilities" / "score-input-01.json")
+        .read_text(encoding="utf-8")
+    )
+    result = rescore.compute(fixture)
+    assert "C0" in result
+    for banned in ("C7_low", "C7_high"):
+        assert banned not in result, "rescore must not emit %s" % banned
+
+    schema = json.loads((ROOT / "contracts" / "ability-profile.schema.json").read_text(encoding="utf-8"))
+    assert "scenario_day7" not in schema["properties"]
+    assert "scenario_day7" not in schema["required"]
+
+    scoring = (ROOT / "contracts" / "scoring.md").read_text(encoding="utf-8")
+    # 合同里不得再出现 C7 的**公式定义**；只允许出现「已删除」的说明性提及。
+    for formula in ("C7_low  = min(100", "C7_high = min(100", "可提升空间 = 100"):
+        assert formula not in scoring, "scoring.md still defines %r" % formula
+    assert "删除" in scoring, "scoring.md must state that the C0 extrapolation was retired"
+
+
+def test_radar_option_has_no_predictive_series():
+    from radar_adapter import build_option
+
+    ability = json.loads(
+        (ROOT / "tests" / "fixtures-synthetic" / "abilities" / "ability-01.json")
+        .read_text(encoding="utf-8")
+    )
+    option = build_option(ability)
+    assert len(option["series"][0]["data"]) == 1
+    assert option["series"][0]["data"][0]["name"] == "当前证据快照"
+    blob = json.dumps(option, ensure_ascii=False)
+    for banned in ("七天推演", "C7", "scenario"):
+        assert banned not in blob
+
+
+def test_assets_rewrite_targets_the_deployed_tree():
+    """favicon / 本地 ECharts 必须落在真正部署的 public 树里。"""
+    config = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
+    rules = {item["source"]: item["destination"] for item in config["rewrites"]}
+    assert rules.get("/assets/:path*") == "/public/assets/:path*"
+    assert "ui/assets" not in json.dumps(config)
+    for relative in ("public/assets/favicon.svg", "public/assets/logo.svg",
+                     "public/assets/vendor/echarts.min.js"):
+        assert (ROOT / relative).is_file(), relative
+
+
+def test_no_dead_routes_in_vercel_config():
+    """每条 static 重写的目标都必须存在；每条 _route 都必须有处理器。"""
+    config = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
+    index_source = (ROOT / "api" / "index.py").read_text(encoding="utf-8")
+
+    for rule in config["rewrites"]:
+        destination = rule["destination"]
+        if "?" in destination:
+            match = re.match(r"^/api\?_route=([^&]+)$", destination)
+            assert match, "unexpected api rewrite: %s" % destination
+            route = match.group(1).replace("/$1", "")
+            assert not route.startswith("retired/"), "retired shim left: %s" % rule["source"]
+            assert route in index_source, "no handler for %s" % route
+        elif destination.endswith(".html"):
+            assert (ROOT / destination.lstrip("/")).is_file(), destination
+
+
+def test_user_navigation_has_no_retired_entries():
+    """导航不得再出现已下线能力，也不得超过 DoD 的 4 项上限 + 首页。"""
+    html = (ROOT / "public" / "index.html").read_text(encoding="utf-8")
+    labels = re.findall(r'class="nav"[^>]*>([^<]*)<', html)
+    assert labels == ["首页", "F1 简历诊断", "F3 模拟面试", "F4 能力报告", "F5 投递"], labels
+    for banned in ("面经知识库", "岗位匹配", "知识库"):
+        assert banned not in " ".join(labels), banned

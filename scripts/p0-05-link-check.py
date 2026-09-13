@@ -16,7 +16,6 @@ urls = [
     {"url": "https://qianfan.baidubce.com/v2/embeddings", "source": "test_qianfan_embedding.py", "note": "新版千帆 embedding-v1"},
     {"url": "https://qianfan.baidubce.com/v2/chat/completions", "source": "test_new_tools.py", "note": "千帆 Chat Completions"},
     {"url": "https://api.jina.ai/v1/embeddings", "source": "test_embedding_comprehensive.py", "note": "Jina AI 备选 embedding"},
-    {"url": "https://dumate.baidu.com/asr", "source": "voice_handler.py", "note": "DuMate ASR 接口"},
     {"url": "https://open.bigmodel.cn/", "source": "MEMORY.md", "note": "智谱 AI 开放平台"},
     {"url": "https://jina.ai/embeddings/", "source": "test_embedding_comprehensive.py", "note": "Jina AI Embedding 文档"},
 ]

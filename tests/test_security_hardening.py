@@ -234,24 +234,6 @@ def test_sensitive_json_endpoints_reject_array_bodies(isolated_db, monkeypatch):
         assert response.json["error"] == "invalid_request", endpoint
 
 
-def test_asr_provider_error_is_not_exposed(isolated_db, monkeypatch):
-    class FailingAsr:
-        def transcribe(self, _audio):
-            raise RuntimeError("provider secret path /internal/token")
-
-    monkeypatch.setenv("DUMATE_CONSENT_SECRET", "security-test-secret")
-    monkeypatch.setattr(api_module, "build_asr_provider", lambda: FailingAsr())
-    api_module.app.config.update(TESTING=True)
-    client = api_module.app.test_client()
-    consent = _consent(client)
-    response = client.post(
-        "/api/wf04/asr",
-        data=b"RIFF-not-real-but-provider-is-mocked",
-        headers=_material_headers(consent),
-    )
-    assert response.status_code == 502
-    assert response.json["error"] == "asr_failed"
-    assert "provider secret" not in response.json["message"]
 
 
 def _minimal_docx(path, extra_entries=None):

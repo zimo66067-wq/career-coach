@@ -4,7 +4,7 @@
   "title": "AbilityProfile · F4 能力聚合合同 v1.0（冻结）",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "resume_score", "match_score", "interview_score", "dimensions", "baseline", "scenario_day7", "plan"],
+  "required": ["version", "resume_score", "match_score", "interview_score", "dimensions", "baseline", "plan"],
   "properties": {
     "version": { "type": "string", "const": "1.0" },
     "resume_score": { "type": "number", "minimum": 0, "maximum": 100, "description": "R，见 contracts/scoring.md" },
@@ -35,23 +35,8 @@
         }
       }
     },
-    "baseline": { "type": "number", "minimum": 0, "maximum": 100, "description": "C0 = 0.25R + 0.35M + 0.40I" },
-    "scenario_day7": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["low", "high", "assumptions"],
-      "properties": {
-        "low": { "type": "number", "minimum": 0, "maximum": 100, "description": "C7_low = C0 + 空间×0.30（演示假设）" },
-        "high": { "type": "number", "minimum": 0, "maximum": 100, "description": "C7_high = C0 + 空间×0.70（演示假设）" },
-        "assumptions": {
-          "type": "array",
-          "minItems": 1,
-          "description": "情景假设，必须如实列出；0.30/0.70 为 MVP 演示假设而非统计参数",
-          "items": { "type": "string", "minLength": 1 }
-        }
-      }
-    },
-    "plan": {
+      "baseline": { "type": "number", "minimum": 0, "maximum": 100, "description": "C0 = 0.25R + 0.35M + 0.40I，当前证据快照；不代表真实就业概率" },
+      "plan": {
       "type": "array",
       "minItems": 7,
       "maxItems": 7,

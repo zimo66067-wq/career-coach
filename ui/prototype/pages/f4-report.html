@@ -160,8 +160,8 @@
   <a class="nav" data-page="f5" href="f5-apply.html">F5 投递</a>
 </nav>
 <div class="wrap" id="main">
-  <h1 class="page-title">F4 · 能力报告 + 七天竞争力情景推演</h1>
-  <p class="page-sub">C0 = 0.25R + 0.35M + 0.40I ｜ 七天结果为公开假设下的情景区间，不是预测</p>
+  <h1 class="page-title">F4 · 能力报告</h1>
+  <p class="page-sub">C0 = 0.25R + 0.35M + 0.40I ｜ C0 是当前证据快照，不代表真实就业概率</p>
 
   <section class="card journey-progress" aria-labelledby="journeyProgressTitle">
     <div class="journey-progress-head">
@@ -216,7 +216,7 @@
       <div class="ai-stages" aria-label="AI 分析阶段">
         <span class="ai-stage done">R/M/I 归集</span>
         <span class="ai-stage on">六维聚合</span>
-        <span class="ai-stage">情景推演</span>
+        <span class="ai-stage">缺口归集</span>
       </div>
       <div class="skel h-lg" style="margin:16px 0"></div>
       <div class="skel h-sm" style="width:70%"></div>
@@ -232,13 +232,8 @@
         <div style="font-size:13px;margin-top:8px;color:var(--zy-ink-2)">R 73.00 × 0.25 ＋ M 60.00 × 0.35 ＋ I 72.55 × 0.40</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <h3 style="margin-bottom:10px">七天竞争力情景推演</h3>
-        <div class="range-band">
-          <span>77.79</span>
-          <div class="bar"><div class="seg" style="left:68.27%;width:22.21%"></div></div>
-          <span>90.48</span>
-        </div>
-        <div class="assump" style="margin-top:12px" id="assump"></div>
+        <h3 style="margin-bottom:10px">怎么读这份报告</h3>
+        <p style="font-size:13.5px;color:var(--zy-ink-2)">C0 与六维分是<strong>当前证据快照</strong>：衡量的是材料里有多少可核验的关联证据，<strong>不代表真实就业概率</strong>。下方七天计划是行动项清单，变化只能靠复测确认。</p>
       </div>
     </div>
 
@@ -248,7 +243,7 @@
     </div>
 
     <div class="card">
-      <h3>七天情景提升计划（恰好 7 天，每天 30-45 分钟）</h3>
+      <h3>七天行动计划（每天 30-45 分钟）</h3>
       <div class="plan-grid" id="planGrid"></div>
     </div>
   </div>
@@ -258,7 +253,7 @@
       <div class="icon">⚠️</div>
       <div>
         <h3>报告生成被阻断</h3>
-        <p>七天计划未通过合同校验（条数/时长/成果物约束），或检测到未在输入中出现的数字，已按事实锁阻断发布。</p>
+        <p>七天行动计划未通过合同校验（条数/时长/成果物约束），或检测到未在输入中出现的数字，已按事实锁阻断发布。</p>
         <span class="btn">重新生成</span>
       </div>
     </div>
@@ -277,7 +272,7 @@
       <div id="radarFallback"></div>
     </div>
     <div class="card">
-      <h3>七天情景提升计划</h3>
+      <h3>七天行动计划</h3>
       <div class="plan-grid" id="planGridDegraded"></div>
     </div>
   </div>
@@ -404,7 +399,6 @@ document.addEventListener("DOMContentLoaded", function () {
   var a = fetchSync('ability');
   if (!a) return;
   if (state === "success") {
-    document.getElementById("assump").innerHTML = "<b>情景假设：</b>" + a.scenario_day7.assumptions.join("；");
     window.RADAR.mount("radar", a, false);
     renderPlan("planGrid", a.plan);
     // C0 数字递增（真实基线值，减少动态时直接呈现终值）

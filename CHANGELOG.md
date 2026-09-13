@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+### Removed - 2026-09-13 Phase 1 其余项（C7 预测 / 知识库 / 语音 / 死路由）
+- **C7 预测区间彻底删除**：`tools/rescore.py` 不再输出 `C7_low`/`C7_high`（固定 0.30/0.70 演示假设），`services/interview_service.build_ability_profile` 与 `api/index.py` 的 `wf05/ability` 响应不再返回；`contracts/ability-profile.schema.json` 移除 `scenario_day7`（含 required）；`contracts/scoring.md` §4 改写为「C0 是当前证据快照，不是就业概率，也不是预测」。保留 `C0` 与六维分，并新增「不代表真实就业概率」的显式标注
+- **前端同步**：`radar.js` 只画一条「当前证据快照」曲线（原三条：C0 + 七天推演 low/high）；`f4-report.html` 移除区间带与情景假设块，标题去掉「七天竞争力情景推演」；`index.html` 与 `mock-data.js` 同步；三份镜像一致
+- **独立知识库产品下线**：导航与 `pages/kb.html` + `js/kb.js`（三树各一份）删除，`/api/knowledge/search`、`/api/knowledge/questions` 及两条 `vercel.json` 重写移除。`tools/knowledge.py` **保留**，作为 Interview Engine 的内部 Question Bank 数据源（待 Phase 3 接线）
+- **整条语音链路删除**：`public/js/voice.js`（三树）、`tools/voice_handler.py`(398)、`tools/providers/asr.py`(113)、`scripts/p0-04-voice-validation.py`、`public|docs/voice-test-checklist.md`、`tests/test_new_tools.py`、`tests/test_voice_browser.py`；`/api/wf04/asr` 路由 + 重写 + OPTIONS 项移除；`.env.example` 删除 `ASR_API_URL`/`TTS_API_URL`/`BAIDU_SPEECH_TOKEN` 三个变量
+- **死路由修复**：`/assets/:path*` 原重写到未部署的 `/ui/assets/:path*`，导致**所有页面的 favicon 线上 404**、`radar.js` 的本地 ECharts 兜底永不生效；现改为 `/public/assets/:path*` 并把 `assets/`（favicon / logo / vendor/echarts.min.js）纳入 public 与 docs 两棵发布树，同时加入 publish mirror 一致性测试
+- 导航从 7 项收敛到 **5 项**（首页 / F1 / F3 / F4 / F5）；首页、各页导航、`scripts/sync_sidebar.py`、`test_publish_mirror.js` 同步
+- 顺手修掉一个自引入缺陷：删知识库路由时误把 `/api/wf04/asr` 处理器改名为 `wf04/start`，造成与真实 `wf04/start` **重复路由**；已连带删除该 ASR 处理器，`wf04/start` 恢复唯一
+- 删除陈旧生成物 `tests/e2e_closed_loop_results.json`（含过期 C7 文案，测试每次运行会重新生成）
+- 回归门禁：**pytest 全绿**、**Node 36/36**；`vercel.json` 静态重写目标全部存在、`_route` 全部有处理器（**dead routes = 0**）；无残留 voice/asr/知识库代码引用
+
 ### Removed - 2026-09-13 专业→职业匹配整块下线（D1）
 - 删除 `api/f2_major.py`（703 行）：专业目录检索、意向推荐、模式 A/B 匹配、`LEVEL_SCORE` 专业契合度，以及 `/api/f2/*` 全部端点（`health`/`majors/tree`/`majors/search`/`majors/<code>`/`match`/`intent`），现在统一返回 404
 - 删除数据与脚本：`data/f2/majors_2025.json`、`data/f2/profiles_top30.json`（合计 175 KB）、`scripts/build_majors_data.py`、`scripts/validate_f2_data.py`

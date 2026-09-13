@@ -339,15 +339,6 @@ def build_ability_profile(session_id):
         "interview_score": round(result["I"], 2),
         "dimensions": dims,
         "baseline": round(c0, 2),
-        "scenario_day7": {
-            "low": result["C7_low"],
-            "high": result["C7_high"],
-            "assumptions": [
-                "0.30 与 0.70 为 MVP 演示假设，非统计学习参数",
-                "假设用户按计划完成每天 30-45 分钟训练并产出 artifact",
-                "第七天复测结果才是真实变化",
-            ],
-        },
         "plan": plan,
     }
     save_ability(session_id, ability)

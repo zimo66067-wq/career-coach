@@ -234,13 +234,10 @@ def test_full_pipeline(resume_path=None, job_path=None, verbose=False):
         score_result = rescore.compute(score_input)
         assert "C0" in score_result
         assert 0 <= score_result["C0"] <= 100
-        assert score_result["C7_low"] <= score_result["C7_high"]
 
         result.add_step(
             "WF-05: rescore", True,
-            "C0=%.1f, C7_low=%.1f, C7_high=%.1f" % (
-                score_result["C0"], score_result["C7_low"], score_result["C7_high"]
-            ),
+            "C0=%.1f（当前证据快照，无预测项）" % score_result["C0"],
             int((time.time() - t0) * 1000)
         )
     except Exception as e:

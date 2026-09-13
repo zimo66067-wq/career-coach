@@ -64,13 +64,7 @@ from tools.account import (  # noqa: E402
 from tools.deidentify import deidentify  # noqa: E402
 from tools.extract_text import extract_docx, extract_pdf, extract_txt  # noqa: E402
 from tools.ocr_provider import ocr_pdf  # noqa: E402
-from tools.knowledge import (  # noqa: E402
-    list_categories,
-    list_questions,
-    search_questions,
-)
 from tools.optimizer import rewrite_suggestion  # noqa: E402
-from tools.providers.asr import build_asr_provider  # noqa: E402
 from tools.interview_engine import InterviewEngine  # noqa: E402
 from tools.match_requirements import (  # noqa: E402
     Bm25Matcher,
@@ -606,8 +600,7 @@ def route_api(**_ignored):
             "admin/resumes", "admin/export",
             "auth/register", "auth/login", "auth/logout", "auth/me",
             "history",
-            "knowledge/search", "knowledge/questions",
-            "wf04/asr", "wf04/stream",
+            "wf04/stream",
             "wf02/optimize", "wf02/apply-rewrite",
             "wf07/cover-letter", "wf07/applications",
             "f5/organizations/status", "f5/organizations/suggest",
@@ -755,38 +748,6 @@ def route_api(**_ignored):
         except AccountError as err:
             raise ApiError(err.code, err.message, err.status)
         return api_response({"status": "DELETED"})
-
-    if route == "knowledge/search" and request.method == "GET":
-        q = request.args.get("q", "")
-        category = request.args.get("category", "") or None
-        try:
-            limit = int(request.args.get("limit", 5))
-        except (TypeError, ValueError):
-            limit = 5
-        return api_response(search_questions(q, category=category, limit=limit))
-
-    if route == "knowledge/questions" and request.method == "GET":
-        category = request.args.get("category", "") or None
-        items = list_questions(category)
-        return api_response({
-            "categories": list_categories(),
-            "items": items,
-            "total": len(items),
-        })
-
-    if route == "wf04/asr" and request.method == "POST":
-        require_consent()
-        enforce_usage("asr_hour", 30, 3600)
-        enforce_usage("asr_day", 60, 86400)
-        audio = request.get_data(cache=False)
-        if not audio:
-            raise ApiError("audio_required", "请上传音频数据。", 422)
-        try:
-            asr_result = build_asr_provider().transcribe(audio)
-        except Exception as exc:
-            app.logger.warning("ASR provider failed: %s", type(exc).__name__)
-            raise ApiError("asr_failed", "语音识别服务暂不可用，请稍后重试。", 502)
-        return api_response(asr_result)
 
     if route == "wf04/stream" and request.method == "POST":
         require_consent()
@@ -1141,8 +1102,6 @@ def route_api(**_ignored):
             "score_M": ability["match_score"],
             "score_I": ability["interview_score"],
             "C0": ability["baseline"],
-            "C7_low": result["C7_low"],
-            "C7_high": result["C7_high"],
             "session_id": session_id,
         })
 
@@ -1207,8 +1166,7 @@ for _rule in (
     "/api/admin/resumes", "/api/admin/export",
     "/api/auth/register", "/api/auth/login", "/api/auth/logout", "/api/auth/me",
     "/api/history", "/api/history/<id>",
-    "/api/knowledge/search", "/api/knowledge/questions",
-    "/api/wf04/asr", "/api/wf04/stream",
+    "/api/wf04/stream",
     "/api/wf02/optimize", "/api/wf02/apply-rewrite",
     "/api/wf07/cover-letter", "/api/wf07/applications",
     "/api/f5/organizations/status", "/api/f5/organizations/suggest",

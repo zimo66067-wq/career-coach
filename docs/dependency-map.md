@@ -7,17 +7,24 @@
 
 依赖关系均为静态扫描实测（`grep`/AST 级 import 统计），不是凭印象描述。
 
-> **Phase 1 / D1 更新（2026-09-13）**：专业→职业匹配与随其存在的异步任务框架已整块删除，
-> 以下条目随之失效——§1 的 `api/f2_major.py`（703 行）、§3.1 的
-> `services.task_service ──► api.f2_major` **违规已消失**（倒置数 3 → 2）、
-> §3.2 的 `tools.tasks`、§3.3 页面专属脚本里的 `f2-major`、§4.1 的 `api/f2_major.py`
-> "既是路由又是业务又是服务器"、§4.2 的**两套匹配逻辑并存**（已只剩一套）、
-> §5 的 `/api/f2_major` 退休垫片。
+> **Phase 1 更新（2026-09-13）**：本文件列出的全部 Phase 1 删除项已执行完毕，以下条目
+> **只描述删除前的状态**：
 >
-> 删除后不再存在「产品层 F2 概念冲突」的代码根因：主产品只剩 `wf03` /
-> `services/match_service.py` 一套 Target Job Analysis。新增回归门禁
-> `tests/test_phase1_deletions.py`（11 项）固化该结论。§6 的 `ui/prototype` 死树、
-> §7 的 `tasks/` 目录等其余结论**仍然有效**。
+> - §1 的 `api/f2_major.py`(703)、§3.1 的 `services.task_service ──► api.f2_major` **违规已消失**
+>   （dependency inversion 3 → 2）、§3.2 的 `tools.tasks`、§3.3 页面专属脚本里的 `f2-major`、
+>   §4.1「既是路由又是业务又是服务器」、§4.2 的**两套匹配逻辑并存**（已只剩一套）、
+>   §5 的 `/api/f2_major` 退休垫片
+> - §3.2 / §4.3 的 `tools.voice_handler ──► tools.providers.asr` 整条链已删除
+> - §4.3 / §7 所列的 `public/js/voice.js`、`tools/voice_handler.py`、`tools/providers/asr.py`、
+>   `/api/wf04/asr`、3 个 ASR/TTS env 全部删除
+> - §1 的 `kb.html` / `kb.js` / `/api/knowledge/*` 已删除（`tools/knowledge.py` 保留为内部题库）
+> - C7 预测链（`rescore` → `scoring.md` §4 → schema `scenario_day7` → `radar.js` / `f4-report.html`）
+>   已整体删除
+>
+> **现状**：主产品只剩 `wf03` / `services/match_service.py` 一套 Target Job Analysis；
+> `vercel.json` 静态重写目标全部存在、`_route` 全部有处理器（**dead routes = 0**）；
+> 一级导航 7 → 5。新增回归门禁 `tests/test_phase1_deletions.py`（11 项）。
+> 仍有效的结论：§6 的 `ui/prototype` 陈旧分叉、§7 的 `tasks/` 目录与 4 个一次性推送脚本。
 
 ---
 

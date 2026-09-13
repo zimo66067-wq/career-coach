@@ -38,18 +38,6 @@
   ],
   "rewrites": [
     {
-      "source": "/api/knowledge/search",
-      "destination": "/api?_route=knowledge/search"
-    },
-    {
-      "source": "/api/knowledge/questions",
-      "destination": "/api?_route=knowledge/questions"
-    },
-    {
-      "source": "/api/wf04/asr",
-      "destination": "/api?_route=wf04/asr"
-    },
-    {
       "source": "/api/wf04/stream",
       "destination": "/api?_route=wf04/stream"
     },
@@ -163,7 +151,7 @@
     },
     {
       "source": "/assets/:path*",
-      "destination": "/ui/assets/:path*"
+      "destination": "/public/assets/:path*"
     },
     {
       "source": "/api/wf07/cover-letter",

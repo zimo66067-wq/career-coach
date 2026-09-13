@@ -1,10 +1,12 @@
 ﻿/* test_phase4_contract.js
  *
  * Phase 4 frontend contract checks:
- *  - kb.html + kb.js (knowledge base search/list, BM25 fallback notice)
  *  - f3-interview.html + f3-interview.js (SSE follow-up stream, session snapshot)
  *  - f1-resume.html + optimizer.js (rewrite preview modal, apply flow)
  * All scripts are also smoke-loaded in a stub DOM context to catch load-time crashes.
+ *
+ * 2026-09-13：kb.html / kb.js 的独立「面经知识库」产品页已下线（Phase 1），
+ * 相应契约一并移除；题库数据保留为 Interview Engine 的内部数据源（tools/knowledge.py）。
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -49,7 +51,7 @@ function makeContext() {
     removeItem: function (k) { delete storage[k]; }
   };
   const context = {
-    location: { search: '', pathname: '/pages/kb.html', hash: '' },
+    location: { search: '', pathname: '/pages/f1-resume.html', hash: '' },
     document: {
       addEventListener: function () {},
       getElementById: function () { return elementStub(); },
@@ -86,26 +88,6 @@ function smokeLoad(name, rel) {
   try { vm.runInNewContext(read('js/data-bridge.js'), context, { filename: 'data-bridge.js' }); } catch (e) { /* bridge stub optional */ }
   assert.doesNotThrow(() => vm.runInNewContext(source, context, { filename: name }));
 }
-
-test('kb.html wires the knowledge base and includes kb.js', () => {
-  const html = read('pages/kb.html');
-  assert.match(html, /id="kbSearchBtn"/);
-  assert.match(html, /id="kbQuery"/);
-  assert.match(html, /id="kbResults"/);
-  assert.match(html, /id="kbChips"/);
-  assert.match(html, /id="kbNotice"/);
-  assert.match(html, /src="\.\.\/js\/kb\.js"/);
-});
-
-test('kb.js calls the knowledge endpoints and renders lists', () => {
-  const src = read('js/kb.js');
-  assert.match(src, /\/api\/knowledge\/search/);
-  assert.match(src, /\/api\/knowledge\/questions/);
-  assert.match(src, /function renderList/);
-  assert.match(src, /function doSearch/);
-  assert.match(src, /bm25|BM25/);
-  smokeLoad('kb.js', 'js/kb.js');
-});
 
 test('f3-interview.html contains the streamed interview controls', () => {
   const html = read('pages/f3-interview.html');

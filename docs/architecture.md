@@ -6,12 +6,24 @@
 - 配套：`docs/product-scope.md`（产品范围与裁决）、`docs/dependency-map.md`（依赖与缺陷清单）
 - 历史文档：`docs/design/architecture.md`（62 行，2026-08 的四层架构描述，**已过期**，Phase 7 归并）
 
-> **Phase 1 / D1 更新（2026-09-13）**：专业→职业匹配已整块删除，以下条目随之失效——
-> `public/pages/f2-match.html`（§2）、`/api/f2/*` 全部端点与 `/api/f2_major` 退休垫片（§4）、
-> `/api/tasks*`（§4，仅服务该功能）、`services/task_service.py`（§5）、
-> `api/f2_major.py`（§5、§11 覆盖率表）、`tasks` 表（§7）。
-> 仍有效的结论：`/api/wf04/asr`、`/api/admin/*`、`/api/f5/organizations/*` 无用户界面消费。
-> 删除后主产品只剩一套匹配概念（`wf03` / `services/match_service.py`），DoD #6 达成；dependency inversion 由 3 处降为 2 处。
+> **Phase 1 更新（2026-09-13）**：本次审计列出的全部 Phase 1 删除项已执行完毕，本文件中以下条目
+> **只描述删除前的状态，不再代表现状**：
+>
+> | 审计条目 | 位置 | 现状 |
+> | --- | --- | --- |
+> | `public/pages/f2-match.html` | §2 | 已删除 |
+> | `/api/f2/*`、`/api/f2_major`、`/api/tasks*` | §4 | 已删除（全部 404） |
+> | `services/task_service.py`、`api/f2_major.py` | §5、§11 | 已删除 |
+> | `tasks` 表 | §7 | 已从双方言 DDL 移除 + `init_db()` 幂等 drop |
+> | `C7_low` / `C7_high` / `scenario_day7` | §4（wf05）、§7 | 已删除；只留 `C0` 与六维分作为当前证据快照 |
+> | `public/pages/kb.html`、`js/kb.js`、`/api/knowledge/*` | §2、§4 | 已删除；`tools/knowledge.py` 保留为内部题库 |
+> | `public/js/voice.js`、`tools/voice_handler.py`、`tools/providers/asr.py`、`/api/wf04/asr`、3 个 env | §4、§6、§12 | 已全部删除 |
+> | `README:74` 列出 3 个语音 env | §14 | 已删除（README 同步修正） |
+> | `/assets/:path*` → `/ui/assets/:path*` | §4 死路由 | 已修正为 `/public/assets/:path*`，favicon 恢复 |
+>
+> **现状口径**：主产品只剩一套匹配概念（`wf03` / `services/match_service.py`，DoD #6 达成）；
+> dependency inversion 由 3 处降为 2 处；一级导航 7 → 5 项；dead routes = 0。
+> 仍有效的审计结论：`/api/admin/*`、`/api/f5/organizations/*` 无用户界面消费；`ui/prototype` 是陈旧分叉（Phase 6/7）。
 
 ---
 

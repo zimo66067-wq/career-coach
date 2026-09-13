@@ -9,13 +9,17 @@
   M: requirements 数组，每项 {type: hard|responsibility|preferred|terminology,
                                status: covered|weak|missing|unknown}
   I: 五个子分 0-100
-  expected（可选）: {R,M,I,C0,C7_low,C7_high} 对拍基准
+  expected（可选）: {R,M,I,C0} 对拍基准
 
 规则（冻结）:
   covered=1 / weak=0.5 / missing=0 / unknown 剔出分母
   类别全 unknown -> 该类 insufficient_evidence，权重在剩余类别归一
   全部类别 unknown -> M=insufficient_evidence，退出码 3
 退出码: 0=对拍通过  1=对拍超差  2=输入错误  3=证据不足
+
+注意：本复算器**只输出当前证据快照**（R/M/I/C0）。历史上的 C7_low/C7_high
+「七天情景推演」基于固定 0.30/0.70 演示假设，属于预测型展示，已于 2026-09-13
+删除；C0 也不代表真实就业概率。
 """
 import argparse
 import io
@@ -101,18 +105,15 @@ def compute(data):
         return {"insufficient_evidence": True, "M_categories": cat}
     I = calc_I(data["I"])
     C0 = 0.25 * R + 0.35 * M + 0.40 * I
-    space = 100.0 - C0
     return {
         "R": round2(R), "M": round2(M), "I": round2(I),
         "M_categories": {k: (round2(v) if v is not None else "insufficient_evidence") for k, v in cat.items()},
         "C0": round2(C0),
-        "C7_low": round2(min(100.0, C0 + space * 0.30)),
-        "C7_high": round2(min(100.0, C0 + space * 0.70)),
     }
 
 
 def main():
-    ap = argparse.ArgumentParser(description="按 contracts/scoring.md 复算 R/M/I/C0/C7")
+    ap = argparse.ArgumentParser(description="按 contracts/scoring.md 复算 R/M/I/C0")
     ap.add_argument("--input", required=True)
     ap.add_argument("--expect", nargs="*", default=[], help="如 C0=68.27 R=73.00（可多个）")
     ap.add_argument("--tolerance", type=float, default=0.5)

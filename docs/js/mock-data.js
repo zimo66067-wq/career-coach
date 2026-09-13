@@ -146,11 +146,6 @@ pii_removed:true`,
       { key: "followup_adaptation", name: "追问适应", score: 75.0 }
     ],
     baseline: 68.27,
-    scenario_day7: { low: 77.79, high: 90.48, assumptions: [
-      "0.30 与 0.70 为 MVP 演示假设，非统计学习参数",
-      "假设用户按计划完成每天 30-45 分钟训练并产出 artifact",
-      "第七天复测结果才是真实变化"
-    ] },
     plan: [
       { day: 1, focus: "为三条核心经历补充量化证据，无法确认的数字用「待用户核实：」占位", minutes: 40, artifact: "修订后的三段经历文本" },
       { day: 2, focus: "针对 P0 缺口（分布式实践经验）整理项目复盘笔记", minutes: 35, artifact: "一页复盘笔记" },

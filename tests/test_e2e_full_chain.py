@@ -344,7 +344,6 @@ def test_tool_chain_full_products(monkeypatch):
     })
     c0 = computed["C0"]
     assert 0 <= c0 <= 100
-    assert computed["C7_low"] <= computed["C7_high"]
 
     ability = json.loads((FIX / "abilities" / "ability-01.json").read_text(encoding="utf-8"))
     ability["resume_score"] = round(r_score, 2)
@@ -362,7 +361,7 @@ def test_tool_chain_full_products(monkeypatch):
 
     option = radar_adapter.build_option(ability)
     assert len(option["radar"]["indicator"]) == 6
-    assert len(option["series"][0]["data"]) == 3
+    assert len(option["series"][0]["data"]) == 1  # 只有当前证据快照，无预测曲线
 
 
 def test_tool_chain_rejects_broken_contract():

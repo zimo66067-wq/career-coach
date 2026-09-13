@@ -4,8 +4,12 @@
 用法:
   python tools/radar_adapter.py --input ability.json --output option.json
 
-输出可直接被 ui/prototype/js/radar.js 消费（indicator 六维 max=100，
-series 含 C0 基线 + 七天推演 low/high 两条）。
+输出可直接被 js/radar.js 消费（indicator 六维 max=100，series 只有一条
+「当前证据快照」）。历史上的「七天推演 low/high」两条曲线依赖固定 0.30/0.70
+演示假设，属预测型展示，已于 2026-09-13 删除。
+
+Radar 现在只是**可选可视化组件**，不再是一级功能；C0 只是当前证据快照，
+不代表真实就业概率。
 """
 import argparse
 import io
@@ -18,19 +22,12 @@ def build_option(ability):
     if len(dims) != 6:
         raise ValueError("dimensions 必须恰好六维（当前 %d）" % len(dims))
     base = ability["baseline"]
-    low = ability["scenario_day7"]["low"]
-    high = ability["scenario_day7"]["high"]
-    if not (0 <= base <= 100 and 0 <= low <= 100 and 0 <= high <= 100):
-        raise ValueError("baseline/low/high 越界 [0,100]")
-    ratio_low = low / base if base else 1.0
-    ratio_high = high / base if base else 1.0
-
-    def scaled(ratio):
-        return [round(min(100.0, d["score"] * ratio), 2) for d in dims]
+    if not (0 <= base <= 100):
+        raise ValueError("baseline 越界 [0,100]")
 
     return {
         "tooltip": {},
-        "legend": {"bottom": 0, "data": ["C0 基线", "七天推演 low", "七天推演 high"]},
+        "legend": {"bottom": 0, "data": ["当前证据快照"]},
         "radar": {
             "indicator": [{"name": d["name"], "max": 100} for d in dims],
             "radius": "62%",
@@ -38,12 +35,8 @@ def build_option(ability):
         "series": [{
             "type": "radar",
             "data": [
-                {"value": [d["score"] for d in dims], "name": "C0 基线",
+                {"value": [d["score"] for d in dims], "name": "当前证据快照",
                  "areaStyle": {"opacity": 0.25}, "lineStyle": {"color": "#2563eb"}, "itemStyle": {"color": "#2563eb"}},
-                {"value": scaled(ratio_low), "name": "七天推演 low",
-                 "lineStyle": {"color": "#93c5fd", "type": "dashed"}, "itemStyle": {"color": "#93c5fd"}},
-                {"value": scaled(ratio_high), "name": "七天推演 high",
-                 "lineStyle": {"color": "#16a34a", "type": "dashed"}, "itemStyle": {"color": "#16a34a"}},
             ],
         }],
     }

@@ -50,13 +50,13 @@
 | 4 | JD 匹配四态（`wf03/jd`、`wf03/match`、`match_service`） | Target Job Decision ✅ | **保留**，升级为 Target Job Analysis + APPLY/STRETCH/PASS |
 | 5 | 专业→职业匹配 F2（`f2/match`、`f2/majors/*`、`f2/intent`、`api/f2_major.py` 703 行、`data/f2/*.json` 175 KB） | 与 #4 概念冲突；占用一级导航 | **已整块删除**（D1，2026-09-13，见 §10） |
 | 6 | 文字模拟面试（`wf04/start|answer|end|stream`） | Interview Performance ✅ | **保留**，改为按 Gap 定向出题 |
-| 7 | 面试语音（`/api/wf04/asr`、`tools/voice_handler.py`、`tools/providers/asr.py`、`public/js/voice.js`） | 链路已断，前端 0 引用 | **删除**（见 §4） |
-| 8 | 能力报告 + 雷达图（`wf05/ability`、`radar_adapter`、`public/js/radar.js`） | 雷达图无决策价值 | **重构为 Gap & Action Plan**；Radar 降级为可选可视化 |
-| 9 | 七天竞争力情景推演 C7_low / C7_high（0.3 / 0.7 假设） | 预测型，无真实依据 | **删除**（见 §3） |
-| 10 | 面经知识库（`knowledge/search`、`knowledge/questions`、`public/pages/kb.html`、`tools/knowledge.py` 333 行、24 条问答） | 通用百科，与个人证据无关 | **拆解**：导航与独立页删除；题库数据下沉为 Interview Engine 内部数据源；问答升级为 Ask My Career Evidence |
+| 7 | 面试语音（`/api/wf04/asr`、`tools/voice_handler.py`、`tools/providers/asr.py`、`public/js/voice.js`） | 链路已断，前端 0 引用 | ✅ **已整条删除**（2026-09-13，见 §4） |
+| 8 | 能力报告 + 雷达图（`wf05/ability`、`radar_adapter`、`public/js/radar.js`） | 雷达图无决策价值 | 预测部分 ✅ **已删除**；Radar 已降为可选可视化（只画当前快照）；**Gap & Action Plan 重构留 Phase 4** |
+| 9 | 七天竞争力情景推演 C7_low / C7_high（0.3 / 0.7 假设） | 预测型，无真实依据 | ✅ **已彻底删除**（2026-09-13，见 §3） |
+| 10 | 面经知识库（`knowledge/search`、`knowledge/questions`、`public/pages/kb.html`、`tools/knowledge.py` 333 行、24 条问答） | 通用百科，与个人证据无关 | 导航/独立页/API ✅ **已删除**；`tools/knowledge.py` 保留为内部题库（待 Phase 3 接线）；**Ask My Career Evidence 留 Phase 3/4** |
 | 11 | 求职信（`wf07/cover-letter`、`apply_service.generate_cover_letter`） | Outcome ✅ | **保留并重构**：输入必须含 TargetJob requirements + EvidenceMatch + Career Evidence，且每项事实可映射 Evidence ID |
 | 12 | 申请记录（`wf07/applications`、`applications` 表） | Outcome Feedback ✅ | **保留并重构**：并入 Target Job Workspace；状态扩展为 7 态；Outcome 反写 Career Profile |
-| 13 | 单位/职位检索（`/api/f5/organizations/*`、7 张新表、`organization_service`、`providers/organization.py`） | 无授权数据源，索引恒空 | **下线**（见 §6） |
+| 13 | 单位/职位检索（`/api/f5/organizations/*`、7 张新表、`organization_service`、`providers/organization.py`） | 无授权数据源，索引恒空 | ✅ **已不暴露**：首页/导航/用户入口均无入口（实测导航 5 项无此项）；API 保留为显式降级状态；**表与 provider 的存废取决于 D3**（见 §6） |
 | 14 | 账号系统（`auth/register|login|logout|me`、`history`） | 支撑隔离与留存 | **保留**（D2 已决策：**不去手机号**，注册仍要求手机号 + 邮箱）；另新增「进入即强制注册/登录弹窗」要求，见 §10 |
 | 15 | 异步任务（`tasks` 路由 + `task_service` + `tools/tasks.py`） | 仅服务 F2 大文件匹配 | **已随 #5 一并删除**（该子系统在删除前只支持 `task_type="f2_match"`，无其它调用方） |
 | 16 | 管理接口（`admin/resumes`、`admin/export`） | 运维需要 | **保留**（非用户功能） |
@@ -65,7 +65,7 @@
 
 ---
 
-## 3. F4 的预测属性：必须删除
+## 3. F4 的预测属性：必须删除 —— ✅ 已于 2026-09-13 执行
 
 `tools/rescore.py` 计算并对外返回：
 
@@ -86,7 +86,7 @@
 
 ---
 
-## 4. 旧语音能力：整条链路已断，代码全留
+## 4. 旧语音能力：整条链路已断，代码全留 —— ✅ 已于 2026-09-13 整条删除
 
 证据（全部实测）：
 
@@ -107,7 +107,7 @@
 
 ---
 
-## 5. F2 概念冲突的处置
+## 5. F2 概念冲突的处置 —— ✅ D1 已整块删除
 
 **冲突事实**：`/api/wf03/match`（JD 四态匹配）与 `/api/f2/match`（专业画像 Mode A/B + `LEVEL_SCORE` 强/较强/较弱/弱）**共用「F2」这个名字**，但语义、输入、输出、权重全不同。代码层有两套独立实现（见 `dependency-map.md` §3.4）。
 
@@ -186,17 +186,17 @@ CareerProfile        TargetJob                InterviewSession        Action
 
 ---
 
-## 9. 与 DoD 的当前位置对照（Phase 0 起点 + D1 后）
+## 9. 与 DoD 的当前位置对照（Phase 0 起点 → Phase 1 完成）
 
 > 「现状」列为 Phase 0 审计快照；「差距」列已按 D1 落地结果更新。
 
 | DoD | 现状 | 差距 |
 | --- | --- | --- |
-| 1 一级导航 ≤4 | 7 → **6** | −2 |
+| 1 一级导航 ≤4 | 7 → **5** | −1（Phase 6 再做 IA 重构） |
 | 2 无用户可见 F1-F5 | 5 个导航项直接用代号 → **4 个** | 仍需全部改名（Phase 6） |
-| 3 单位/职位检索不暴露 | 已不在一级导航；API 在线 | 需 feature flag |
-| 4 C7 预测删除 | `C7_low/C7_high` 在 API 与页面 | 未删 |
-| 5 KB 非独立产品 | KB 是独立一级页 | 未拆 |
+| 3 单位/职位检索不暴露 | ✅ 首页/导航/用户入口均无入口（导航实测 5 项无此项）；API 保留为显式降级 | 剩余：表与 provider 存废取决于 D3 |
+| 4 C7 预测删除 | ✅ **已彻底删除**（rescore / wf05 响应 / schema / scoring.md / radar.js / f4-report.html） | ✅ **已达成**（Phase 1） |
+| 5 KB 非独立产品 | ✅ 导航/页面/API 均删除；题库下沉为内部数据源 | ✅ **已达成**（接线留 Phase 3） |
 | 6 Major Match 不共用 F2 概念 | 两套并存 → **单一 Target Job Analysis** | ✅ **已达成**（D1） |
 | 7 Career Evidence 为 source of truth | **不存在** CareerProfile/CareerEvidence 实体 | Phase 2 新建 |
 | 8 Target Job 输出 APPLY/STRETCH/PASS | 只有 0-100 分 | Phase 3 |
@@ -207,14 +207,14 @@ CareerProfile        TargetJob                InterviewSession        Action
 | 13 Service 不反向依赖 API | 3 处倒置 → **2 处**（`task_service → api.f2_major` 随 D1 消失） | Phase 5 |
 | 14 .env 无重复/废弃 | 4 个重复变量 + 2 个无消费者 | Phase 7 |
 | 15 前端只有一套 canonical | public / docs / ui 三份 | Phase 6（D1 已保证三份同步删除、public==docs 逐字节一致） |
-| 16-18 Coverage 85/90/75 | Python 79%；JS 未测 | Phase 15 |
-| 19 CI 全绿 | ✅ pytest 全绿 + node 38/38 | 已达成 |
+| 16-18 Coverage 85/90/75 | Python 79%（Phase 0 基线）；JS 未测 | Phase 15（须在 CI 的 Python 3.11 上重测） |
+| 19 CI 全绿 | ✅ pytest 全绿 + node 36/36 | 已达成 |
 | 20 High/Critical 依赖漏洞 = 0 | ✅ pip-audit 无发现 | 已达成 |
 | 21 关键 AI 输出有 fallback | 大部分有（模型失败回退规则） | 待逐项核查 |
-| 22 删除链路自动化测试 | 部分 → **`tests/test_phase1_deletions.py` 11 项** | ✅ **已达成**（D1） |
-| 23 README 与实际 IA 一致 | ❌ README 仍写 F1-F5 + 过期测试数字 | Phase 7 |
-| 24 无 dead routes | 2 个 → **0 个**（`/api/f2/*`、`/api/tasks*` 已下线） | ✅ **已达成**（D1） |
-| 25 无明显 dead code | 语音链路 + ui/prototype + 4 个推送脚本 + 5 个未用 prompt（→ 专业匹配与任务框架已清除） | Phase 1/7 继续 |
+| 22 删除链路自动化测试 | ✅ **`tests/test_phase1_deletions.py` 24 项**（覆盖 D1 + C7/KB/语音/死路由） | ✅ **已达成**（Phase 1） |
+| 23 README 与实际 IA 一致 | 已修正项目状态、页面数、F4 口径与已删变量 | 命名体系仍用 F1–F5（Phase 6/7 统一） |
+| 24 无 dead routes | ✅ **0 个**：`/api/f2/*`、`/api/tasks*`、`/api/knowledge/*`、`/api/wf04/asr` 全部下线；`/assets/*` 重写指向已修正 | ✅ **已达成**（Phase 1） |
+| 25 无明显 dead code | 已清除：专业匹配+任务框架、C7、KB 页、语音链路、陈旧测试产物 | 剩余：`ui/prototype` 陈旧分叉、4 个推送脚本、5 个未调用 prompt（Phase 6/7） |
 
 ---
 
@@ -259,3 +259,31 @@ CareerProfile        TargetJob                InterviewSession        Action
 **D3 仍是 F5 阶段 2 的唯一阻塞项**：没有数据授权、Provider、SLA、预算、纠错责任人五项决策，索引就只能保持为空，任何材料都不得声称已有单位库或实时职位覆盖。
 
 ---
+
+---
+
+## 11. Phase 1 完成记录（2026-09-13）
+
+Phase 1（Product Deletion）已全部执行完毕，分两个提交：
+
+| 提交 | 内容 | 规模 |
+| --- | --- | --- |
+| `fc016c5` | D1：专业→职业匹配整块删除（含只服务它的异步任务子系统） | 74 文件，+1158 / −13688 |
+| 本次 | C7 预测 / 独立知识库 / 整条语音链路 / 4 条死路由 | 72 文件，+451 / −4366 |
+
+**Phase 1 的 7 项删除目标全部达成**：Organization Search（无入口）、Job Search（无入口）、
+C7 Predictions（彻底删除）、KB Navigation（删除）、Major Match 一级入口（删除）、
+Voice remnants（删除）、retired routes（删除 + `/assets/*` 修正）。
+
+**门禁**：pytest 全绿、Node 36/36、`vercel.json` dead routes = 0、public↔docs web 资产逐字节一致、
+敏感扫描无发现、`git diff --check` 干净、`tests/test_phase1_deletions.py` 24 项契约全过。
+
+**Phase 1 结束时仍无界面的能力**（重要口径，不得宣传）：
+
+- **目标岗位分析**（`/api/wf03/jd` + `/api/wf03/match`）—— 后端与合同完好，但承载它的
+  `js/job-upload.js` 当前**没有任何页面挂载**。Phase 1 删掉了旧的专业匹配页，而目标岗位
+  工作区要到 Phase 3 才建。**在此之前不得声称「可以匹配 JD」。**
+
+**Phase 2 入口条件已满足**：D4 已决策（允许迁移 `applications` 生产数据到新 7 态模型），
+migration 可以落笔。仍需 D5（`workflows/` 去留）、D6（`deliverables/` 归档）决定仓库体积口径，
+D3 阻塞 F5 阶段 2。

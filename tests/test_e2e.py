@@ -210,10 +210,10 @@ class TestWF04Interview:
 class TestWF05Rescore:
 
     def test_full_compute_with_fixture(self, score_input):
-        """WF-05: 使用 fixture 完整复算 R/M/I/C0/C7"""
+        """WF-05: 使用 fixture 完整复算 R/M/I/C0"""
         result = rescore.compute(score_input)
         exp = score_input["expected"]
-        for k in ("R", "M", "I", "C0", "C7_low", "C7_high"):
+        for k in ("R", "M", "I", "C0"):
             assert abs(result[k] - exp[k]) <= 0.5, "%s: got %s expect %s" % (k, result[k], exp[k])
 
     def test_c0_formula(self, score_input):
