@@ -372,7 +372,7 @@ def test_health_reflects_model_configuration(monkeypatch):
     assert response.json["workflows"] == {
         "wf01": "available", "wf02": "available", "wf03": "available",
         "wf04": "available", "wf05": "available", "wf06": "available",
-        "wf07": "available", "f2_major": "available",
+        "wf07": "available",
     }
 
 

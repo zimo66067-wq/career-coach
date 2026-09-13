@@ -236,14 +236,6 @@ test('页面包含上传进度元素与错误映射', () => {
   assert.equal(f1.includes('id="resumeUploadProgressBar"'), true);
   assert.equal(f1.includes('id="resumeUploadProgressText"'), true);
 
-  const f2 = fs.readFileSync(path.join(root, 'docs', 'pages', 'f2-match.html'), 'utf8');
-  assert.equal(f2.includes('id="f2FileStatus"'), true);
-  assert.equal(f2.includes('id="f2UploadProgress"'), true);
-
-  const f2Major = fs.readFileSync(path.join(root, 'docs', 'js', 'f2-major.js'), 'utf8');
-  assert.equal(f2Major.includes('uploadResumeWithProgress'), true);
-  assert.equal(f2Major.includes('scanned_pdf'), true);
-
   const resumeUpload = fs.readFileSync(path.join(root, 'docs', 'js', 'resume-upload.js'), 'utf8');
   assert.equal(resumeUpload.includes('uploadResumeWithProgress'), true);
   const jobUpload = fs.readFileSync(path.join(root, 'docs', 'js', 'job-upload.js'), 'utf8');

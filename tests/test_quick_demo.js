@@ -15,20 +15,10 @@ test('F1 页面含一键体验按钮、演示标注与脚本引用', () => {
   assert.match(html, /demo-badge|演示数据/);
 });
 
-test('F2 页面含一键体验按钮、专业导向样式与脚本引用', () => {
-  const html = read('docs/pages/f2-match.html');
-  assert.match(html, /id="quickDemoF2"/);
-  assert.match(html, /quick-demo\.js/);
-  assert.match(html, /f2-major\.css/);
-  assert.match(html, /f2-major\.js/);
-  assert.match(html, /pages-api-config\.js/);
-});
-
-test('首页提供两个 Quick Demo 入口', () => {
+test('首页提供 Quick Demo 入口', () => {
   const html = read('docs/index.html');
   assert.match(html, /hero-cta/);
   assert.match(html, /f1-resume\.html\?quick=1/);
-  assert.match(html, /f2-match\.html\?quick=1/);
   assert.match(html, /quick-demo\.js/);
 });
 
@@ -51,7 +41,6 @@ test('quick-demo.js 暴露 QuickDemo.start 且必须标注演示数据', () => {
     MOCK: { resumeText: '样例' },
     DataBridge: { diagnoseResume: async function () { return { error: 'offline' }; }, getMockData: function () { return null; } },
     APP: { setState: function () {} },
-    F2Major: { runQuickDemo: function () {} },
     DUMATE_API_BASE: 'https://api.example.test'
   };
   context.window = context;
@@ -59,31 +48,8 @@ test('quick-demo.js 暴露 QuickDemo.start 且必须标注演示数据', () => {
   vm.runInContext(source, context, { filename: 'quick-demo.js' });
   assert.equal(typeof context.window.QuickDemo.start, 'function');
   assert.equal(typeof context.window.QuickDemo.startF1, 'function');
-  assert.equal(typeof context.window.QuickDemo.startF2, 'function');
   assert.match(source, /演示数据/);
   assert.match(source, /showDemoBadge/);
-});
-
-test('f2-major.js 暴露 runQuickDemo 且 API 基址来自 DUMATE_API_BASE', () => {
-  const source = read('docs/js/f2-major.js');
-  assert.match(source, /DUMATE_API_BASE/);
-  const context = {
-    console,
-    window: null,
-    document: { readyState: 'loading', addEventListener: function () {} },
-    location: { search: '' },
-    setTimeout: setTimeout,
-    clearTimeout: clearTimeout,
-    setInterval: setInterval,
-    clearInterval: clearInterval,
-    fetch: function () { return Promise.reject(new Error('offline')); },
-    FileReader: function () {},
-    history: { replaceState: function () {} }
-  };
-  context.window = context;
-  vm.createContext(context);
-  vm.runInContext(source, context, { filename: 'f2-major.js' });
-  assert.equal(typeof context.window.F2Major.runQuickDemo, 'function');
 });
 
 test('mock-data.js 提供样例 JD（jdText）', () => {

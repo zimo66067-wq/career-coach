@@ -195,16 +195,15 @@ def test_http_full_product_chain_f1_to_f5_and_delete(monkeypatch):
     resume_profile = diagnose.json["resumeProfile"]
     score_r = diagnose.json["score_R"]
 
-    # F2
+    # F2：目标岗位分析（JD 要求 -> 四态匹配 -> M 分）；专业导向匹配已下线
     parsed = client.post("/api/wf03/jd", json={"jdText": JD_TEXT, "session_id": session_id})
     job_profile = parsed.json["jobProfile"]
     job_profile["user_confirmed"] = True
     matched = client.post(
-        "/api/f2/match",
+        "/api/wf03/match",
         json={
-            "majorCode": "080901",
             "resumeText": RESUME,
-            "jdText": JD_TEXT,
+            "jobProfile": job_profile,
             "session_id": session_id,
         },
     )

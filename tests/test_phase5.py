@@ -12,7 +12,6 @@ import services.apply_service as apply_service
 import services.diagnosis_service as diagnosis_service
 import services.interview_service as interview_service
 import services.match_service as match_service
-import services.task_service as task_service
 
 RESUME = (
     "项目经历：负责后端接口开发并完成上线验证，持续跟进问题闭环。"
@@ -108,7 +107,6 @@ def test_services_layer_exposes_expected_entry_points():
     assert callable(interview_service.answer_interview)
     assert callable(interview_service.end_interview)
     assert callable(interview_service.build_ability_profile)
-    assert callable(task_service._f2_match_chunk)
     assert callable(apply_service.generate_cover_letter)
     assert callable(apply_service.create_application)
     assert callable(apply_service.list_applications_for)

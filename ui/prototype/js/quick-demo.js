@@ -1,28 +1,16 @@
 ﻿/* quick-demo.js · 一键体验（Quick Demo，P0-1）
  *
- * 游客无需注册、无需上传：一键填充样例简历与专业/JD，
+ * 游客无需注册、无需上传：一键填充样例简历，
  * 优先走真实 API（无模型 key 时后端规则降级），API 不可用时退回演示数据。
  * 任何演示结果都必须显示"演示数据"标注，绝不伪装成用户真实结果。
  *
  * 用法：
  *   <button id="quickDemoF1" type="button">一键体验 F1</button>
  *   <script src="js/quick-demo.js"></script>
- *   或直接访问 f1-resume.html?quick=1 / f2-match.html?quick=1 自动执行。
+ *   或直接访问 f1-resume.html?quick=1 自动执行。
  */
 (function () {
   'use strict';
-
-  var DEMO_JD = [
-    '岗位职责：',
-    '1. 负责订单中心微服务的设计、开发与维护，保障接口稳定性与响应性能；',
-    '2. 参与库存扣减、支付回调等核心链路的方案设计与问题排查；',
-    '3. 编写接口文档并推动前后端联调。',
-    '任职要求：',
-    '1. 本科及以上学历，计算机相关专业；',
-    '2. 熟悉 Java 或 Go，了解 Spring Boot / Gin 等框架；',
-    '3. 熟悉 MySQL、Redis，理解常用数据结构与基础算法；',
-    '4. 了解分布式系统基础知识（锁、消息队列）者优先。'
-  ].join('\n');
 
   function $(id) { return document.getElementById(id); }
 
@@ -139,28 +127,13 @@
     }
   }
 
-  // ---------- F2 ----------
-  function startF2() {
-    var text = resumeText();
-    if (!text) { alert('演示数据未加载，请刷新后重试。'); return; }
-    showDemoBadge();
-    if (window.F2Major && typeof window.F2Major.runQuickDemo === 'function') {
-      window.F2Major.runQuickDemo('080901', text, (window.MOCK && window.MOCK.jdText) || DEMO_JD);
-    } else {
-      alert('当前页面不支持 F2 一键体验，请先选择专业后手动上传简历。');
-    }
-  }
-
   // ---------- 绑定与自动执行 ----------
   function bind() {
     var b1 = $('quickDemoF1');
     if (b1) b1.addEventListener('click', startF1);
-    var b2 = $('quickDemoF2');
-    if (b2) b2.addEventListener('click', startF2);
     if (!isQuick()) return;
     var page = (document.body.getAttribute('data-page') || '').toLowerCase();
     if (page.indexOf('f1') === 0) startF1();
-    else if (page.indexOf('f2') === 0) startF2();
   }
 
   if (document.readyState === 'loading') {
@@ -170,8 +143,7 @@
   }
 
   window.QuickDemo = {
-    start: function (t) { if (t === 'f2') { startF2(); } else { startF1(); } },
-    startF1: startF1,
-    startF2: startF2
+    start: function () { startF1(); },
+    startF1: startF1
   };
 })();

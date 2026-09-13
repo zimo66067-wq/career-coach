@@ -12,7 +12,6 @@
   var ENDPOINTS = {
     uploadResume:    '/api/wf01/upload',
     uploadJD:        '/api/wf03/upload',
-    tasks:           '/api/tasks',
     diagnoseResume:  '/api/wf02/diagnose',
     submitJD:        '/api/wf03/jd',
     matchJD:         '/api/wf03/match',
@@ -436,46 +435,6 @@
     setCache('jobText', res.jdText);
     return { jdText: res.jdText, trace_id: res.trace_id || traceId };
   }
-  // ── 任务中心（阶段3：客户端驱动分片）────────────────────
-  // 创建任务；同 owner + idempotency_key 幂等返回同一任务
-  async function createTask(taskType, payload, idempotencyKey) {
-    var traceId = genTraceId();
-    var body = { task_type: taskType, payload: payload };
-    if (idempotencyKey) body.idempotency_key = String(idempotencyKey).slice(0, 120);
-    var res = await request(ENDPOINTS.tasks, { body: body, _traceId: traceId });
-    if (res.error) return res;
-    return res.task || res;
-  }
-
-  // 查询任务进度
-  async function getTask(taskId) {
-    var res = await request(ENDPOINTS.tasks + '/' + encodeURIComponent(taskId), { method: 'GET', _traceId: genTraceId() });
-    if (res.error) return res;
-    return res.task || res;
-  }
-
-  // 推进一个分片（客户端驱动）
-  async function advanceTask(taskId) {
-    var res = await request(ENDPOINTS.tasks + '/' + encodeURIComponent(taskId) + '/next', { _traceId: genTraceId() });
-    if (res.error) return res;
-    return res.task || res;
-  }
-
-  // 轮询推进直至 done/failed；onProgress 收到每次任务快照
-  async function pollTask(taskId, onProgress) {
-    var task = await getTask(taskId);
-    if (!task || task.error) return task;
-    if (typeof onProgress === 'function') onProgress(task);
-    var guard = 0;
-    while (task && !task.error && (task.state === 'pending' || task.state === 'running') && guard < 80) {
-      task = await advanceTask(taskId);
-      if (!task || task.error) return task;
-      if (typeof onProgress === 'function') onProgress(task);
-      guard += 1;
-    }
-    return task;
-  }
-
   // 提交 JD -> {jobProfile, trace_id}
   async function submitJD(jdText) {
     var traceId = genTraceId();
@@ -780,10 +739,6 @@
     uploadResume: uploadResume,
     uploadResumeWithProgress: uploadResumeWithProgress,
     uploadJD: uploadJD,
-    createTask: createTask,
-    getTask: getTask,
-    advanceTask: advanceTask,
-    pollTask: pollTask,
     uploadJDWithProgress: uploadJDWithProgress,
     diagnoseResume: diagnoseResume,
     submitJD: submitJD,

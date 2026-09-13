@@ -223,7 +223,6 @@ def test_sensitive_json_endpoints_reject_array_bodies(isolated_db, monkeypatch):
     assert register.json["error"] == "invalid_request"
 
     for endpoint in (
-        "/api/tasks",
         "/api/wf04/stream",
         "/api/wf02/optimize",
         "/api/wf02/apply-rewrite",

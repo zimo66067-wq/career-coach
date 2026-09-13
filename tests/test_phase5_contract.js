@@ -150,7 +150,7 @@ test('f5-apply.js smoke-loads without load-time crashes', () => {
 });
 
 test('all pages expose the F5 navigation entry', () => {
-  const pages = ['index.html', 'pages/f1-resume.html', 'pages/f2-match.html',
+  const pages = ['index.html', 'pages/f1-resume.html',
     'pages/f3-interview.html', 'pages/f4-report.html', 'pages/kb.html', 'pages/f5-apply.html'];
   for (const rel of pages) {
     assert.match(read(rel), /data-page="f5"/, rel);

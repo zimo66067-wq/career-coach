@@ -13,7 +13,6 @@ TREES = [ROOT / "docs", ROOT / "public"]
 PAGES = [
     "index.html",
     "pages/f1-resume.html",
-    "pages/f2-match.html",
     "pages/f3-interview.html",
     "pages/f4-report.html",
     "pages/states.html",

@@ -83,11 +83,7 @@ from tools.model_router import ZhipuModelRouter  # noqa: E402
 from tools.radar_adapter import build_option  # noqa: E402
 from tools.redflag import JSON_NOISE, RE_NUMBER, RE_PLACEHOLDER  # noqa: E402
 from tools.rescore import calc_R, compute as rescore_compute, round2  # noqa: E402
-from tools.tasks import advance_task as tasks_advance  # noqa: E402
-from tools.tasks import create_task as tasks_create  # noqa: E402
-from tools.tasks import get_task as tasks_get  # noqa: E402
 from tools.validate_schema import business_rules  # noqa: E402
-from api.f2_major import route_api as route_f2_major  # noqa: E402
 
 
 
@@ -125,7 +121,6 @@ from services.organization_service import (  # noqa: E402
     provider_status,
     suggest_organizations,
 )
-from services.task_service import _f2_match_chunk  # noqa: E402
 from tools.api_errors import ApiError  # noqa: E402
 from tools.contracts import MAX_TEXT_CHARS, MIN_TEXT_CHARS  # noqa: E402
 from tools.providers.model import build_model_router  # noqa: E402
@@ -610,7 +605,7 @@ def route_api(**_ignored):
             "wf05/ability", "wf06/delete", "health",
             "admin/resumes", "admin/export",
             "auth/register", "auth/login", "auth/logout", "auth/me",
-            "history", "tasks",
+            "history",
             "knowledge/search", "knowledge/questions",
             "wf04/asr", "wf04/stream",
             "wf02/optimize", "wf02/apply-rewrite",
@@ -618,23 +613,9 @@ def route_api(**_ignored):
             "f5/organizations/status", "f5/organizations/suggest",
             "f5/organizations/discover", "f5/organizations/detail",
             "f5/organizations/jobs",
-        } or route.startswith("history/") or route.startswith("tasks/") or route.startswith("f2/") or route.startswith("f5/"):
+        } or route.startswith("history/") or route.startswith("f5/"):
             return ("", 204)
         raise ApiError("not_found", "接口不存在。", 404)
-    if route.startswith("f2/"):
-        if request.method == "GET" and route != "f2/health":
-            enforce_usage("f2_catalog_read", 240, 600, owner_key=_client_rate_key())
-        if route == "f2/match" and request.method == "POST":
-            require_consent()
-            enforce_usage("f2_match_hour", 30, 3600)
-            enforce_usage("f2_match_day", 100, 86400)
-            if not request.is_json:
-                raise ApiError("invalid_content_type", "专业匹配请求必须使用 JSON 格式。", 415)
-            body = request.get_json(silent=True)
-            if not isinstance(body, dict):
-                raise ApiError("invalid_request", "专业匹配请求格式无效。", 422)
-            ensure_session_access(body.get("session_id"), allow_create=True)
-        return route_f2_major()
 
     # F5 unit/job index (phase 1 foundation: contract + explicit degrade only).
     if route.startswith("f5/organizations/"):
@@ -774,47 +755,6 @@ def route_api(**_ignored):
         except AccountError as err:
             raise ApiError(err.code, err.message, err.status)
         return api_response({"status": "DELETED"})
-
-    if route == "tasks" and request.method == "POST":
-        require_consent()
-        enforce_usage("task_create_hour", 30, 3600)
-        body = require_json_object("任务请求")
-        task_type = str(body.get("task_type") or "")
-        if task_type != "f2_match":
-            raise ApiError("unsupported_task_type", "不支持的任务类型。", 422)
-        payload = body.get("payload")
-        if not isinstance(payload, dict):
-            raise ApiError("invalid_request", "任务参数格式无效。", 422)
-        session_id = str(payload.get("session_id") or trace_id()).strip()
-        payload["session_id"] = session_id
-        ensure_session_access(session_id, allow_create=True)
-        idempotency_key = str(body.get("idempotency_key") or "").strip()[:120] or None
-        task = tasks_create(
-            task_type,
-            _task_owner_key(),
-            payload=payload,
-            idempotency_key=idempotency_key,
-            total_steps=4,
-        )
-        return api_response({"task": task}, 201)
-
-    if route.startswith("tasks/"):
-        require_consent()
-        parts = route.split("/")
-        task_id = parts[1]
-        owner = _task_owner_key()
-        if request.method == "GET" and len(parts) == 2:
-            task = tasks_get(task_id)
-            if task is None or task["owner_key"] != owner:
-                raise ApiError("not_found", "任务不存在。", 404)
-            return api_response({"task": task})
-        if request.method == "POST" and len(parts) == 3 and parts[2] == "next":
-            task, status = tasks_advance(task_id, owner, _f2_match_chunk)
-            if task is None or status == "forbidden":
-                raise ApiError("not_found", "任务不存在。", 404)
-            if status == "already_done":
-                return api_response({"task": task, "notice": "任务已完成。"})
-            return api_response({"task": task})
 
     if route == "knowledge/search" and request.method == "GET":
         q = request.args.get("q", "")
@@ -1021,7 +961,7 @@ def route_api(**_ignored):
             "workflows": {
                 "wf01": "available", "wf02": "available", "wf03": "available",
                 "wf04": "available", "wf05": "available", "wf06": "available",
-                "wf07": "available", "f2_major": "available",
+                "wf07": "available",
             },
         })
     if route == "wf01/consent" and request.method == "POST":
@@ -1267,13 +1207,10 @@ for _rule in (
     "/api/admin/resumes", "/api/admin/export",
     "/api/auth/register", "/api/auth/login", "/api/auth/logout", "/api/auth/me",
     "/api/history", "/api/history/<id>",
-    "/api/tasks", "/api/tasks/<id>", "/api/tasks/<id>/next",
     "/api/knowledge/search", "/api/knowledge/questions",
     "/api/wf04/asr", "/api/wf04/stream",
     "/api/wf02/optimize", "/api/wf02/apply-rewrite",
     "/api/wf07/cover-letter", "/api/wf07/applications",
-    "/api/f2/health", "/api/f2/majors/tree", "/api/f2/majors/search",
-    "/api/f2/majors/<code>", "/api/f2/match", "/api/f2/intent",
     "/api/f5/organizations/status", "/api/f5/organizations/suggest",
     "/api/f5/organizations/discover", "/api/f5/organizations/detail",
     "/api/f5/organizations/jobs",

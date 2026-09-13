@@ -139,7 +139,7 @@
         var it = (items || []).filter(function (x) { return String(x.id) === id; })[0];
         if (!it || (typeof it.id === 'number' && it.id < 0)) return;
         var target = pageBase + {
-          F1: 'f1-resume.html', F2: 'f2-match.html', F3: 'f3-interview.html', F4: 'f4-report.html'
+          F1: 'f1-resume.html', F3: 'f3-interview.html', F4: 'f4-report.html'
         }[it.event_type];
         if (!target) return;
         location.href = target + '?session=' + encodeURIComponent(it.session_id);

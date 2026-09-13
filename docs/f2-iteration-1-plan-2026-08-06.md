@@ -1,5 +1,8 @@
 # F2 迭代一 · 专业导向岗位匹配 全链路规划与执行报告
 
+> ⚠️ **已作废（2026-09-13）**：本文档描述的专业→职业匹配（`api/f2_major.py`、`data/f2/*.json`、`pages/f2-match.html`、`/api/f2/*`）已由产品负责人裁决**整块删除**。
+> 本文件仅作历史记录保留，**不代表当前产品能力**。当前唯一匹配能力为 Target Job Analysis（`/api/wf03/jd` + `/api/wf03/match`）。决策记录见 `docs/product-scope.md` §10.1，删除清单见 `CHANGELOG.md` 2026-09-13 条目。
+
 > 规划日期：2026-08-06 ｜ 执行与验收：2026-08-08 ｜ 状态：已实现并端到端验证
 > 前置文档：[f2-major-based-matching-plan-2026-08-06.md](./f2-major-based-matching-plan-2026-08-06.md)
 

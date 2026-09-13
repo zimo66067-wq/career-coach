@@ -12,7 +12,6 @@
   var ENDPOINTS = {
     uploadResume:    '/api/wf01/upload',
     uploadJD:        '/api/wf03/upload',
-    tasks:           '/api/tasks',
     diagnoseResume:  '/api/wf02/diagnose',
     submitJD:        '/api/wf03/jd',
     matchJD:         '/api/wf03/match',
@@ -23,8 +22,7 @@
     deleteData:      '/api/wf06/delete',
     consent:         '/api/wf01/consent',
     coverLetter:     '/api/wf07/cover-letter',
-    applications:    '/api/wf07/applications',
-    majorMatch:      '/api/f2/match'
+    applications:    '/api/wf07/applications'
   };
 
   // 后端会依次尝试主模型与备用模型（Vercel 函数上限为 60 秒）。
@@ -196,27 +194,6 @@
       method: 'POST',
       body: { session_id: sessionId, company: company, position: position }
     });
-  }
-
-  async function matchMajor(majorCode, resumeText, jdText) {
-    var traceId = genTraceId();
-    var sessionId = getCache('sessionId') || traceId;
-    var res = await request(ENDPOINTS.majorMatch, {
-      body: {
-        majorCode: majorCode,
-        resumeText: resumeText,
-        jdText: jdText || '',
-        session_id: sessionId
-      },
-      _traceId: traceId
-    });
-    if (!res.error) {
-      res.score_M = res.score_M != null ? res.score_M : (res.scores && res.scores.overall);
-      res.gaps = res.gaps || (res.modeB && res.modeB.gaps) || [];
-      setCache('matchResult', res);
-      setCache('sessionId', res.session_id || sessionId);
-    }
-    return res;
   }
 
   function saveApplication(sessionId, company, position, coverLetter) {
@@ -470,46 +447,6 @@
     setCache('sessionId', res.session_id || sessionId);
     return { jdText: res.jdText, trace_id: res.trace_id || traceId, session_id: res.session_id || sessionId };
   }
-  // ── 任务中心（阶段3：客户端驱动分片）────────────────────
-  // 创建任务；同 owner + idempotency_key 幂等返回同一任务
-  async function createTask(taskType, payload, idempotencyKey) {
-    var traceId = genTraceId();
-    var body = { task_type: taskType, payload: payload };
-    if (idempotencyKey) body.idempotency_key = String(idempotencyKey).slice(0, 120);
-    var res = await request(ENDPOINTS.tasks, { body: body, _traceId: traceId });
-    if (res.error) return res;
-    return res.task || res;
-  }
-
-  // 查询任务进度
-  async function getTask(taskId) {
-    var res = await request(ENDPOINTS.tasks + '/' + encodeURIComponent(taskId), { method: 'GET', _traceId: genTraceId() });
-    if (res.error) return res;
-    return res.task || res;
-  }
-
-  // 推进一个分片（客户端驱动）
-  async function advanceTask(taskId) {
-    var res = await request(ENDPOINTS.tasks + '/' + encodeURIComponent(taskId) + '/next', { _traceId: genTraceId() });
-    if (res.error) return res;
-    return res.task || res;
-  }
-
-  // 轮询推进直至 done/failed；onProgress 收到每次任务快照
-  async function pollTask(taskId, onProgress) {
-    var task = await getTask(taskId);
-    if (!task || task.error) return task;
-    if (typeof onProgress === 'function') onProgress(task);
-    var guard = 0;
-    while (task && !task.error && (task.state === 'pending' || task.state === 'running') && guard < 80) {
-      task = await advanceTask(taskId);
-      if (!task || task.error) return task;
-      if (typeof onProgress === 'function') onProgress(task);
-      guard += 1;
-    }
-    return task;
-  }
-
   // 提交 JD -> {jobProfile, trace_id}
   async function submitJD(jdText) {
     var traceId = genTraceId();
@@ -832,15 +769,10 @@
     uploadResume: uploadResume,
     uploadResumeWithProgress: uploadResumeWithProgress,
     uploadJD: uploadJD,
-    createTask: createTask,
-    getTask: getTask,
-    advanceTask: advanceTask,
-    pollTask: pollTask,
     uploadJDWithProgress: uploadJDWithProgress,
     diagnoseResume: diagnoseResume,
     submitJD: submitJD,
     matchJD: matchJD,
-    matchMajor: matchMajor,
     startInterview: startInterview,
     submitAnswer: submitAnswer,
     endInterview: endInterview,

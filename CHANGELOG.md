@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+### Removed - 2026-09-13 专业→职业匹配整块下线（D1）
+- 删除 `api/f2_major.py`（703 行）：专业目录检索、意向推荐、模式 A/B 匹配、`LEVEL_SCORE` 专业契合度，以及 `/api/f2/*` 全部端点（`health`/`majors/tree`/`majors/search`/`majors/<code>`/`match`/`intent`），现在统一返回 404
+- 删除数据与脚本：`data/f2/majors_2025.json`、`data/f2/profiles_top30.json`（合计 175 KB）、`scripts/build_majors_data.py`、`scripts/validate_f2_data.py`
+- 删除仅为该功能存在的异步分片任务子系统：`services/task_service.py`、`tools/tasks.py`、`/api/tasks` 系列端点在移除前只支持 `task_type="f2_match"`，无其它调用方
+- 删除前端三套副本中的 `pages/f2-match.html`、`css/f2-major.css`、`js/f2-major.js`（public / docs / ui/prototype），以及 `data-bridge.js` 的 `matchMajor`、`createTask`/`getTask`/`advanceTask`/`pollTask`、`ENDPOINTS.tasks`/`ENDPOINTS.majorMatch`
+- 导航与入口：首页与各页移除 F2 导航项、F2 一键体验按钮与 F2 功能卡；`quick-demo.js` 只保留 F1 一键体验并移除 `DEMO_JD`；`account.js` 历史记录不再把 F2 事件链到已删除页面；`scripts/sync_sidebar.py` 的页面清单同步移除
+- F4 报告的 F2 行程节点改为不可点击的状态指示，避免跳转到已删除页面；节点文案沿用原文，留待导航重构阶段统一改名
+- 数据库：`tasks` 表从双方言 DDL 移除，并在 `init_db()` 中对其执行幂等 `DROP TABLE IF EXISTS`（老库不留孤儿表）；`transfer_owner_data()` 不再尝试更新该表
+- 保留但不再有页面挂载：`js/job-upload.js`（`/api/wf03` JD 解析→确认→匹配 UI）与 `job-upload.js` 相关测试。目标岗位分析的后端、数据桥与合同未做任何改动
+- 回归门禁：**pytest 423/423**、**Node 38/38**；`schema validation` 通过；敏感信息扫描对 tracked+untracked 内容无发现；`pip_audit` 两份 requirements 未新增发现；`git diff --check` 通过；public/docs 镜像逐字节一致
+- 新增回归门禁 `tests/test_phase1_deletions.py`（11 项）：下线端点在 GET 与 OPTIONS 下均 404、能力表不再含 `f2_major`、删除文件确实不存在、`api/index.py` 无残留 import、`vercel.json` 无 f2/tasks 重写、`tasks` 表不再创建且不再出现在 `transfer_owner_data`、`/api/wf03/match` 正向对照仍可用、publish 两树仍逐字节一致、publish 树不再出现已删页面引用
+
 ### Added - 2026-09-12 F5 单位/职位索引基础框架（阶段 1）
 - 新增双方言索引表：`organizations`、`organization_aliases`、`organization_profiles`、`source_snapshots`、`job_postings`、`job_posting_versions`、`job_embeddings`；单位与职位均以 `(source_provider, source_key)` / `(source_provider, external_job_id)` 幂等 upsert，职位内容哈希变化才追加版本
 - 新增 provider 契约 `tools/providers/organization.py`：默认 `UnconfiguredOrganizationProvider`，结果必须携带 `source_provider`、`source_url`、`source_updated_at`、`verified_at`、`verification_state`，缺项在写入与返回两处一律剔除；通过 `ORG_DATA_PROVIDER` 选择已注册且已授权的 provider

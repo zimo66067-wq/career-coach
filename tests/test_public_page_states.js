@@ -78,14 +78,6 @@ async function run() {
     assert.ok(html.includes('window.APP.isDemoMode()'), name + ' must guard synthetic success rendering');
   }
 
-  // F2 已升级为专业导向向导（选专业→画像→上传→报告）：空态 = 第一步面板；
-  // 进度门 = 未选专业时 f2Next1 禁用；结果仅来自 /api/f2/match，不读取合成演示数据。
-  const f2 = fs.readFileSync(path.join(root, 'docs', 'pages', 'f2-match.html'), 'utf8');
-  assert.ok(f2.includes('id="f2Step1"'), 'F2 must start at step 1 (empty state)');
-  assert.ok(f2.includes('id="f2Next1"') && f2.includes('disabled'), 'F2 step 1 must gate progression until a major is selected');
-  assert.ok(!f2.includes('getMockData'), 'F2 must not read synthetic demo data');
-  assert.ok(f2.includes('pages-api-config.js'), 'F2 must load the production API base');
-
   const bridge = loadBridge('');
   const offlineResults = await Promise.all([
     bridge.uploadResume({}),

@@ -38,14 +38,6 @@
   ],
   "rewrites": [
     {
-      "source": "/api/tasks/(.*)",
-      "destination": "/api?_route=tasks/$1"
-    },
-    {
-      "source": "/api/tasks",
-      "destination": "/api?_route=tasks"
-    },
-    {
       "source": "/api/knowledge/search",
       "destination": "/api?_route=knowledge/search"
     },
@@ -124,34 +116,6 @@
     {
       "source": "/api/admin/export",
       "destination": "/api?_route=admin/export"
-    },
-    {
-      "source": "/api/f2_major",
-      "destination": "/api?_route=retired/f2-major"
-    },
-    {
-      "source": "/api/f2/health",
-      "destination": "/api?_route=f2/health"
-    },
-    {
-      "source": "/api/f2/majors/tree",
-      "destination": "/api?_route=f2/majors/tree"
-    },
-    {
-      "source": "/api/f2/majors/search",
-      "destination": "/api?_route=f2/majors/search"
-    },
-    {
-      "source": "/api/f2/majors/(.*)",
-      "destination": "/api?_route=f2/majors/$1"
-    },
-    {
-      "source": "/api/f2/match",
-      "destination": "/api?_route=f2/match"
-    },
-    {
-      "source": "/api/f2/intent",
-      "destination": "/api?_route=f2/intent"
     },
     {
       "source": "/api/auth/register",

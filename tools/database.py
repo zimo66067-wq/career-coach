@@ -25,6 +25,12 @@ def dialect():
     return "postgres" if os.environ.get("DATABASE_URL", "").strip() else "sqlite"
 
 
+# Tables kept only by features that no longer exist.  They are dropped on
+# startup (idempotently) so a database created by an older build does not keep
+# storage that no code path reads or writes.
+_RETIRED_TABLES = ("tasks",)
+
+
 def _render(sql):
     """Translate SQLite placeholders to psycopg placeholders."""
     if dialect() == "postgres":
@@ -140,24 +146,6 @@ CREATE TABLE IF NOT EXISTS history_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_history_user ON history_events(user_id, created_at DESC);
-CREATE TABLE IF NOT EXISTS tasks (
-    id              TEXT PRIMARY KEY,
-    task_type       TEXT NOT NULL,
-    idempotency_key TEXT,
-    owner_key       TEXT NOT NULL,
-    state           TEXT NOT NULL DEFAULT 'pending',
-    progress        INTEGER NOT NULL DEFAULT 0,
-    total_steps     INTEGER NOT NULL DEFAULT 1,
-    current_step    INTEGER NOT NULL DEFAULT 0,
-    payload         TEXT,
-    result_json     TEXT,
-    error_code      TEXT,
-    error_message   TEXT,
-    created_at      TEXT NOT NULL,
-    updated_at      TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_key, created_at DESC);
 CREATE TABLE IF NOT EXISTS resume_rewrites (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id     TEXT NOT NULL,
@@ -357,14 +345,6 @@ CREATE TABLE IF NOT EXISTS history_events (
     status TEXT NOT NULL, created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_history_user ON history_events(user_id, created_at DESC);
-CREATE TABLE IF NOT EXISTS tasks (
-    id TEXT PRIMARY KEY, task_type TEXT NOT NULL, idempotency_key TEXT,
-    owner_key TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending',
-    progress INTEGER NOT NULL DEFAULT 0, total_steps INTEGER NOT NULL DEFAULT 1,
-    current_step INTEGER NOT NULL DEFAULT 0, payload TEXT, result_json TEXT,
-    error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_key, created_at DESC);
 CREATE TABLE IF NOT EXISTS resume_rewrites (
     id BIGSERIAL PRIMARY KEY, session_id TEXT NOT NULL, suggestion_id TEXT,
     issue TEXT, candidate_text TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
@@ -474,6 +454,12 @@ def init_db():
                     conn.execute(statement.strip())
         else:
             conn.executescript(_INIT_SQL)
+        # Retire tables whose only consumer was removed.  The asynchronous task
+        # queue existed solely to drive the major-based match, so both the
+        # feature and its storage are gone; dropping here keeps existing
+        # databases from carrying an orphan table nobody reads or writes.
+        for retired in _RETIRED_TABLES:
+            conn.execute("DROP TABLE IF EXISTS %s" % retired)
     finally:
         conn.close()
 
@@ -839,7 +825,7 @@ def transfer_owner_data(previous_owner, new_owner):
     changed = 0
     try:
         conn.execute("BEGIN")
-        for table in ("session_owners", "applications", "tasks"):
+        for table in ("session_owners", "applications"):
             cur = conn.execute(
                 f"UPDATE {table} SET owner_key = ? WHERE owner_key = ?",
                 (new_owner, previous_owner),
