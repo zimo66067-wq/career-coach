@@ -114,7 +114,7 @@
 
 ```
 提交 fc016c5（D1）      74 files changed, 1158 insertions(+), 13688 deletions(-)
-本次提交（Phase 1 其余） 72 files changed,  451 insertions(+),  4366 deletions(-)
+本次提交（Phase 1 其余） 73 files changed,   646 insertions(+),  4447 deletions(-)
 ```
 
 - 新增：`tests/test_phase1_deletions.py`（24 项删除契约）、`public|docs/assets/*`（3 个文件 ×2 树）
