@@ -140,6 +140,49 @@ DEFAULT_GUEST_MAX_AGE_SECONDS = 365 * 86400
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_BYTES + 1024 * 1024
 
 
+# ---- Phase 2：领域收敛迁移 ----------------------------------------------------
+# 建表本身是加法（CREATE TABLE IF NOT EXISTS），但"历史数据要落到新模型"必须显式迁移。
+# 迁移幂等；冷启动执行一次，失败不阻断服务（新表已由 DDL 建好，迁移只做列补齐与状态
+# 规范化），但必须可见 —— /api/health 的 migrations 字段会如实上报。
+#
+# 这里刻意只 import 模块本身而不是三个函数：/api/health 必须报告**当前**数据库的真实
+# 状态（补跑未应用的迁移后再上报），否则换了数据库之后健康检查会继续报旧结论。
+from repositories import migrations as _migrations  # noqa: E402
+
+_MIGRATION_ERROR = None
+try:
+    _migrations.ensure_applied()
+except Exception as exc:  # pragma: no cover - 故障路径由 /api/health 上报
+    _MIGRATION_ERROR = "%s: %s" % (type(exc).__name__, exc)
+    app.logger.exception("phase-2 domain migration failed")
+
+
+def migration_status():
+    """给 /api/health 用的迁移状态：先补跑未应用的迁移，再如实上报。
+
+    冷启动时的失败会记在 ``_MIGRATION_ERROR`` 里并一直上报，不会被重试掩盖。
+    """
+    expected = [version for version, _func in _migrations.MIGRATIONS]
+    error = _MIGRATION_ERROR
+    if error is None:
+        try:
+            _migrations.ensure_applied()
+        except Exception as exc:  # pragma: no cover - 故障路径
+            error = "%s: %s" % (type(exc).__name__, exc)
+    applied = []
+    try:
+        applied = sorted(_migrations.applied_versions())
+    except Exception as exc:  # pragma: no cover - 故障路径
+        if error is None:
+            error = "%s: %s" % (type(exc).__name__, exc)
+    return {
+        "ok": error is None and all(version in applied for version in expected),
+        "applied": applied,
+        "expected": expected,
+        "error": error,
+    }
+
+
 
 def configured_origins():
     values = os.environ.get("DUMATE_ALLOWED_ORIGINS", PUBLIC_PAGES_ORIGIN)
@@ -924,6 +967,8 @@ def route_api(**_ignored):
                 "wf04": "available", "wf05": "available", "wf06": "available",
                 "wf07": "available",
             },
+            # 领域收敛迁移的可观测性：迁移失败不静默（见 repositories/migrations.py）
+            "migrations": migration_status(),
         })
     if route == "wf01/consent" and request.method == "POST":
         enforce_usage("consent_hour", 30, 3600, owner_key=_client_rate_key())

@@ -166,6 +166,7 @@ CREATE TABLE IF NOT EXISTS applications (
     position     TEXT NOT NULL,
     cover_letter TEXT NOT NULL,
     status       TEXT NOT NULL DEFAULT 'applied',
+    target_job_id INTEGER,
     created_at   TEXT NOT NULL
 );
 
@@ -298,6 +299,137 @@ CREATE TABLE IF NOT EXISTS job_embeddings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_job_embeddings_org ON job_embeddings(organization_id);
+
+-- ---- Phase 2 · 领域收敛：职业证据 / 目标岗位 / 行动闭环 ----
+-- 口径依据 docs/domain-model.md：
+--   * CareerEvidence 是个人职业事实的唯一可信来源，必须带可回指的 source_quote
+--   * AI 产出的证据只能以 status='pending' 落库，user_confirmed 只能由用户确认置位
+--   * 目标岗位决策必须引用 >=3 条 evidence（在 domain 层校验）
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version    TEXT PRIMARY KEY,
+    applied_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS career_profiles (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_key    TEXT NOT NULL UNIQUE,
+    display_name TEXT,
+    headline     TEXT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS career_evidence (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_key      TEXT NOT NULL,
+    evidence_type  TEXT NOT NULL,
+    claim          TEXT NOT NULL,
+    source_type    TEXT NOT NULL,
+    source_id      TEXT,
+    source_quote   TEXT NOT NULL,
+    confidence     REAL NOT NULL DEFAULT 0.5,
+    status         TEXT NOT NULL DEFAULT 'pending',
+    user_confirmed INTEGER NOT NULL DEFAULT 0,
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL,
+    confirmed_at   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_owner ON career_evidence(owner_key, status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_evidence_source ON career_evidence(source_type, source_id);
+
+CREATE TABLE IF NOT EXISTS target_jobs (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_key        TEXT NOT NULL,
+    session_id       TEXT,
+    company          TEXT,
+    position         TEXT,
+    jd_text          TEXT,
+    job_profile_json TEXT,
+    status           TEXT NOT NULL DEFAULT 'open',
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_target_jobs_owner ON target_jobs(owner_key, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS job_requirements (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    target_job_id    INTEGER NOT NULL,
+    req_key          TEXT NOT NULL,
+    req_type         TEXT NOT NULL,
+    text             TEXT NOT NULL,
+    ordinal          INTEGER NOT NULL DEFAULT 0,
+    source_span_json TEXT,
+    created_at       TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_requirements_key ON job_requirements(target_job_id, req_key);
+
+CREATE TABLE IF NOT EXISTS evidence_matches (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    requirement_id INTEGER NOT NULL,
+    evidence_id    INTEGER,
+    match_status   TEXT NOT NULL,
+    rationale      TEXT,
+    created_at     TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_matches_req ON evidence_matches(requirement_id);
+
+CREATE TABLE IF NOT EXISTS gaps (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    target_job_id     INTEGER NOT NULL,
+    requirement_id    INTEGER,
+    gap_type          TEXT NOT NULL,
+    priority          TEXT NOT NULL,
+    reason            TEXT,
+    current_evidence  TEXT,
+    missing_evidence  TEXT,
+    action            TEXT,
+    expected_artifact TEXT,
+    retest            TEXT,
+    status            TEXT NOT NULL DEFAULT 'open',
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_gaps_target ON gaps(target_job_id, priority);
+
+CREATE TABLE IF NOT EXISTS target_job_decisions (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    target_job_id  INTEGER NOT NULL,
+    decision       TEXT NOT NULL,
+    rationale_json TEXT NOT NULL,
+    created_at     TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_decisions_target ON target_job_decisions(target_job_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS actions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_key  TEXT NOT NULL,
+    gap_id     INTEGER,
+    task       TEXT NOT NULL,
+    artifact   TEXT,
+    outcome    TEXT,
+    status     TEXT NOT NULL DEFAULT 'todo',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_actions_owner ON actions(owner_key, status, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS application_outcomes (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    application_id INTEGER NOT NULL,
+    outcome        TEXT NOT NULL,
+    note           TEXT,
+    recorded_at    TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_outcomes_application ON application_outcomes(application_id, recorded_at DESC);
 """
 
 
@@ -354,7 +486,7 @@ CREATE INDEX IF NOT EXISTS idx_rewrites_session ON resume_rewrites(session_id, s
 CREATE TABLE IF NOT EXISTS applications (
     id BIGSERIAL PRIMARY KEY, session_id TEXT NOT NULL, owner_key TEXT NOT NULL,
     company TEXT NOT NULL, position TEXT NOT NULL, cover_letter TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'applied', created_at TEXT NOT NULL
+    status TEXT NOT NULL DEFAULT 'applied', target_job_id BIGINT, created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_applications_owner ON applications(owner_key, created_at DESC);
 CREATE TABLE IF NOT EXISTS session_owners (
@@ -414,6 +546,65 @@ CREATE TABLE IF NOT EXISTS job_embeddings (
     content_hash TEXT NOT NULL, model TEXT, vector_json TEXT NOT NULL, created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_job_embeddings_org ON job_embeddings(organization_id);
+
+-- ---- Phase 2 · 领域收敛（PostgreSQL 方言，见 docs/domain-model.md）----
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version TEXT PRIMARY KEY, applied_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS career_profiles (
+    id BIGSERIAL PRIMARY KEY, owner_key TEXT NOT NULL UNIQUE, display_name TEXT,
+    headline TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_career_profiles_owner ON career_profiles(owner_key);
+CREATE TABLE IF NOT EXISTS career_evidence (
+    id BIGSERIAL PRIMARY KEY, owner_key TEXT NOT NULL, evidence_type TEXT NOT NULL,
+    claim TEXT NOT NULL, source_type TEXT NOT NULL, source_id TEXT, source_quote TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 0.5, status TEXT NOT NULL DEFAULT 'pending',
+    user_confirmed INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL, confirmed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_evidence_owner ON career_evidence(owner_key, status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_evidence_source ON career_evidence(source_type, source_id);
+CREATE TABLE IF NOT EXISTS target_jobs (
+    id BIGSERIAL PRIMARY KEY, owner_key TEXT NOT NULL, session_id TEXT, company TEXT,
+    position TEXT, jd_text TEXT, job_profile_json TEXT, status TEXT NOT NULL DEFAULT 'open',
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_target_jobs_owner ON target_jobs(owner_key, created_at DESC);
+CREATE TABLE IF NOT EXISTS job_requirements (
+    id BIGSERIAL PRIMARY KEY, target_job_id BIGINT NOT NULL, req_key TEXT NOT NULL,
+    req_type TEXT NOT NULL, text TEXT NOT NULL, ordinal INTEGER NOT NULL DEFAULT 0,
+    source_span_json TEXT, created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_requirements_key ON job_requirements(target_job_id, req_key);
+CREATE TABLE IF NOT EXISTS evidence_matches (
+    id BIGSERIAL PRIMARY KEY, requirement_id BIGINT NOT NULL, evidence_id BIGINT,
+    match_status TEXT NOT NULL, rationale TEXT, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_evidence_matches_req ON evidence_matches(requirement_id);
+CREATE TABLE IF NOT EXISTS gaps (
+    id BIGSERIAL PRIMARY KEY, target_job_id BIGINT NOT NULL, requirement_id BIGINT,
+    gap_type TEXT NOT NULL, priority TEXT NOT NULL, reason TEXT, current_evidence TEXT,
+    missing_evidence TEXT, action TEXT, expected_artifact TEXT, retest TEXT,
+    status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gaps_target ON gaps(target_job_id, priority);
+CREATE TABLE IF NOT EXISTS target_job_decisions (
+    id BIGSERIAL PRIMARY KEY, target_job_id BIGINT NOT NULL, decision TEXT NOT NULL,
+    rationale_json TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_decisions_target ON target_job_decisions(target_job_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS actions (
+    id BIGSERIAL PRIMARY KEY, owner_key TEXT NOT NULL, gap_id BIGINT, task TEXT NOT NULL,
+    artifact TEXT, outcome TEXT, status TEXT NOT NULL DEFAULT 'todo',
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_actions_owner ON actions(owner_key, status, updated_at DESC);
+CREATE TABLE IF NOT EXISTS application_outcomes (
+    id BIGSERIAL PRIMARY KEY, application_id BIGINT NOT NULL, outcome TEXT NOT NULL,
+    note TEXT, recorded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_outcomes_application ON application_outcomes(application_id, recorded_at DESC);
 """
 
 
@@ -444,8 +635,24 @@ def _get_conn():
     return conn
 
 
+#: Databases whose schema this process has already created.  Recommended because
+#: every repository call goes through ``connection()`` -> ``init_db()``, and the
+#: DDL is 29 tables plus their indexes; without this cache a read-only endpoint
+#: such as /api/health would replay the whole script on every request.
+_INITIALIZED = set()
+
+
 def init_db():
-    """Create tables and indexes if they do not exist."""
+    """Create tables and indexes if they do not exist.
+
+    Cached per connection target for the life of the process.  The statements are
+    all ``CREATE ... IF NOT EXISTS``, so replaying them is only wasted work, never
+    a correctness requirement — and tests that point at a fresh database still get
+    a real run because the key includes the resolved path.
+    """
+    key = "postgres" if dialect() == "postgres" else str(db_path())
+    if key in _INITIALIZED:
+        return
     conn = _get_conn()
     try:
         if dialect() == "postgres":
@@ -462,6 +669,12 @@ def init_db():
             conn.execute("DROP TABLE IF EXISTS %s" % retired)
     finally:
         conn.close()
+    _INITIALIZED.add(key)
+
+
+def reset_init_cache():
+    """Drop the "schema created" cache (tests that reuse a path after wiping it)."""
+    _INITIALIZED.clear()
 
 
 def _insert_returning_id(conn, sql, params):
@@ -470,6 +683,60 @@ def _insert_returning_id(conn, sql, params):
         row = conn.execute(f"{sql.rstrip()} RETURNING id", params).fetchone()
         return row["id"]
     return conn.execute(sql, params).lastrowid
+
+
+# ------------------------------------------------------------------ #
+# Public infrastructure façade
+#
+# The domain-consolidation layers (repositories/, services/) must not reach for
+# the underscore-prefixed helpers above.  These four functions are the supported
+# entry points for opening a connection, translating placeholders, inserting a
+# row and reading the canonical timestamp, so the private names stay free to
+# change without breaking callers.
+# ------------------------------------------------------------------ #
+
+def connection():
+    """Ensure the schema exists and return an open connection (dialect-aware)."""
+    init_db()
+    return _get_conn()
+
+
+def render(sql):
+    """Translate ``?`` placeholders for the active dialect."""
+    return _render(sql)
+
+
+def insert_id(conn, sql, params):
+    """Insert one row and return its generated id."""
+    return _insert_returning_id(conn, sql, params)
+
+
+def utc_iso():
+    """Canonical UTC timestamp string used across every table."""
+    return _utc_iso()
+
+
+def has_column(conn, table, column):
+    """True when ``table`` already has ``column`` (works on both dialects)."""
+    if dialect() == "postgres":
+        row = conn.execute(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = %s AND column_name = %s",
+            (table, column),
+        ).fetchone()
+        return row is not None
+    rows = conn.execute("PRAGMA table_info(%s)" % table).fetchall()
+    return any(row[1] == column for row in rows)
+
+
+def table_names(conn):
+    if dialect() == "postgres":
+        rows = conn.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+        ).fetchall()
+        return {row[0] for row in rows}
+    rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    return {row[0] for row in rows}
 
 
 def save_resume(session_id, client_ip, user_agent, filename, file_type,

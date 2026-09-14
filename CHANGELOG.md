@@ -4,6 +4,70 @@
 
 ## [Unreleased]
 
+### Added - 2026-09-14 领域收敛：Career Evidence / TargetJob / Action / Application（Phase 2）
+
+新增纯域层与数据层两包，把"什么算合法"从 `api/index.py` 与 `services/*.py` 里
+抽出来。分层方向定为 Routes → Services → **Domain** → Repositories / Providers；
+`domain/` 不 import Flask / `tools.database` / `services`，因此可以在无数据库、
+无网络的条件下测试。
+
+- `domain/evidence.py`：CareerEvidence。三条硬规则 —— 引文必填且必须是来源原文的
+  逐字子串（与 F1 的 source_span 事实锁同口径）；模型产出（resume / interview /
+  application_outcome）**不得**直接写成 confirmed，只有 `user_input` 可以；已确认
+  证据的正文被修改会退回 pending，除非声明 `confirmed_by_user=True`
+- `domain/career_profile.py`：CareerProfile 的六个分支是**同一批证据的视图**，
+  不是第二套事实；`usable_evidence()` 是唯一对外入口
+- `domain/target_job.py`：JobRequirement / EvidenceMatch / Gap / Decision。
+  APPLY / STRETCH / PASS 写成可读谓词而非权重求和，且 `decide()` 会独立重算
+  `expected_decision()`，结论不一致直接拒绝（不允许手写判定）；每条 Decision 至少
+  3 条不重复依据
+- `domain/interview.py`：出题优先级 P0 Gap > P1 Gap > 关键证据验证 > 行为问题 >
+  通用题库；评估分数强制标注为**训练指标**，不得暗示招聘成功率；面试新经历走
+  `candidate_evidence()` 必然是 pending
+- `domain/action.py`：Gap → Action → Artifact → Outcome。没有 `expected_artifact`
+  的动作不算闭环；只有 `done` 且带 artifact 才允许记录结果
+- `domain/application.py`：7 态状态机（considering/preparing/applied/interview/
+  offer/rejected/withdrawn），终态不可迁出；**新建默认 preparing 而非 applied**
+  （原实现默认 applied 等于凭空断言已投递）；结果可反向写入待确认证据
+- `repositories/`：唯一拼 SQL 的层。每条语句走 `database.render()` 以兼容双方言；
+  所有查询带 `owner_key` 条件，归属隔离在数据层兜底
+- 双方言 DDL 新增 9 张表 + `schema_migrations`；库内共 30 张
+
+### Added - 2026-09-14 版本化迁移（D4：已授权迁移生产数据）
+
+- `applications` 补 `target_job_id`（ALTER TABLE，非破坏）
+- 历史 `status` 规范到 7 态；未知值兜底为最保守的 `applied` 并记入 `unknown_values`，
+  不猜测
+- 为历史 owner_key 补建 CareerProfile，**但不生成任何证据**
+- **刻意不从既有 `diagnoses` 反向生成证据**：诊断的 `source_spans` 多是"实习经历"
+  这类小节标题，变成职业事实会污染唯一可信源
+- `/api/health` 新增 `migrations` 字段（`ok / applied / expected / error`），
+  报告前先补跑未应用的迁移，避免"换了数据库却继续报 ok"
+
+### Fixed - 2026-09-14 Phase 2 自查发现的四个缺陷
+
+- **Decision 规则误判**：初版额外做了一层「P0 且 req_type == hard」过滤，但
+  `priority_for` 已把 hard 唯一映射成 P0，且缺口记录不保存 req_type，导致"P0 硬性
+  缺口"被判成 STRETCH。修正为只看优先级，并加测试锁住「P0 ⟺ hard」
+- **迁移无法人工重跑**：`apply_all(force=True)` 会重复插入 `schema_migrations`
+  版本行并撞主键。`_mark()` 改为幂等
+- **`init_db()` 每次调用重放整套 DDL**：`repositories.base.cursor()` 每次都走
+  `connection()` → `init_db()`，而 DDL 从不缓存；Phase 2 新增的 `applied_versions()`
+  被 `/api/health` 调用，于是每个健康检查请求都在重放 29 张表 + 约 30 个索引
+  （实测冷跑 75ms）。`init_db()` 改为按连接目标在进程内缓存一次，
+  单次 `connection()` 从 ~82ms 降到 7.35ms
+- **邮箱脱敏正则二次复杂度（先于 Phase 2 存在，但属生产缺陷）**：
+  `[A-Za-z0-9._%+-]+@` 在"不含 @"的长文本上对每个起点都要吃到结尾再回溯找 `@`。
+  接口明确接受 20 万字符简历、脱敏又是 WF-01 必经环节，实测 `deidentify(200_000)`
+  需 **114.7 秒**，`test_text_maximum_length_accepted` 单用例 75.6 秒、占全量门禁的
+  64%。加前瞻 `(?<![A-Za-z0-9._%+-])` + RFC 长度上限后降到 **10.3ms**，该用例
+  **0.12 秒**，全量门禁 **234 秒 → 52.13 秒**；`tools/log_sanitize.py` 同一写法同步修正。
+  语义不变（`a@b.co` 仍脱敏、`a @ b` 不误伤），有测试覆盖
+
+- 回归门禁：pytest 392 passed (52.13s)、Node 36/36；schema / 敏感扫描 / `git diff --check` / 镜像一致
+
+- 回归门禁：pytest 待记、Node 36/36；schema / 敏感扫描 / `git diff --check` / 镜像一致
+
 ### Removed - 2026-09-13 Phase 1 其余项（C7 预测 / 知识库 / 语音 / 死路由）
 - **C7 预测区间彻底删除**：`tools/rescore.py` 不再输出 `C7_low`/`C7_high`（固定 0.30/0.70 演示假设），`services/interview_service.build_ability_profile` 与 `api/index.py` 的 `wf05/ability` 响应不再返回；`contracts/ability-profile.schema.json` 移除 `scenario_day7`（含 required）；`contracts/scoring.md` §4 改写为「C0 是当前证据快照，不是就业概率，也不是预测」。保留 `C0` 与六维分，并新增「不代表真实就业概率」的显式标注
 - **前端同步**：`radar.js` 只画一条「当前证据快照」曲线（原三条：C0 + 七天推演 low/high）；`f4-report.html` 移除区间带与情景假设块，标题去掉「七天竞争力情景推演」；`index.html` 与 `mock-data.js` 同步；三份镜像一致

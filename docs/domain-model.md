@@ -1,0 +1,263 @@
+# domain-model.md · Career Coach 领域模型（Phase 2）
+
+- 日期：2026-09-14
+- 状态：**已实现**（`domain/` + `repositories/`），尚未接入 HTTP 路由（Phase 3）
+- 范围：CareerEvidence / CareerProfile / TargetJob / InterviewSession / Action / Application
+- 配套：`docs/architecture.md`（现状清点）、`docs/product-scope.md`（产品裁决）、
+  `docs/dependency-map.md`（依赖与缺陷）、`docs/phase1-report.md`（Phase 1 报告）
+
+---
+
+## 1. 为什么要有一层 domain
+
+Phase 1 之前，"什么算合法"这件事散落在三个地方：`api/index.py` 的参数校验、
+`services/*.py` 的编排、`tools/*.py` 的纯函数。结果是同一条规则有两个版本，而
+"职业事实"没有任何地方定义过 —— 简历诊断的分数、JD 匹配的证据、面试评估的引用块
+各说各话，没有一个能被回溯的实体。
+
+Phase 2 把这层抽出来：`domain/` 只回答"什么算合法"，不做任何 I/O；`repositories/`
+是唯一拼 SQL 的地方。分层方向：
+
+```
+Routes  →  Services  →  Domain  →  Repositories / Providers
+```
+
+**反向依赖零容忍**：`domain/` 不 import Flask、不 import `tools.database`、
+不 import `services`。这一条让域规则可以在没有数据库、没有网络的情况下被测试
+（`tests/test_domain_model.py`，46 项，0.7 秒跑完）。
+
+---
+
+## 2. 实体关系
+
+```
+CareerProfile                     长期容器，owner 唯一
+├── Evidence                      唯一可信来源（career_evidence）
+├── Experience                    evidence_type = experience
+├── Skill                         evidence_type = skill
+├── Achievement                   evidence_type = achievement
+├── Story                         evidence_type = story
+└── Preference                    evidence_type = preference
+
+TargetJob                         一个目标岗位
+├── JobRequirement                JD 拆出的要求（hard / responsibility / preferred / terminology）
+├── EvidenceMatch                 要求 ↔ 证据的四态判定（covered / weak / missing / unknown）
+├── Gap                           未满足的要求 → 可执行补强（P0 / P1 / P2）
+├── Decision                      APPLY / STRETCH / PASS（至少 3 条依据）
+└── Application                   投递记录（7 态）
+
+InterviewSession
+├── TargetJob / Gap               出题依据
+├── Question                      含类型与优先级来源
+├── Answer                        含逐字引文
+├── Evaluation                    训练指标（必须标注）
+└── NewEvidence                   面试新经历 → **必须经用户确认**
+
+Action                            Gap → Action → Artifact → Outcome
+```
+
+**后五个分支不是五张表。** `Profile.buckets()` 是同一批证据按
+`evidence_type` 分出的视图。这样"我的经历"永远等于"证据里 experience 那部分"，
+不会出现两套互相矛盾的事实。`Profile.summary()` 给出每类的 总数/已确认/待确认。
+
+---
+
+## 3. 三条贯穿全部实体的不变量
+
+### 3.1 任何职业事实都必须能回指来源
+
+`new_evidence()` 要求 `source_quote` 非空；当调用方提供了 `source_text`（来源原文）
+时，**引文必须是原文的逐字子串**，否则抛 `quote_not_verbatim`。这与 F1 诊断的
+`source_span` 事实锁是同一个口径，`verify_quote()` 可在落库后复查。
+
+`source_type` 是白名单，只有四个值：
+
+| source_type | 含义 | 是否允许直接 confirmed |
+| --- | --- | --- |
+| `resume` | 从简历抽取 | ❌ 只能 pending |
+| `interview` | 面试回答中抽取 | ❌ 只能 pending |
+| `application_outcome` | 由投递结果推断 | ❌ 只能 pending |
+| `user_input` | 用户本人陈述 | ✅ 允许 |
+
+需要外部定位对象的来源（前三个）**必须带 `source_id`**，否则无法回指，直接
+拒绝（`missing_source_id`）。
+
+### 3.2 AI 不能把推测写成已确认事实
+
+这是产品的立身之本，也是零容忍项（DoD #17）。实现上是三处防护：
+
+1. **创建时**：`resume` / `interview` / `application_outcome` 三个来源显式传
+   `status="confirmed"` 会被拒绝（`evidence_requires_confirmation`），默认只会
+   落成 `pending`。
+2. **确认时**：只有 `confirm()` 能把 `pending` 翻成 `confirmed` 并置
+   `user_confirmed=1`、写 `confirmed_at`。`confirm()` 是用户动作，不是模型动作。
+3. **修改时**：已确认证据的正文被改动会**退回 pending**，除非调用方显式声明
+   `confirmed_by_user=True`（即"这次修改就是用户本人做的"）。这防止"确认过的旧
+   文案被悄悄替换成新说法"。
+
+`is_usable()` 是唯一判据：`status == confirmed` **且** `user_confirmed == 1`。
+改写、匹配、面试、求职信都必须走 `usable_evidence()`，不得直接读全部证据。
+
+### 3.3 关键判断必须可解释（≥3 条依据）
+
+`decide()` 生成一条 Decision 时校验：至少 3 条依据、不得为空串、不得重复。
+
+更重要的是**判定规则透明**：`decide()` 接受 `gaps`，会独立算一遍
+`expected_decision()`，与调用方给的结论不一致就直接拒绝（`decision_inconsistent`）。
+**不允许手写结论**。
+
+---
+
+## 4. APPLY / STRETCH / PASS 的规则
+
+规则写成可读谓词，不是权重求和。优先级由 `priority_for()` 唯一决定：
+`hard → P0`、`responsibility → P1`、`preferred/terminology → P2`。
+
+| Decision | 条件 |
+| --- | --- |
+| **PASS** | 存在未解决的 **P0** 缺口 —— 短期无法补齐的关键门槛 |
+| **STRETCH** | 没有未解决的 P0，但存在未解决的 **P1** 缺口（岗位职责级），可由已有证据重写或短期补强 |
+| **APPLY** | 不存在未解决的 P0/P1 缺口 |
+
+"未解决" = `status ∈ {open, doing}`。`done` / `dropped` 的缺口不参与判定。
+
+> **实现说明（Phase 2 修正）**：初版实现额外做了一层"要求类型过滤"
+> （P0 且 `req_type == hard` 才算 PASS）。这是错的 —— 因为 `priority_for` 已经把
+> `hard` 唯一映射成 `P0`，而缺口记录里不保存 `req_type`，于是"P0 硬性缺口"会被
+> 误判成 STRETCH。修正后只看优先级，`tests/test_domain_model.py` 里有一条测试
+> 专门锁住「P0 ⟺ hard」这个映射。
+
+---
+
+## 5. 申请 7 态状态机
+
+```
+considering → preparing → applied → interview → offer
+                                   ↘ rejected
+任意状态 → withdrawn
+```
+
+- `rejected` / `withdrawn` 是**终态**，不能再迁出。
+- 非法迁移抛 `invalid_transition`（例如 `considering → applied`、
+  `offer → rejected`、`applied → preparing`）。
+- **新建默认是 `preparing`，不是 `applied`。** 原实现默认 `applied` 会凭空断言
+  "已经投递"。只有投出去之后才应由用户显式确认。
+- 结果（`ApplicationOutcome`）会反向影响 Career Profile：
+  `evidence_from_outcome()` 产出一条 `source_type='application_outcome'` 的
+  **待确认**证据 —— "被拒说明我缺 X"是推断，不是用户陈述。
+
+结果类型：`applied / interview / offer / rejected / withdrawn / no_response`。
+其中 `no_response` 不改变申请状态。
+
+---
+
+## 6. 行动闭环
+
+```
+Gap → Reason → Current Evidence → Missing Evidence → Action → Expected Artifact → Retest
+```
+
+两条规则保证"闭环"不是空话：
+
+1. `open_from_gap()` 要求缺口带 `expected_artifact`，否则拒绝
+   （`artifact_required`）—— 没有可验证成果物的动作不算闭环。
+2. `record_outcome()` 只接受 `status == done` **且**带 artifact 的动作，否则拒绝
+   （`action_not_done`）—— 避免"什么都没做，但记录了一个结果"。
+
+动作状态：`todo → doing → done`，允许 `todo → done`（当天做掉一件小事是主场景，
+强制先标 `doing` 只是多余仪式），允许 `done → doing`（返工），`dropped` 是终态。
+
+---
+
+## 7. 面试出题优先级与训练指标
+
+出题顺序（`domain/interview.py`）：
+
+```
+P0 Gap > P1 Gap > 关键证据验证 > 行为问题 > 通用题库
+```
+
+`plan_question_order()` 只做排序，不生成文案；已关闭的缺口不出题。
+
+**评分必须标注为训练指标**：`evaluation()` 返回的记录里 `is_training_metric=True`
+且带 `notice`（"本轮评分为训练指标……不代表真实招聘结果或录用概率"）。这是产品
+口径，不是可选文案。
+
+面试中发现的新经历走 `candidate_evidence()`，它的 `source_type='interview'`，
+因此**必然落成 pending**，且 `quote` 必须是回答原文的逐字子串。
+
+---
+
+## 8. 数据表（Phase 2 新增 10 张，库内共 30 张）
+
+SQLite 与 PostgreSQL 两份 DDL 同步维护（`tools/database.py`）；`schema_migrations`
+由 `repositories/migrations.py` 建，其余 9 张在 DDL 里。
+
+| 表 | 用途 |
+| --- | --- |
+| `schema_migrations` | 迁移版本记录 |
+| `career_profiles` | owner 唯一的职业档案容器 |
+| `career_evidence` | 证据（唯一可信来源） |
+| `target_jobs` | 目标岗位 |
+| `job_requirements` | JD 拆出的要求（保留 source_span） |
+| `evidence_matches` | 要求 ↔ 证据四态判定 |
+| `gaps` | 缺口（P0/P1/P2 + 行动四段） |
+| `target_job_decisions` | Decision 与其依据（JSON） |
+| `actions` | 行动闭环 |
+| `application_outcomes` | 投递结果 |
+
+另：`applications` 增加 `target_job_id`（列补齐走迁移，见下）。
+
+---
+
+## 9. 迁移（D4：已授权迁移生产数据）
+
+`repositories/migrations.py` 提供最小可用的版本化迁移：
+
+| 版本 | 内容 |
+| --- | --- |
+| `2026-09-13-phase2-application-status` | `applications` 补 `target_job_id`；历史 `status` 规范到 7 态 |
+| `2026-09-13-phase2-career-profiles` | 为历史上出现过的 owner_key 补建 CareerProfile |
+
+性质：
+
+- **幂等**：重复执行不改变结果；`force=True` 可人工重跑，且不会重复记版本。
+- **冷启动执行一次**，失败不阻断服务（新表已由 DDL 建好），但会在 `/api/health`
+  的 `migrations` 字段里如实上报 `ok / applied / expected / error`。
+- 健康检查**先补跑未应用的迁移再上报**，避免"换了数据库却继续报 ok"。
+- 未知历史状态值兜底为最保守的 `applied`，并在报告里记入 `unknown_values`，
+  不猜测。
+
+> **刻意不做的事**：不从既有 `diagnoses` 反向生成证据。诊断的 `source_spans`
+> 引文多为"实习经历"这类小节标题，把它变成"职业事实"会直接污染唯一可信源。
+> 证据必须由用户确认后进入，迁移不代替用户做这件事。这条有专门测试
+> （`test_migration_does_not_turn_a_historical_diagnosis_into_evidence`）。
+
+---
+
+## 10. 测试
+
+| 文件 | 项数 | 覆盖 |
+| --- | --- | --- |
+| `tests/test_domain_model.py` | 46 | 三条不变量、Decision 规则、状态机、行动闭环、出题优先级 |
+| `tests/test_migrations.py` | 12 | 新库冷启动、幂等、**真实老库**（旧 applications 无新列 + 脏状态）、档案回填不造证据、health 自愈与如实上报 |
+
+迁移测试不是拿新库跑一遍就完事：它用手写的旧 DDL 建一个**真的没有
+`target_job_id` 列、且 status 是 `submitted` / `interviewing` / `saved` /
+`weird_value` 的库**，再断言迁移结果。
+
+---
+
+## 11. 尚未接线（Phase 3 待办）
+
+domain 与 repositories 已就位，但**还没有 HTTP 路由**：
+
+- CareerProfile 的读写接口
+- TargetJob 的 JD → Requirements → EvidenceMatch → Gap → Decision 全链路
+- 面试引擎按 `plan_question_order()` 定向出题
+- 行动闭环与结果回流
+- `js/job-upload.js`（JD 解析→确认→匹配 UI）**仍无宿主页面**，需要在目标岗位
+  工作区里重新挂载
+
+**因此当前不得对外声称已具备 "Career Evidence Profile" 或 "APPLY/STRETCH/PASS
+决策" 的可用功能** —— 那是 Phase 3 的交付物。

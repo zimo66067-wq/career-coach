@@ -15,7 +15,10 @@ import re
 import sys
 
 RE_PHONE = re.compile(r"1[3-9]\d{9}")
-RE_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+# 与 tools/deidentify.py 保持同一写法：前瞻 + 长度上限，否则在长日志行上是二次复杂度。
+RE_EMAIL = re.compile(
+    r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,24}"
+)
 RE_ID = re.compile(r"\d{17}[\dXx]")
 RE_NAME_FIELD = re.compile(r"(姓\s*名\s*[:：]\s*)([\u4e00-\u9fa5·]{2,4})")
 RE_BEARER = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._\-]{8,}")

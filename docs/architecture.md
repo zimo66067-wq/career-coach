@@ -21,6 +21,17 @@
 > | `README:74` 列出 3 个语音 env | §14 | 已删除（README 同步修正） |
 > | `/assets/:path*` → `/ui/assets/:path*` | §4 死路由 | 已修正为 `/public/assets/:path*`，favicon 恢复 |
 >
+> **Phase 2 更新（2026-09-14）**：领域层与数据层已建立，本文件以下结论随之改变 ——
+>
+> | 审计条目 | 位置 | 现状 |
+> | --- | --- | --- |
+> | "不存在 CareerProfile / CareerEvidence 实体" | §5、§7 | 已建立 `domain/`（纯规则）+ `repositories/`（唯一拼 SQL），双方言新增 9 张表 + `schema_migrations` |
+> | `diagnosis_service` / `interview_service` 反向 import `api.index` | §3 依赖倒置 | **仍然存在**（2 处）。新的 domain/repositories 层不反向依赖 API，但既有 service 的重构属于 Phase 5，本轮未动 |
+> | 表数量 20 张 | §7 | 30 张 |
+> | 无 migration 机制 | §7 | 已有 `repositories/migrations.py`（版本化、幂等、`/api/health` 可观测） |
+>
+> 新增参考：`docs/domain-model.md`（领域模型与不变量）。
+>
 > **现状口径**：主产品只剩一套匹配概念（`wf03` / `services/match_service.py`，DoD #6 达成）；
 > dependency inversion 由 3 处降为 2 处；一级导航 7 → 5 项；dead routes = 0。
 > 仍有效的审计结论：`/api/admin/*`、`/api/f5/organizations/*` 无用户界面消费；`ui/prototype` 是陈旧分叉（Phase 6/7）。

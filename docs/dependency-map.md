@@ -25,6 +25,21 @@
 > `vercel.json` 静态重写目标全部存在、`_route` 全部有处理器（**dead routes = 0**）；
 > 一级导航 7 → 5。新增回归门禁 `tests/test_phase1_deletions.py`（11 项）。
 > 仍有效的结论：§6 的 `ui/prototype` 陈旧分叉、§7 的 `tasks/` 目录与 4 个一次性推送脚本。
+>
+> **Phase 2 更新（2026-09-14）**：领域层与数据层建成，本文档以下结论随之改变 ——
+>
+> - **§3 依赖倒置从 2 处减少的路径没有走通，但新增代码不再制造新倒置**：
+>   `services/diagnosis_service.py:324` 与 `services/interview_service.py:50` 仍
+>   `from api.index import build_model_router`。新的 `domain/` 与 `repositories/`
+>   两包经静态扫描确认**不 import flask / api / services**，分层方向在新增代码上成立；
+>   既有两处的修复属于 Phase 5（`build_model_router` 应从 `tools/providers/model.py`
+>   经 provider registry 注入）。
+> - **§7 "无 migration 机制"已解决**：新增 `repositories/migrations.py`，版本化、幂等、
+>   `/api/health` 可观测。
+> - **表数量 20 → 30**，双方言 DDL 同步。
+> - **§4.1 "api/index.py 既是路由又是业务"仍然有效**：拆 `api/index.py` 属于 Phase 5。
+>
+> 新增参考：`docs/domain-model.md`。
 
 ---
 
