@@ -1,9 +1,10 @@
 # phase3-report.md · Phase 3（Core Flow）
 
 - 日期：2026-09-14
+- 提交：**`a0c055f`**（18 文件，+2430 / −106）
 - 阶段目标：打通 **Resume → Evidence → Target Job → Match → APPLY/STRETCH/PASS → Interview**
 - 授权：D8 已决策为**方案 A**（诊断只产候选证据，用户确认后才是事实）
-- 结论：**Phase 3 完成（后端闭环）**。6 个新服务函数组、11 条新路由、1 条新迁移、1 套新测试。
+- 结论：**Phase 3 完成（后端闭环）**。11 条新路由、2 个新服务模块、1 条新迁移、1 套新测试。
   **前端工作面（导航/页面）仍属 Phase 6**，因此"用户能在浏览器里走完闭环"尚未成立。
 
 ---
@@ -11,7 +12,7 @@
 ## 1. 修改摘要
 
 ```
-14 files changed, 2044 insertions(+), 71 deletions(-)
+18 files changed, 2430 insertions(+), 106 deletions(-)   (a0c055f)
 ```
 
 | 新增 | 作用 |

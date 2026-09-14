@@ -336,7 +336,7 @@ D3 阻塞 F5 阶段 2。
 
 ## 12. Phase 3 完成记录（2026-09-14）
 
-Phase 3（Core Flow）后端闭环打通，一个提交：14 文件，**+2044 / −71**。
+Phase 3（Core Flow）后端闭环打通，一个提交 **`a0c055f`**：18 文件，**+2430 / −106**。
 
 **新增能力**：`/api/profile`（含证据 confirm/reject/edit/delete）、`/api/target-jobs`
 （CRUD + analyse + decision）、`POST /api/wf04/start` 支持 `targetJobId` 按缺口定向出题。
