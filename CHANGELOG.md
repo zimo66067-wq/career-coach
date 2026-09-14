@@ -4,6 +4,47 @@
 
 ## [Unreleased]
 
+### Added - 2026-09-14 核心闭环：职业证据档案 + 目标岗位分析（Phase 3）
+
+把 domain / repositories 两层接到 HTTP 上，打通
+**Resume → Evidence → Target Job → Match → APPLY/STRETCH/PASS → Interview**。
+
+- `services/career_evidence_service.py`：模型产出 → **候选证据（pending）** → 用户确认。
+  HTTP 层不提供任何直接写 `confirmed` 的入参。三道内容过滤：子项白名单
+  （`structure` / `ats_readability` 不产证据）、`is_substantive_claim`（挡版块标题）、
+  `is_complete_span`（挡词中间截断的定长窗口）
+- `services/target_job_service.py`：JD → 要求 → 匹配 → 缺口 → 决策。含 JD 解析过滤
+  （丢掉标题行与版块名，并把标题回收成岗位名）与 `blocking` 判定
+- `repositories/career_profile.py`：CareerProfile 幂等持久化
+- 11 条路由：`/api/profile`、`/api/profile/evidence/*`（confirm/reject/edit/delete）、
+  `/api/target-jobs`（CRUD + analyse + decision）；`vercel.json` 增 5 条重写（共 41 条）
+- `POST /api/wf04/start` 新增可选 `targetJobId`：出题顺序直接来自该岗位的未解决缺口，
+  并返回 `questionPlan` 证明 P0 排在 P1 之前
+- `domain.target_job.GAP_TYPES` 增 `unverifiable`
+- `/api/health` 的能力表增 `profile`、`target_jobs`
+
+### Fixed - 2026-09-14 Phase 3 自查发现的三个缺陷
+
+- **无缺口时凑不满 3 条依据**：只有 1 条要求的 JD 在"没有缺口"（= APPLY）时只剩 2 条依据，
+  于是返回 `insufficient_grounds` 422 —— 把"JD 要求少"误判成"证据不足"。补一条**匹配概览**
+  依据（`岗位共 N 条要求：已覆盖 X、弱命中 Y、缺失 Z、无法判定 W`）
+- **`unknown` 不产缺口 → 完全没核实也输出 APPLY**：匹配 `unknown` 表示"材料完全对不上，
+  无法判定"。原实现把它排除在缺口之外，于是一条关键硬性要求既不产生缺口也不阻断，
+  最终输出 APPLY（"关键要求均有已确认证据支撑"）—— 而事实是什么都没核实。
+  改为产出 `unverifiable` 缺口（非 blocking → STRETCH）
+- **三份真实 JD 全部输出 PASS**：初版规则是"存在未解决的 P0 缺口即 PASS"，但**弱命中也是
+  P0 缺口**，于是"材料能对上但强度不足"被判成"不可短期解决"。引入 `blocking`
+  （该缺口是否不可短期解决）并**存进 `gaps.blocking`**，使判定可只从库里复现：
+  学历门槛高于现有 / 要求证书而材料无相关字样 → PASS；弱命中或材料对不上 → STRETCH
+
+### Added - 2026-09-14 迁移 `2026-09-14-phase3-gap-blocking`
+
+`gaps` 增加 `blocking`（补列，非破坏）。老行默认 0（不阻断）——
+无法从旧数据反推当时是否真的不可短期解决，重新分析会刷新。
+
+- 回归门禁：pytest 423 passed (54.74s)、Node 36/36；schema / 敏感扫描 / `git diff --check` /
+  public↔docs 镜像 / 双方言 DDL 同步 / vercel 死路由全部通过；真实 HTTP 冒烟 37/37
+
 ### Added - 2026-09-14 领域收敛：Career Evidence / TargetJob / Action / Application（Phase 2）
 
 新增纯域层与数据层两包，把"什么算合法"从 `api/index.py` 与 `services/*.py` 里

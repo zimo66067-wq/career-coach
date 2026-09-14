@@ -369,11 +369,15 @@ def test_health_reflects_model_configuration(monkeypatch):
     response = raw.get("/api/health")
     assert response.status_code == 200
     assert response.json["model_configured"] is False
-    assert response.json["workflows"] == {
-        "wf01": "available", "wf02": "available", "wf03": "available",
-        "wf04": "available", "wf05": "available", "wf06": "available",
-        "wf07": "available",
-    }
+    # 只断言"这些能力必须可用"，不再逐字比对整张表 —— 否则每加一个能力
+    # 都要改这条测试，而它真正想守的是"健康检查如实反映能力可用性"。
+    workflows = response.json["workflows"]
+    for name in ("wf01", "wf02", "wf03", "wf04", "wf05", "wf06", "wf07",
+                 "profile", "target_jobs"):
+        assert workflows.get(name) == "available", name
+    # 已下线能力不得重新出现
+    for retired in ("f2_major", "tasks", "knowledge"):
+        assert retired not in workflows, retired
 
 
 def test_jd_injection_text_flagged(client):

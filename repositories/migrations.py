@@ -14,6 +14,8 @@
 1. ``2026-09-13-phase2-application-status`` —— ``applications`` 增加 ``target_job_id``，
    并把历史 status 规范到 7 态模型（D4：产品负责人已授权迁移生产数据）。
 2. ``2026-09-13-phase2-career-profiles`` —— 为历史上出现过的 owner_key 补建 CareerProfile。
+3. ``2026-09-14-phase3-gap-blocking`` —— ``gaps`` 增加 ``blocking``，
+   让 APPLY / STRETCH / PASS 能区分"不可短期解决"的缺口（见该迁移的说明）。
 
 **刻意不做的事**：不从既有 `diagnoses` 反向生成证据。诊断的 ``source_spans`` 引文多为
 "实习经历"这类小节标题，把它变成"职业事实"会直接污染唯一可信源。证据必须由用户确认后进入，
@@ -28,6 +30,7 @@ from tools import database
 
 VERSION_APPLICATION_STATUS = "2026-09-13-phase2-application-status"
 VERSION_CAREER_PROFILES = "2026-09-13-phase2-career-profiles"
+VERSION_GAP_BLOCKING = "2026-09-14-phase3-gap-blocking"
 
 VALID_STATUSES = tuple(item.value for item in ApplicationStatus)
 
@@ -135,9 +138,31 @@ def migrate_career_profiles():
     return report
 
 
+def migrate_gap_blocking():
+    """``gaps`` 增加 ``blocking``：该缺口是否**不可短期解决**。
+
+    背景：APPLY/STRETCH/PASS 原本只看优先级，于是"硬性要求只是弱命中（weak）"也被判成
+    PASS —— 实测三份 JD 全部得到 PASS，等于告诉所有人都别投。但 weak 恰恰是"可由已有
+    证据重写"的情形，应当 STRETCH。所以把"不可短期解决"这个事实显式存下来：
+
+    * ``missing`` 且属于结构性门槛（学历 / 专业 / 证书）→ blocking=1 → PASS
+    * ``weak``，或 missing 但属于可短期补强的能力项 → blocking=0 → STRETCH
+
+    老行默认 0（不阻断），因为无法从旧数据反推当时是否真的不可解决；重新分析会刷新。
+    """
+    report = {"version": VERSION_GAP_BLOCKING, "column_added": False}
+    with cursor() as conn:
+        _ensure_table(conn)
+        if not database.has_column(conn, "gaps", "blocking"):
+            conn.execute("ALTER TABLE gaps ADD COLUMN blocking INTEGER NOT NULL DEFAULT 0")
+            report["column_added"] = True
+    return report
+
+
 MIGRATIONS = (
     (VERSION_APPLICATION_STATUS, migrate_application_status),
     (VERSION_CAREER_PROFILES, migrate_career_profiles),
+    (VERSION_GAP_BLOCKING, migrate_gap_blocking),
 )
 
 

@@ -16,11 +16,14 @@
 
 Decision 规则（**必须透明**，因此写成可读谓词而不是权重求和）：
 
-* **PASS**：存在未解决的 **P0** 缺口 —— ``priority_for`` 把 hard 要求唯一映射成 P0，
-  所以 P0 就是"短期无法补齐的关键门槛"。
-* **STRETCH**：没有未解决的 P0，但存在未解决的 **P1** 缺口（岗位职责级），
-  可由已有证据重写或短期补强。
+* **PASS**：存在未解决的 P0 缺口，**且该缺口不可短期解决**（``blocking``）——
+  典型是学历 / 专业 / 证书这类结构性门槛。
+* **STRETCH**：其余存在未解决 P0/P1 缺口的情形。**硬性要求只是弱命中（weak）
+  也属于这里** —— weak 恰恰意味着"材料能对上但不够强"，可由已有证据重写或短期补强。
 * **APPLY**：不存在未解决的 P0/P1 缺口 —— 关键要求都有真实证据。
+
+``blocking`` 由服务层判定并入库（服务层才拿得到要求原文），域层只消费，
+因此判定规则可以完全从 ``gaps`` 表复现。
 
 任何 Decision 都必须至少引用 3 条具体依据（DoD #9）。
 """
@@ -32,10 +35,25 @@ from domain.errors import DomainError
 REQUIREMENT_TYPES = ("hard", "responsibility", "preferred", "terminology")
 MATCH_STATUSES = ("covered", "weak", "missing", "unknown")
 GAP_PRIORITIES = ("P0", "P1", "P2")
-GAP_TYPES = ("missing", "weak")
+
+#: 缺口类型。
+#:
+#: ``unverifiable`` 对应匹配结果 ``unknown``：**材料完全对不上，无法判定**。
+#: 它必须算缺口 —— 否则"我们找不到任何相关材料"会被当成"满足要求"，
+#: 于是输出 APPLY（"关键要求均有已确认证据支撑"），那是假话。
+#: 但它不是 ``blocking``（补材料即可判定），所以推 STRETCH 而不是 PASS。
+GAP_TYPES = ("missing", "weak", "unverifiable")
 
 #: 未解决的缺口 —— 只有 open / doing 参与 Decision 判定。
 OPEN_GAP_STATUSES = ("open", "doing")
+
+#: 缺口生命周期。
+#:
+#: ``cleared`` 表示**该要求现在已被证据覆盖，缺口不再适用**（重新分析时由系统写入）；
+#: 它与 ``done``（用户完成了补强动作）语义不同，不能混用 —— 否则报告会显示成
+#: "用户解决了它"，而事实只是简历变了。
+GAP_STATUSES = ("open", "doing", "done", "dropped", "cleared")
+CLEARED_GAP_STATUS = "cleared"
 
 #: Decision 至少要引用几条依据。
 MIN_DECISION_CITATIONS = 3
@@ -137,36 +155,53 @@ def gap_from_requirement(
     action=None,
     expected_artifact=None,
     retest=None,
+    blocking=False,
     now=None,
 ):
     """按 Gap → Reason → Current Evidence → Missing Evidence → Action → Artifact → Retest 建缺口。
 
-    ``covered`` / ``unknown`` 的要求不产生缺口（unknown 是"材料不足无法判定"，
-    属于要补材料，而不是要补能力）。
+    只有 ``covered`` 不产生缺口。``weak`` → ``weak``、``missing`` → ``missing``、
+    ``unknown`` → ``unverifiable``。
+
+    ``unknown`` **必须**算缺口：它是"材料完全对不上"，不是"满足要求"。若把它当无事发生，
+    一条关键硬性要求就会既不产生缺口也不阻断，最终输出 APPLY —— 而事实是我们什么都没能核实。
+
+    ``blocking``：该缺口是否**不可短期解决**。判定由服务层给出（它才拿得到要求原文），
+    域层只负责消费 —— 这是 APPLY/STRETCH/PASS 区分 PASS 与 STRETCH 的唯一依据。
     """
     status = _one_of(match_status, MATCH_STATUSES, "match_status")
-    if status in ("covered", "unknown"):
+    if status == "covered":
         raise DomainError(
             "no_gap_for_status",
-            "只有 weak / missing 的要求才会生成缺口，收到 %s。" % status,
+            "已覆盖（covered）的要求不产生缺口，收到 %s。" % status,
         )
     req_type = requirement.get("req_type") or requirement.get("type") or "hard"
     stamp = now or _utc_iso()
+    gap_type = "missing" if status == "missing" else ("unverifiable" if status == "unknown" else "weak")
     return {
         "target_job_id": int(target_job_id),
         "requirement_id": requirement.get("id"),
-        "gap_type": "missing" if status == "missing" else "weak",
+        "gap_type": gap_type,
         "priority": priority_for(req_type),
-        "reason": reason or ("该要求目前%s。" % ("没有对应证据" if status == "missing" else "只有弱证据")),
+        "reason": reason or _default_reason(status),
         "current_evidence": requirement.get("evidence") or None,
         "missing_evidence": missing_evidence,
         "action": action,
         "expected_artifact": expected_artifact,
         "retest": retest,
         "status": "open",
+        "blocking": 1 if blocking else 0,
         "created_at": stamp,
         "updated_at": stamp,
     }
+
+
+def _default_reason(match_status):
+    if match_status == "missing":
+        return "该要求目前没有对应证据。"
+    if match_status == "unknown":
+        return "材料中找不到与该要求相关的内容，无法判定当前是否满足。"
+    return "该要求目前只有弱证据。"
 
 
 def open_gaps(gaps):
@@ -178,18 +213,28 @@ def open_priorities(gaps):
     return {g.get("priority") for g in open_gaps(gaps)}
 
 
+def is_blocking_gap(gap):
+    """未解决的 **P0 且不可短期解决** 的缺口 —— 只有它才推 PASS。"""
+    return gap.get("priority") == "P0" and bool(gap.get("blocking"))
+
+
 def expected_decision(gaps):
     """透明规则的唯一实现：给定当前缺口，应当得出哪个 Decision。
 
-    优先级由 ``priority_for`` 唯一决定（hard→P0、responsibility→P1、其余→P2），
-    所以判定只需要看优先级，不需要再回查要求类型 —— 多一层类型过滤只会把
-    「P0 硬性缺口」误判成 STRETCH。
-    """
+    规则与产品口径一一对应（见 docs/product-scope.md §10.7）：
 
-    priorities = open_priorities(gaps)
-    if "P0" in priorities:
+    * **PASS**  ⟺ 存在未解决的 P0 缺口 **且该缺口不可短期解决**（如学历 / 专业 / 证书）。
+    * **STRETCH** ⟺ 其余存在未解决 P0/P1 缺口的情形 —— 包括"硬性要求只是弱命中"，
+      它恰恰是"可由已有证据重写或短期补强"。
+    * **APPLY** ⟺ 没有未解决的 P0/P1 缺口。
+
+    ``blocking`` 之所以必须由服务层传入而不能在这里推断：域层拿不到要求原文，
+    而"这个缺口能不能短期补上"只有原文能回答。
+    """
+    open_list = open_gaps(gaps)
+    if any(is_blocking_gap(gap) for gap in open_list):
         return Decision.PASS.value
-    if "P1" in priorities:
+    if any(gap.get("priority") in ("P0", "P1") for gap in open_list):
         return Decision.STRETCH.value
     return Decision.APPLY.value
 

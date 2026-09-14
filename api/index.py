@@ -82,12 +82,16 @@ from tools.validate_schema import business_rules  # noqa: E402
 
 
 # ---- Phase 5: shared modules + service layer ----
+from domain.errors import DomainError  # noqa: E402
 from services.apply_service import (  # noqa: E402
     create_application,
     delete_application,
     generate_cover_letter,
     list_applications_for,
 )
+from services import career_evidence_service as evidence_service  # noqa: E402
+from services import target_job_service  # noqa: E402
+from services.target_job_service import TargetJobError  # noqa: E402
 from services.diagnosis_service import (  # noqa: E402
     build_rule_based_resume_profile,
     diagnose_resume,
@@ -104,8 +108,7 @@ from services.interview_service import (  # noqa: E402
     start_interview,
 )
 from services.match_service import (  # noqa: E402
-    build_job_profile,
-    match_job_profile,
+    build_job_profile,    match_job_profile,
     validate_job_profile,
 )
 from services.organization_service import (  # noqa: E402
@@ -293,6 +296,29 @@ def handle_api_error(error):
     if retry_after:
         response.headers["Retry-After"] = str(int(retry_after))
     return response
+
+
+@app.errorhandler(DomainError)
+def handle_domain_error(error):
+    """领域规则被违反 → 422，并把领域层的机器可读 code 原样带出。
+
+    领域错误是"这个请求不合法"，不是"服务坏了"，所以不能落到 500 处理器；
+    集中在 App 层翻译一次，路由里就不必逐个 try/except。
+    """
+    return jsonify({
+        "error": error.code,
+        "message": str(error),
+        "trace_id": trace_id(),
+    }), 422
+
+
+@app.errorhandler(TargetJobError)
+def handle_target_job_error(error):
+    return jsonify({
+        "error": error.code,
+        "message": error.message,
+        "trace_id": trace_id(),
+    }), error.status
 
 
 @app.errorhandler(413)
@@ -649,8 +675,165 @@ def route_api(**_ignored):
             "f5/organizations/status", "f5/organizations/suggest",
             "f5/organizations/discover", "f5/organizations/detail",
             "f5/organizations/jobs",
-        } or route.startswith("history/") or route.startswith("f5/"):
+            "profile", "profile/evidence/candidates", "target-jobs",
+        } or (route.startswith("history/") or route.startswith("f5/")
+              or route.startswith("profile/evidence/") or route.startswith("target-jobs/")):
             return ("", 204)
+        raise ApiError("not_found", "接口不存在。", 404)
+
+    # ---- Phase 3 · 核心闭环：职业证据档案 + 目标岗位分析 ------------------------
+    # D8 方案 A：模型抽取只产出**候选证据**（pending），用户确认后才成为可信事实。
+    # 这里不提供任何"直接写 confirmed"的入参 —— 见 services/career_evidence_service.py。
+    if route == "profile" and request.method == "GET":
+        require_consent()
+        owner = _task_owner_key()
+        evidence_service.ensure_profile(owner)
+        return api_response(evidence_service.profile_payload(owner))
+
+    if route == "profile/evidence/candidates" and request.method == "POST":
+        require_consent()
+        enforce_usage("evidence_candidates_hour", 30, 3600)
+        body = require_json_object("候选证据请求")
+        session_id = str(body.get("session_id") or "")
+        ensure_session_access(session_id)
+        detail = get_resume_detail(session_id)
+        resume_text = str((detail or {}).get("resume_text") or "")
+        if not resume_text:
+            raise ApiError("resume_required", "请先上传并完成简历诊断。", 422)
+        resume_profile = body.get("resumeProfile")
+        requirements = body.get("requirements")
+        owner = _task_owner_key()
+        evidence_service.ensure_profile(owner)
+        created, skipped, considered = evidence_service.collect_candidates(
+            owner,
+            session_id,
+            resume_text,
+            resume_profile=resume_profile if isinstance(resume_profile, dict) else None,
+            requirements=requirements if isinstance(requirements, list) else None,
+        )
+        return api_response({
+            "created": created,
+            "createdCount": len(created),
+            "skippedExisting": skipped,
+            "considered": len(considered),
+            "profile": evidence_service.profile_payload(owner),
+        }, 201)
+
+    if route.startswith("profile/evidence/") and request.method in ("POST", "DELETE"):
+        require_consent()
+        parts = route.split("/")
+        if len(parts) not in (3, 4):
+            raise ApiError("not_found", "接口不存在。", 404)
+        try:
+            evidence_id = int(parts[2])
+        except (TypeError, ValueError):
+            raise ApiError("invalid_request", "证据 ID 无效。", 422)
+        action = parts[3] if len(parts) == 4 else ""
+        owner = _task_owner_key()
+        try:
+            if request.method == "DELETE" and not action:
+                evidence_service.delete(owner, evidence_id)
+                return api_response({"deleted": True, "id": evidence_id})
+            if request.method == "POST" and action == "confirm":
+                return api_response({"evidence": evidence_service.confirm(owner, evidence_id)})
+            if request.method == "POST" and action == "reject":
+                return api_response({"evidence": evidence_service.reject(owner, evidence_id)})
+            if request.method == "POST" and action == "edit":
+                body = require_json_object("证据修改请求")
+                return api_response({"evidence": evidence_service.edit(
+                    owner,
+                    evidence_id,
+                    claim=body.get("claim"),
+                    source_quote=body.get("sourceQuote"),
+                    confirmed_by_user=bool(body.get("confirmedByUser")),
+                )})
+        except LookupError:
+            raise ApiError("evidence_not_found", "证据不存在。", 404)
+        raise ApiError("not_found", "接口不存在。", 404)
+
+    if route == "target-jobs" and request.method == "GET":
+        require_consent()
+        items = target_job_service.list_target_jobs(_task_owner_key())
+        return api_response({"targetJobs": items, "total": len(items)})
+
+    if route == "target-jobs" and request.method == "POST":
+        require_consent()
+        enforce_usage("target_job_create_hour", 20, 3600)
+        body = require_json_object("目标岗位请求")
+        session_id = str(body.get("session_id") or "")
+        if session_id:
+            ensure_session_access(session_id)
+        job_profile = body.get("jobProfile")
+        jd_text = str(body.get("jdText") or "").strip()
+        if not isinstance(job_profile, dict):
+            job_profile = None
+        if job_profile is None and not jd_text:
+            raise ApiError("jd_required", "请提供 JD 文本或已确认的岗位画像。", 422)
+        if len(jd_text) > MAX_TEXT_CHARS:
+            raise ApiError("payload_too_large", "JD 文本超过服务允许的长度。", 413)
+        record = target_job_service.create_target_job(
+            owner_key=_task_owner_key(),
+            session_id=session_id or None,
+            company=str(body.get("company") or "").strip() or None,
+            position=str(body.get("position") or "").strip() or None,
+            jd_text=jd_text or None,
+            job_profile=job_profile,
+        )
+        return api_response({
+            "targetJob": record,
+            "requirements": target_job_service.requirements_of(record["id"]),
+            "droppedNonRequirements": record.get("dropped_non_requirements") or [],
+        }, 201)
+
+    if route.startswith("target-jobs/") and request.method in ("GET", "POST", "DELETE"):
+        require_consent()
+        parts = route.split("/")
+        if len(parts) not in (2, 3):
+            raise ApiError("not_found", "接口不存在。", 404)
+        try:
+            target_job_id = int(parts[1])
+        except (TypeError, ValueError):
+            raise ApiError("invalid_request", "目标岗位 ID 无效。", 422)
+        action = parts[2] if len(parts) == 3 else ""
+        owner = _task_owner_key()
+
+        if request.method == "GET" and not action:
+            record = target_job_service.get_target_job(target_job_id, owner)
+            return api_response({
+                "targetJob": record,
+                "requirements": target_job_service.requirements_of(target_job_id),
+                "decision": target_job_service.decision_of(target_job_id, owner),
+            })
+
+        if request.method == "GET" and action == "decision":
+            return api_response({
+                "decision": target_job_service.decision_of(target_job_id, owner),
+            })
+
+        if request.method == "POST" and action == "analyse":
+            enforce_usage("target_job_analyse_hour", 30, 3600)
+            body = require_json_object("分析请求") if request.data else {}
+            resume_text = str(body.get("resumeText") or "").strip()
+            if not resume_text:
+                session_id = str(body.get("session_id") or "")
+                if not session_id:
+                    record = target_job_service.get_target_job(target_job_id, owner)
+                    session_id = str(record.get("session_id") or "")
+                if not session_id:
+                    raise ApiError("resume_required", "请先上传并完成简历诊断。", 422)
+                ensure_session_access(session_id)
+                detail = get_resume_detail(session_id)
+                resume_text = str((detail or {}).get("resume_text") or "")
+            if not resume_text:
+                raise ApiError("resume_required", "请先上传并完成简历诊断。", 422)
+            if len(resume_text) > MAX_TEXT_CHARS:
+                raise ApiError("payload_too_large", "简历文本超过服务允许的长度。", 413)
+            return api_response(target_job_service.analyse(target_job_id, owner, resume_text))
+
+        if request.method == "DELETE" and not action:
+            target_job_service.delete_target_job(target_job_id, owner)
+            return api_response({"deleted": True, "id": target_job_id})
+
         raise ApiError("not_found", "接口不存在。", 404)
 
     # F5 unit/job index (phase 1 foundation: contract + explicit degrade only).
@@ -966,6 +1149,7 @@ def route_api(**_ignored):
                 "wf01": "available", "wf02": "available", "wf03": "available",
                 "wf04": "available", "wf05": "available", "wf06": "available",
                 "wf07": "available",
+                "profile": "available", "target_jobs": "available",
             },
             # 领域收敛迁移的可观测性：迁移失败不静默（见 repositories/migrations.py）
             "migrations": migration_status(),
@@ -1101,7 +1285,27 @@ def route_api(**_ignored):
             raise ApiError("invalid_request", "面试请求格式无效。", 422)
         body["session_id"] = body.get("session_id") or ("iv_" + uuid.uuid4().hex[:16])
         ensure_session_access(body["session_id"], allow_create=True)
-        return api_response(start_interview(body))
+
+        # 通过 targetJobId 把面试接到目标岗位上：出题顺序直接来自该岗位的未解决缺口
+        # （P0 → P1 → P2），这就是"按 Gap 定向出题"的落地方式。
+        target_job_id = body.get("targetJobId")
+        plan = None
+        if target_job_id is not None:
+            try:
+                target_job_id = int(target_job_id)
+            except (TypeError, ValueError):
+                raise ApiError("invalid_request", "目标岗位 ID 无效。", 422)
+            owner = _task_owner_key()
+            gaps = target_job_service.interview_gaps(target_job_id, owner)
+            if not body.get("matchGaps"):
+                body["matchGaps"] = gaps
+            plan = target_job_service.question_plan(target_job_id, owner)
+
+        result = start_interview(body)
+        if plan is not None:
+            result["questionPlan"] = plan
+            result["targetJobId"] = target_job_id
+        return api_response(result)
     if route == "wf04/answer" and request.method == "POST":
         require_consent()
         enforce_usage("interview_turn_hour", 120, 3600)
@@ -1217,6 +1421,17 @@ for _rule in (
     "/api/f5/organizations/status", "/api/f5/organizations/suggest",
     "/api/f5/organizations/discover", "/api/f5/organizations/detail",
     "/api/f5/organizations/jobs",
+    # Phase 3 · 核心闭环：职业证据档案 + 目标岗位分析
+    "/api/profile",
+    "/api/profile/evidence/candidates",
+    "/api/profile/evidence/<id>",
+    "/api/profile/evidence/<id>/confirm",
+    "/api/profile/evidence/<id>/reject",
+    "/api/profile/evidence/<id>/edit",
+    "/api/target-jobs",
+    "/api/target-jobs/<id>",
+    "/api/target-jobs/<id>/analyse",
+    "/api/target-jobs/<id>/decision",
 ):
     app.add_url_rule(_rule, endpoint="route_" + _rule.replace("/", "_") or "root", view_func=route_api,
                      methods=["GET", "POST", "DELETE", "OPTIONS"])

@@ -38,10 +38,22 @@ def list_target_jobs(owner_key, limit=50):
     )
 
 
+def delete_target_job(target_job_id, owner_key):
+    """删除岗位本身；调用方负责先清掉其子记录（要求 / 匹配 / 缺口 / 决策）。"""
+    return update("DELETE FROM target_jobs WHERE id = ? AND owner_key = ?", (target_job_id, owner_key))
+
+
 def set_job_profile(target_job_id, owner_key, job_profile, now):
     return update(
         "UPDATE target_jobs SET job_profile_json = ?, updated_at = ? WHERE id = ? AND owner_key = ?",
         (json.dumps(job_profile, ensure_ascii=False), now, target_job_id, owner_key),
+    )
+
+
+def set_position(target_job_id, owner_key, position, now):
+    return update(
+        "UPDATE target_jobs SET position = ?, updated_at = ? WHERE id = ? AND owner_key = ?",
+        (position, now, target_job_id, owner_key),
     )
 
 
@@ -88,6 +100,10 @@ def list_requirements(target_job_id):
     )
 
 
+def delete_requirements_for_target(target_job_id):
+    return update("DELETE FROM job_requirements WHERE target_job_id = ?", (target_job_id,))
+
+
 # ------------------------------------------------------------------ #
 # EvidenceMatch
 # ------------------------------------------------------------------ #
@@ -113,6 +129,19 @@ def list_matches_for_target(target_job_id):
     )
 
 
+def delete_matches_for_target(target_job_id):
+    """删除该岗位下的全部匹配行。
+
+    匹配是**派生数据**（由当前简历 + 要求重算得出），不含用户状态，因此重新分析时
+    整体替换是安全的；缺口则不同（见 ``find_gap`` 的说明）。
+    """
+    return update(
+        "DELETE FROM evidence_matches WHERE requirement_id IN "
+        "(SELECT id FROM job_requirements WHERE target_job_id = ?)",
+        (target_job_id,),
+    )
+
+
 # ------------------------------------------------------------------ #
 # Gap
 # ------------------------------------------------------------------ #
@@ -122,14 +151,14 @@ def create_gap(record):
         """
         INSERT INTO gaps (target_job_id, requirement_id, gap_type, priority, reason,
                           current_evidence, missing_evidence, action, expected_artifact,
-                          retest, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          retest, status, blocking, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (record["target_job_id"], record.get("requirement_id"), record["gap_type"],
          record["priority"], record.get("reason"), record.get("current_evidence"),
          record.get("missing_evidence"), record.get("action"), record.get("expected_artifact"),
-         record.get("retest"), record.get("status", "open"), record["created_at"],
-         record["updated_at"]),
+         record.get("retest"), record.get("status", "open"), int(record.get("blocking") or 0),
+         record["created_at"], record["updated_at"]),
     )
     return one("SELECT * FROM gaps WHERE id = ?", (new_id,))
 
@@ -144,8 +173,35 @@ def list_gaps(target_job_id, status=None):
     return many(sql, tuple(params))
 
 
+def find_gap(target_job_id, requirement_id, gap_type):
+    return one(
+        "SELECT * FROM gaps WHERE target_job_id = ? AND requirement_id = ? AND gap_type = ? "
+        "ORDER BY id DESC LIMIT 1",
+        (target_job_id, requirement_id, gap_type),
+    )
+
+
+def update_gap_content(gap_id, record):
+    """刷新缺口的说明字段，但**不动 status**。
+
+    缺口带着用户进度（``doing`` / ``done`` / 用户已产出的 artifact），重新分析时
+    覆盖状态等于把用户做过的事抹掉，所以这里只更新推导出来的文案。
+    """
+    return update(
+        "UPDATE gaps SET priority = ?, reason = ?, current_evidence = ?, missing_evidence = ?, "
+        "action = ?, expected_artifact = ?, retest = ?, blocking = ?, updated_at = ? WHERE id = ?",
+        (record["priority"], record.get("reason"), record.get("current_evidence"),
+         record.get("missing_evidence"), record.get("action"), record.get("expected_artifact"),
+         record.get("retest"), int(record.get("blocking") or 0), record["updated_at"], gap_id),
+    )
+
+
 def set_gap_status(gap_id, status, now):
     return update("UPDATE gaps SET status = ?, updated_at = ? WHERE id = ?", (status, now, gap_id))
+
+
+def delete_gaps_for_target(target_job_id):
+    return update("DELETE FROM gaps WHERE target_job_id = ?", (target_job_id,))
 
 
 # ------------------------------------------------------------------ #
@@ -166,3 +222,7 @@ def latest_decision(target_job_id):
         "SELECT * FROM target_job_decisions WHERE target_job_id = ? ORDER BY id DESC LIMIT 1",
         (target_job_id,),
     )
+
+
+def delete_decisions_for_target(target_job_id):
+    return update("DELETE FROM target_job_decisions WHERE target_job_id = ?", (target_job_id,))

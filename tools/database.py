@@ -391,6 +391,7 @@ CREATE TABLE IF NOT EXISTS gaps (
     expected_artifact TEXT,
     retest            TEXT,
     status            TEXT NOT NULL DEFAULT 'open',
+    blocking          INTEGER NOT NULL DEFAULT 0,
     created_at        TEXT NOT NULL,
     updated_at        TEXT NOT NULL
 );
@@ -586,7 +587,8 @@ CREATE TABLE IF NOT EXISTS gaps (
     id BIGSERIAL PRIMARY KEY, target_job_id BIGINT NOT NULL, requirement_id BIGINT,
     gap_type TEXT NOT NULL, priority TEXT NOT NULL, reason TEXT, current_evidence TEXT,
     missing_evidence TEXT, action TEXT, expected_artifact TEXT, retest TEXT,
-    status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    status TEXT NOT NULL DEFAULT 'open', blocking INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_gaps_target ON gaps(target_job_id, priority);
 CREATE TABLE IF NOT EXISTS target_job_decisions (

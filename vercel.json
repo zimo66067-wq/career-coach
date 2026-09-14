@@ -180,6 +180,26 @@
     {
       "source": "/api/f5/organizations/jobs",
       "destination": "/api?_route=f5/organizations/jobs"
+    },
+    {
+      "source": "/api/profile/evidence/candidates",
+      "destination": "/api?_route=profile/evidence/candidates"
+    },
+    {
+      "source": "/api/profile/evidence/(.*)",
+      "destination": "/api?_route=profile/evidence/$1"
+    },
+    {
+      "source": "/api/profile",
+      "destination": "/api?_route=profile"
+    },
+    {
+      "source": "/api/target-jobs/(.*)",
+      "destination": "/api?_route=target-jobs/$1"
+    },
+    {
+      "source": "/api/target-jobs",
+      "destination": "/api?_route=target-jobs"
     }
   ]
 }

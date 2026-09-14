@@ -206,7 +206,12 @@ def test_requirement_type_maps_to_the_documented_priority():
         target_job_domain.priority_for("nice_to_have")
 
 
-def test_gaps_are_only_created_for_weak_or_missing_requirements():
+def test_every_non_covered_requirement_produces_a_gap():
+    """只有 covered 不产生缺口。
+
+    ``unknown`` 必须是缺口：它是"材料完全对不上"，若当成无事发生，
+    一条关键硬性要求就会既不产生缺口也不阻断，最终输出 APPLY —— 而事实是什么都没核实。
+    """
     requirement = {"id": 7, "req_type": "hard", "text": "熟悉 Python"}
 
     missing = target_job_domain.gap_from_requirement(1, requirement, "missing")
@@ -217,15 +222,18 @@ def test_gaps_are_only_created_for_weak_or_missing_requirements():
     weak = target_job_domain.gap_from_requirement(1, requirement, "weak")
     assert weak["gap_type"] == "weak"
 
-    for status in ("covered", "unknown"):
-        with pytest.raises(DomainError) as err:
-            target_job_domain.gap_from_requirement(1, requirement, status)
-        assert err.value.code == "no_gap_for_status"
+    unverifiable = target_job_domain.gap_from_requirement(1, requirement, "unknown")
+    assert unverifiable["gap_type"] == "unverifiable"
+    assert unverifiable["priority"] == "P0"
+
+    with pytest.raises(DomainError) as err:
+        target_job_domain.gap_from_requirement(1, requirement, "covered")
+    assert err.value.code == "no_gap_for_status"
 
 
 def test_closed_gaps_stop_counting_towards_the_decision():
     requirement = {"id": 1, "req_type": "hard", "text": "熟悉 Python"}
-    gap = target_job_domain.gap_from_requirement(1, requirement, "missing")
+    gap = target_job_domain.gap_from_requirement(1, requirement, "missing", blocking=True)
     assert target_job_domain.open_gaps([gap]) == [gap]
     assert target_job_domain.expected_decision([gap]) == "PASS"
 
@@ -240,27 +248,50 @@ def test_closed_gaps_stop_counting_towards_the_decision():
 # TargetJob · APPLY / STRETCH / PASS
 # ------------------------------------------------------------------ #
 
-def _gap(priority, req_type, status="open", requirement_id=1):
+def _gap(priority, req_type, status="open", requirement_id=1, blocking=0, gap_type="missing"):
     return {
         "priority": priority,
         "req_type": req_type,
         "requirement_id": requirement_id,
         "status": status,
+        "blocking": blocking,
+        "gap_type": gap_type,
     }
 
 
-def test_pass_when_an_unresolved_p0_hard_gap_exists():
-    gaps = [_gap("P0", "hard")]
-    assert target_job_domain.expected_decision(gaps) == "PASS"
+def test_pass_requires_an_unresolved_blocking_p0_gap():
+    """PASS 不是"有 P0 缺口"，而是"P0 缺口不可短期解决"。"""
+    assert target_job_domain.expected_decision([_gap("P0", "hard", blocking=1)]) == "PASS"
+    # 同样的 P0，但只是弱命中（可重写）→ 不能推 PASS
+    assert target_job_domain.expected_decision(
+        [_gap("P0", "hard", blocking=0, gap_type="weak")]
+    ) == "STRETCH"
 
 
-def test_stretch_when_no_p0_is_open_but_a_p1_gap_remains():
+def test_stretch_covers_every_short_term_fixable_gap():
     assert target_job_domain.expected_decision([_gap("P1", "responsibility")]) == "STRETCH"
     assert target_job_domain.expected_decision([_gap("P2", "preferred")]) == "APPLY"
-    # P0 一旦出现就是 PASS，即使同时存在可短期补强的 P1
+    # 材料完全对不上（unverifiable）也是缺口，但补材料即可 → STRETCH，不是 APPLY
     assert target_job_domain.expected_decision(
-        [_gap("P0", "hard"), _gap("P1", "responsibility", requirement_id=2)]
+        [_gap("P0", "hard", gap_type="unverifiable")]
+    ) == "STRETCH"
+    # 可短期解决的 P0 与 P1 同时存在 → STRETCH
+    assert target_job_domain.expected_decision(
+        [_gap("P0", "hard", gap_type="weak"),
+         _gap("P1", "responsibility", requirement_id=2)]
+    ) == "STRETCH"
+    # 只要有一个不可短期解决的 P0，就是 PASS
+    assert target_job_domain.expected_decision(
+        [_gap("P0", "hard", blocking=1),
+         _gap("P1", "responsibility", requirement_id=2)]
     ) == "PASS"
+
+
+def test_blocking_on_a_lower_priority_gap_does_not_force_pass():
+    """blocking 只有落在 P0 上才有意义 —— P2 的证书要求不该让人放弃投递。"""
+    assert target_job_domain.expected_decision(
+        [_gap("P2", "preferred", blocking=1)]
+    ) == "APPLY"
 
 
 def test_only_hard_requirements_can_produce_a_p0_gap():
@@ -271,8 +302,12 @@ def test_only_hard_requirements_can_produce_a_p0_gap():
 
 
 def test_apply_when_no_open_p0_or_p1_gaps_remain():
-    gaps = [_gap("P2", "preferred"), _gap("P0", "hard", status="done")]
+    gaps = [_gap("P2", "preferred"), _gap("P0", "hard", status="done", blocking=1)]
     assert target_job_domain.expected_decision(gaps) == "APPLY"
+    # cleared 表示"要求已被证据覆盖，缺口不再适用"，同样不参与判定
+    assert target_job_domain.expected_decision(
+        [_gap("P0", "hard", status="cleared", blocking=1)]
+    ) == "APPLY"
 
 
 def test_decision_requires_at_least_three_distinct_citations():
@@ -296,8 +331,8 @@ def test_decision_requires_at_least_three_distinct_citations():
 
 
 def test_decision_must_agree_with_the_gap_distribution():
-    """判定规则透明：与缺口分布不一致的 Decision 必须被拒绝，不能手写。"""
-    gaps = [_gap("P0", "hard")]
+    """手写结论会被拒绝：缺口的分布决定结论。"""
+    gaps = [_gap("P0", "hard", blocking=1, gap_type="missing")]
     with pytest.raises(DomainError) as err:
         target_job_domain.decide(1, "APPLY", ["a", "b", "c"], gaps=gaps)
     assert err.value.code == "decision_inconsistent"

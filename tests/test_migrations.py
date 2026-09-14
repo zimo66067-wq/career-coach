@@ -23,6 +23,10 @@ from tools import database
 
 VERSION_APPLICATION_STATUS = migrations.VERSION_APPLICATION_STATUS
 VERSION_CAREER_PROFILES = migrations.VERSION_CAREER_PROFILES
+VERSION_GAP_BLOCKING = migrations.VERSION_GAP_BLOCKING
+
+#: 迁移清单由注册表推导 —— 新增迁移时测试不必跟着改数字。
+ALL_VERSIONS = [version for version, _func in migrations.MIGRATIONS]
 
 #: ``applications`` exactly as it looked before Phase 2 (no ``target_job_id``).
 LEGACY_APPLICATIONS_DDL = """
@@ -145,10 +149,8 @@ def test_a_fresh_database_applies_every_migration(tmp_path, monkeypatch):
 
     reports = migrations.apply_all()
 
-    assert sorted(item["version"] for item in reports) == sorted(
-        [VERSION_APPLICATION_STATUS, VERSION_CAREER_PROFILES]
-    )
-    assert migrations.applied_versions() == {VERSION_APPLICATION_STATUS, VERSION_CAREER_PROFILES}
+    assert sorted(item["version"] for item in reports) == sorted(ALL_VERSIONS)
+    assert migrations.applied_versions() == set(ALL_VERSIONS)
     assert _columns(path, "applications").count("target_job_id") == 1
     assert _columns(path, "career_evidence")  # 新表由 DDL 建好
 
@@ -162,14 +164,14 @@ def test_migrations_are_idempotent(tmp_path, monkeypatch):
 
     assert second == [], "已应用的迁移不应再次执行"
     assert _applications(path) == before
-    assert len(migrations.applied_versions()) == 2
+    assert len(migrations.applied_versions()) == len(ALL_VERSIONS)
 
 
 def test_ensure_applied_runs_once_per_database(tmp_path, monkeypatch):
     path = _point_at(tmp_path / "cached.db", monkeypatch)
 
     first = migrations.ensure_applied()
-    assert len(first) == 2, "首个数据库应当执行两条迁移"
+    assert len(first) == len(ALL_VERSIONS), "首个数据库应当执行全部迁移"
 
     assert migrations.ensure_applied() == [], "同一数据库不应重复执行"
 
@@ -177,9 +179,7 @@ def test_ensure_applied_runs_once_per_database(tmp_path, monkeypatch):
     migrations.reset_cache()
     assert migrations.ensure_applied() == []
 
-    assert migrations.applied_versions() == {
-        VERSION_APPLICATION_STATUS, VERSION_CAREER_PROFILES
-    }
+    assert migrations.applied_versions() == set(ALL_VERSIONS)
     assert path.exists()
 
 
@@ -235,7 +235,7 @@ def test_migration_can_be_forced_and_stays_stable(tmp_path, monkeypatch):
         count = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
     finally:
         conn.close()
-    assert count == 2
+    assert count == len(ALL_VERSIONS)
 
 
 def test_empty_applications_table_is_handled(tmp_path, monkeypatch):
@@ -343,9 +343,7 @@ def test_health_self_heals_a_database_whose_migrations_never_ran(tmp_path, monke
 
     assert state["ok"] is True
     assert state["error"] is None
-    assert sorted(state["applied"]) == sorted(
-        [VERSION_APPLICATION_STATUS, VERSION_CAREER_PROFILES]
-    )
+    assert sorted(state["applied"]) == sorted(ALL_VERSIONS)
     assert path.exists()
     assert migrations.applied_versions() == set(state["expected"])
 
@@ -375,6 +373,76 @@ def test_health_endpoint_exposes_migration_state(tmp_path, monkeypatch):
     migrations_state = body["migrations"]
     assert migrations_state["ok"] is True
     assert migrations_state["error"] is None
-    assert sorted(migrations_state["applied"]) == sorted(
-        [VERSION_APPLICATION_STATUS, VERSION_CAREER_PROFILES]
-    )
+    assert sorted(migrations_state["applied"]) == sorted(ALL_VERSIONS)
+
+
+# ------------------------------------------------------------------ #
+# Phase 3 · gaps.blocking 补列
+# ------------------------------------------------------------------ #
+
+LEGACY_GAPS_DDL = """
+CREATE TABLE gaps (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    target_job_id     INTEGER NOT NULL,
+    requirement_id    INTEGER,
+    gap_type          TEXT NOT NULL,
+    priority          TEXT NOT NULL,
+    reason            TEXT,
+    current_evidence  TEXT,
+    missing_evidence  TEXT,
+    action            TEXT,
+    expected_artifact TEXT,
+    retest            TEXT,
+    status            TEXT NOT NULL DEFAULT 'open',
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT NOT NULL
+)
+"""
+
+
+def test_gap_blocking_is_added_to_a_legacy_gaps_table_without_data_loss(tmp_path, monkeypatch):
+    """老库的 gaps 表没有 blocking 列；补列必须成功且不丢行、不误标为阻断。"""
+    path = _point_at(tmp_path / "gaps.db", monkeypatch)
+    database.init_db()  # 建好其余表
+    conn = sqlite3.connect(str(path))
+    try:
+        conn.execute("DROP TABLE IF EXISTS gaps")
+        conn.execute(LEGACY_GAPS_DDL)
+        conn.execute(
+            "INSERT INTO gaps (target_job_id, gap_type, priority, status, created_at, updated_at) "
+            "VALUES (1, 'missing', 'P0', 'open', '2026-09-01T00:00:00+00:00', "
+            "'2026-09-01T00:00:00+00:00')"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    assert "blocking" not in _columns(path, "gaps")
+
+    migrations.reset_cache()
+    report = _report(migrations.apply_all(), VERSION_GAP_BLOCKING)
+
+    assert report["column_added"] is True
+    assert "blocking" in _columns(path, "gaps")
+
+    conn = sqlite3.connect(str(path))
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = [dict(row) for row in conn.execute("SELECT * FROM gaps")]
+    finally:
+        conn.close()
+
+    assert len(rows) == 1, "补列不得丢行"
+    # 老行默认 0：无法从旧数据反推当时是否真的不可短期解决，
+    # 所以不阻断（重新分析会刷新），而不是猜一个"阻断"
+    assert rows[0]["blocking"] == 0
+    assert rows[0]["status"] == "open"
+
+
+def test_gap_blocking_migration_is_idempotent(tmp_path, monkeypatch):
+    path = _point_at(tmp_path / "gaps2.db", monkeypatch)
+    database.init_db()
+
+    assert _report(migrations.apply_all(), VERSION_GAP_BLOCKING)["column_added"] is False
+    forced = _report(migrations.apply_all(force=True), VERSION_GAP_BLOCKING)
+    assert forced["column_added"] is False
+    assert _columns(path, "gaps").count("blocking") == 1

@@ -115,17 +115,56 @@ Action                            Gap → Action → Artifact → Outcome
 
 | Decision | 条件 |
 | --- | --- |
-| **PASS** | 存在未解决的 **P0** 缺口 —— 短期无法补齐的关键门槛 |
-| **STRETCH** | 没有未解决的 P0，但存在未解决的 **P1** 缺口（岗位职责级），可由已有证据重写或短期补强 |
+| **PASS** | 存在未解决的 **P0 缺口且该缺口 `blocking`** —— 短期无法补齐的关键门槛 |
+| **STRETCH** | 其余存在未解决 P0/P1 缺口的情形 |
 | **APPLY** | 不存在未解决的 P0/P1 缺口 |
 
-"未解决" = `status ∈ {open, doing}`。`done` / `dropped` 的缺口不参与判定。
+"未解决" = `status ∈ {open, doing}`。`done` / `dropped` / `cleared` 不参与判定。
+
+### 4.1 `blocking` —— 为什么必须有这个字段
+
+`blocking` 表示**该缺口是否不可短期解决**，对应产品口径里的"不可短期解决的关键硬性 P0 Gap"。
+先看不用它会怎样（Phase 3 实测到的两次错判）：
+
+- 只看"有 P0 缺口就 PASS"：**弱命中（weak）也是一种 P0 缺口**，于是"材料能对上但强度不足"
+  被判成"不可短期解决"。实测三份真实 JD **全部输出 PASS** —— 等于劝所有人都别投。
+- 只看 `req_type == hard`（Phase 2 的旧写法）：`gaps` 表不存 `req_type`，取不到就误判。
+
+判定由**服务层**给出（只有它拿得到要求原文与简历原文），存进 `gaps.blocking`，域层只消费。
+这样 APPLY/STRETCH/PASS 可以**只从库里的数据复现**，满足"关键判断 100% 可解释"。
+
+只有两种情形算"不可短期解决"：
+
+| 情形 | blocking |
+| --- | --- |
+| 要求了高于现有学历的门槛（JD 要硕士、简历只有本科） | 1 |
+| 要求了证书/资格，而简历里没有任何相关字样 | 1 |
+| 硬性要求只是弱命中（改简历即可改善） | 0 |
+| 材料完全对不上（补材料即可判定） | 0 |
+
+学历必须比**级别**而不是比关键词：「硕士研究生及以上学历」在一份本科简历上会被 BM25
+判成 `weak`（因为简历里有"学历"二字），只看 `gap_type` 依然会错。
+
+`blocking` 只有落在 **P0** 上才推进 PASS —— P2 的证书要求不该让人放弃投递。
+
+### 4.2 `unknown` 必须算缺口
+
+匹配结果 `unknown` 表示"材料完全对不上，无法判定"。它会产出一个
+`gap_type='unverifiable'` 的缺口（非 `blocking` → STRETCH）。
+
+**不能把它当作无事发生**：那样一条关键硬性要求就既不产生缺口也不阻断，最终输出 APPLY
+（"关键要求均有已确认证据支撑"），而事实是我们什么都没能核实 —— 假话伪装成结论。
+
+### 4.3 至少 3 条依据，而且必须是真事实
+
+`decide()` 要求 ≥3 条互不重复的依据。依据由四类**可核对事实**拼出：要求判定、匹配概览、
+缺口、已确认证据盘点。刻意保持四类，否则一个只有 1 条要求的 JD 在"没有缺口"（= APPLY）时
+只剩 2 条依据，就会被迫返回 `insufficient_grounds` —— 那是把"JD 要求少"误判成"证据不足"。
 
 > **实现说明（Phase 2 修正）**：初版实现额外做了一层"要求类型过滤"
-> （P0 且 `req_type == hard` 才算 PASS）。这是错的 —— 因为 `priority_for` 已经把
+> （P0 且 `req_type == hard` 才算 PASS）。这是错的 —— `priority_for` 已经把
 > `hard` 唯一映射成 `P0`，而缺口记录里不保存 `req_type`，于是"P0 硬性缺口"会被
-> 误判成 STRETCH。修正后只看优先级，`tests/test_domain_model.py` 里有一条测试
-> 专门锁住「P0 ⟺ hard」这个映射。
+> 误判成 STRETCH。该过滤已删除，改为 `blocking` 驱动。
 
 ---
 
@@ -201,7 +240,7 @@ SQLite 与 PostgreSQL 两份 DDL 同步维护（`tools/database.py`）；`schema
 | `target_jobs` | 目标岗位 |
 | `job_requirements` | JD 拆出的要求（保留 source_span） |
 | `evidence_matches` | 要求 ↔ 证据四态判定 |
-| `gaps` | 缺口（P0/P1/P2 + 行动四段） |
+| `gaps` | 缺口（P0/P1/P2 + 行动四段 + `blocking`） |
 | `target_job_decisions` | Decision 与其依据（JSON） |
 | `actions` | 行动闭环 |
 | `application_outcomes` | 投递结果 |
@@ -218,6 +257,7 @@ SQLite 与 PostgreSQL 两份 DDL 同步维护（`tools/database.py`）；`schema
 | --- | --- |
 | `2026-09-13-phase2-application-status` | `applications` 补 `target_job_id`；历史 `status` 规范到 7 态 |
 | `2026-09-13-phase2-career-profiles` | 为历史上出现过的 owner_key 补建 CareerProfile |
+| `2026-09-14-phase3-gap-blocking` | `gaps` 补 `blocking`（老行默认 0，不阻断；重新分析会刷新） |
 
 性质：
 
@@ -239,25 +279,25 @@ SQLite 与 PostgreSQL 两份 DDL 同步维护（`tools/database.py`）；`schema
 
 | 文件 | 项数 | 覆盖 |
 | --- | --- | --- |
-| `tests/test_domain_model.py` | 46 | 三条不变量、Decision 规则、状态机、行动闭环、出题优先级 |
-| `tests/test_migrations.py` | 12 | 新库冷启动、幂等、**真实老库**（旧 applications 无新列 + 脏状态）、档案回填不造证据、health 自愈与如实上报 |
+| `tests/test_domain_model.py` | 49 | 三条不变量、Decision 规则与 `blocking`、状态机、行动闭环、出题优先级 |
+| `tests/test_migrations.py` | 15 | 新库冷启动、幂等、**真实老库**（旧 applications 无新列 + 脏状态；旧 gaps 无 blocking）、档案回填不造证据、health 自愈与如实上报 |
+| `tests/test_career_flow.py` | 31 | 端到端闭环（HTTP 层）：候选证据、解析过滤、三种结论、归属隔离、删除级联、面试定向出题 |
 
-迁移测试不是拿新库跑一遍就完事：它用手写的旧 DDL 建一个**真的没有
-`target_job_id` 列、且 status 是 `submitted` / `interviewing` / `saved` /
-`weird_value` 的库**，再断言迁移结果。
+迁移测试不是拿新库跑一遍就完事：它用手写的旧 DDL 建**真的缺列、且枚举值是脏数据**的库，
+再断言迁移结果。
 
 ---
 
-## 11. 尚未接线（Phase 3 待办）
+## 11. 接线进度
 
-domain 与 repositories 已就位，但**还没有 HTTP 路由**：
+| 能力 | 状态 |
+| --- | --- |
+| CareerProfile 读写（`/api/profile`） | ✅ Phase 3 |
+| TargetJob 全链路（JD → Requirements → EvidenceMatch → Gap → Decision） | ✅ Phase 3 |
+| 面试按缺口定向出题（`targetJobId` → `questionPlan`） | ✅ Phase 3 |
+| 面试**新事实自动抽取** | ⏳ 域层已强制 pending 且有测试，但引擎尚不产出候选事实（待定 D9） |
+| 行动闭环与结果回流 | ⏳ Phase 4 |
+| 前端消费（导航 / 目标岗位工作区） | ⏳ Phase 6 |
 
-- CareerProfile 的读写接口
-- TargetJob 的 JD → Requirements → EvidenceMatch → Gap → Decision 全链路
-- 面试引擎按 `plan_question_order()` 定向出题
-- 行动闭环与结果回流
-- `js/job-upload.js`（JD 解析→确认→匹配 UI）**仍无宿主页面**，需要在目标岗位
-  工作区里重新挂载
-
-**因此当前不得对外声称已具备 "Career Evidence Profile" 或 "APPLY/STRETCH/PASS
-决策" 的可用功能** —— 那是 Phase 3 的交付物。
+**口径**：后端闭环已可用，但**没有任何页面消费这些接口**（`js/job-upload.js` 仍无宿主）。
+因此对外材料中不得出现"上传简历 + 贴 JD 就能拿到投递建议"这类描述 —— 那要到 Phase 6。

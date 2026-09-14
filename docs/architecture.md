@@ -32,6 +32,20 @@
 >
 > 新增参考：`docs/domain-model.md`（领域模型与不变量）。
 >
+> **Phase 3 更新（2026-09-14）**：领域层已接到 HTTP 上 ——
+>
+> | 审计条目 | 位置 | 现状 |
+> | --- | --- | --- |
+> | "`api/index.py` 既是路由又是业务" | §4.1 | 仍在，但 Phase 3 新增的业务全部落在 `services/`，路由块只做校验与转发；拆分属 Phase 5 |
+> | `js/job-upload.js` 无宿主页面 | §2 | **仍然无宿主**（Phase 6 建目标岗位工作区时重新挂载） |
+> | 迁移 2 条 | §7 | 3 条（新增 `2026-09-14-phase3-gap-blocking`） |
+> | 表数量 30 张 | §7 | 30 张不变（只给 `gaps` 加了 `blocking` 列） |
+>
+> 新增 **11 条路由**：`/api/profile`、`/api/profile/evidence/*`（confirm/reject/edit/delete）、
+> `/api/target-jobs/*`（CRUD + analyse + decision）。`vercel.json` 重写 36 → 41 条，
+> 死路由校验仍为 0（静态目标全部存在、每条 `_route` 都有处理器）。
+> 新增参考：`docs/phase3-report.md`。
+>
 > **现状口径**：主产品只剩一套匹配概念（`wf03` / `services/match_service.py`，DoD #6 达成）；
 > dependency inversion 由 3 处降为 2 处；一级导航 7 → 5 项；dead routes = 0。
 > 仍有效的审计结论：`/api/admin/*`、`/api/f5/organizations/*` 无用户界面消费；`ui/prototype` 是陈旧分叉（Phase 6/7）。

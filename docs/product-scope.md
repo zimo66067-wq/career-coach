@@ -198,22 +198,22 @@ CareerProfile        TargetJob                InterviewSession        Action
 | 4 C7 预测删除 | ✅ **已彻底删除**（rescore / wf05 响应 / schema / scoring.md / radar.js / f4-report.html） | ✅ **已达成**（Phase 1） |
 | 5 KB 非独立产品 | ✅ 导航/页面/API 均删除；题库下沉为内部数据源 | ✅ **已达成**（接线留 Phase 3） |
 | 6 Major Match 不共用 F2 概念 | 两套并存 → **单一 Target Job Analysis** | ✅ **已达成**（D1） |
-| 7 Career Evidence 为 source of truth | **不存在** CareerProfile/CareerEvidence 实体 | Phase 2 新建 |
-| 8 Target Job 输出 APPLY/STRETCH/PASS | 只有 0-100 分 | Phase 3 |
-| 9 每个 Decision ≥3 条 evidence | 不存在 | Phase 3 |
-| 10 Cover Letter 用 Target Job + Evidence | 只读 F1 诊断 | Phase 4 |
-| 11 Interview 按 Gap 定向 | 按 gap 弱相关，未接 Evidence | Phase 3 |
-| 12 Interview 新事实需用户确认 | 无候选证据流 | Phase 2/3 |
-| 13 Service 不反向依赖 API | 3 处倒置 → **2 处**（`task_service → api.f2_major` 随 D1 消失） | Phase 5 |
+| 7 Career Evidence 为 source of truth | ✅ Phase 2 建实体；**Phase 3 已接到 HTTP 且只读已确认证据**（`usable_evidence()`） | ✅ **已达成**（Phase 3） |
+| 8 Target Job 输出 APPLY/STRETCH/PASS | ✅ Phase 3：`blocking` 驱动，三个分支均有测试（`test_the_rule_reaches_all_three_verdicts`） | ✅ **已达成**（Phase 3，后端） |
+| 9 每个 Decision ≥3 条 evidence | ✅ Phase 3：四类可核对依据（要求判定 / 匹配概览 / 缺口 / 证据盘点），不足即拒判 | ✅ **已达成**（Phase 3） |
+| 10 Cover Letter 用 Target Job + Evidence | 仍只读 F1 诊断 | Phase 4 |
+| 11 Interview 按 Gap 定向 | ✅ Phase 3：`targetJobId` → 缺口按 P0→P1→P2 排序出题，返回 `questionPlan` | ✅ **已达成**（Phase 3，后端） |
+| 12 Interview 新事实需用户确认 | ✅ 域层 `candidate_evidence()` 强制 pending 且有测试；⏳ 引擎尚不自动抽取候选事实（待 D9） | 部分达成 |
+| 13 Service 不反向依赖 API | 3 处倒置 → **2 处**（`task_service → api.f2_major` 随 D1 消失）；Phase 3 新增代码无新倒置 | Phase 5 |
 | 14 .env 无重复/废弃 | 4 个重复变量 + 2 个无消费者 | Phase 7 |
 | 15 前端只有一套 canonical | public / docs / ui 三份 | Phase 6（D1 已保证三份同步删除、public==docs 逐字节一致） |
 | 16-18 Coverage 85/90/75 | Python 79%（Phase 0 基线）；JS 未测 | Phase 15（须在 CI 的 Python 3.11 上重测） |
-| 19 CI 全绿 | ✅ pytest 全绿 + node 36/36 | 已达成 |
+| 19 CI 全绿 | ✅ pytest 423 passed + node 36/36 | 已达成 |
 | 20 High/Critical 依赖漏洞 = 0 | ✅ pip-audit 无发现 | 已达成 |
-| 21 关键 AI 输出有 fallback | 大部分有（模型失败回退规则） | 待逐项核查 |
-| 22 删除链路自动化测试 | ✅ **`tests/test_phase1_deletions.py` 24 项**（覆盖 D1 + C7/KB/语音/死路由） | ✅ **已达成**（Phase 1） |
+| 21 关键 AI 输出有 fallback | 大部分有（模型失败回退规则）；Phase 3 的规则路径本身即降级实现 | 待逐项核查 |
+| 22 删除链路自动化测试 | ✅ **`tests/test_phase1_deletions.py` 24 项**；Phase 3 另加目标岗位删除级联（含 requirements/gaps/decisions 无孤儿） | ✅ **已达成** |
 | 23 README 与实际 IA 一致 | 已修正项目状态、页面数、F4 口径与已删变量 | 命名体系仍用 F1–F5（Phase 6/7 统一） |
-| 24 无 dead routes | ✅ **0 个**：`/api/f2/*`、`/api/tasks*`、`/api/knowledge/*`、`/api/wf04/asr` 全部下线；`/assets/*` 重写指向已修正 | ✅ **已达成**（Phase 1） |
+| 24 无 dead routes | ✅ **0 个**；Phase 3 新增 5 条重写后仍为 0（静态目标存在 + 每条 `_route` 有处理器） | ✅ **已达成** |
 | 25 无明显 dead code | 已清除：专业匹配+任务框架、C7、KB 页、语音链路、陈旧测试产物 | 剩余：`ui/prototype` 陈旧分叉、4 个推送脚本、5 个未调用 prompt（Phase 6/7） |
 
 ---
@@ -247,16 +247,60 @@ CareerProfile        TargetJob                InterviewSession        Action
 - 门禁不得让任何页面在未登录时出现空白或不可用；未登录时应展示注册/登录弹窗而不是报错
 - DoD #18「首次用户到第一个 Target Job Decision ≤3 分钟」是这条门禁的直接约束：注册弹窗必须极短，不得插入多余步骤
 
-### 10.4 D3–D6 状态
+### 10.4 决策状态（截至 2026-09-14）
 
-| ID | 状态 |
+| ID | 状态 | 裁决与影响 |
+| --- | --- | --- |
+| D1 专业→职业匹配 | ✅ 已决策 | 整块删除，已执行（`fc016c5`） |
+| D2 账号手机号 | ✅ 已决策 | **不去掉**，注册保持手机号 + 邮箱，`users` 表不动 |
+| D3 单位/职位检索 | ⏸ **暂缓删除，设期限** | 见 §10.5 |
+| D4 `applications` 迁移 | ✅ 已决策 | 允许迁移生产数据，已执行（`23f75cf`） |
+| D5 `workflows/` 去留 | ✅ 已决策 | **保留原地**，Phase 7 统一归档（见 §10.6） |
+| D6 `deliverables/` 归档 | ✅ 已决策 | 同上 |
+| D7 进入即强制注册/登录 | ⏳ 待实现 | Phase 6 前端重构时落地（见 §10.3） |
+| D8 诊断 → 证据的转换策略 | ✅ 已决策 | **方案 A**，见 §10.7 |
+
+### 10.5 D3 · 单位/职位检索：暂缓删除并设 30 天期限
+
+产品负责人授权后按推荐方案推进：**不在今天删除，但立即进入「封存 + 倒计时」状态。**
+
+理由不是"舍不得代码"，而是原始指令明确给了 30 天窗口，且框架本身现在是**诚实的空状态**
+（无入口、API 报 `unconfigured`、索引全 0），不构成虚假宣传。删除时点由期限决定，不由手感决定。
+
+| 项 | 值 |
 | --- | --- |
-| D3 单位/职位 30 天期限起算 | **仍未决策**，阻塞 F5 阶段 2 |
-| D4 `applications` 生产数据迁移 | **仍未决策**，阻塞 Phase 2 migration |
-| D5 `workflows/` 去留 | **仍未决策** |
-| D6 `deliverables/` 归档 | **仍未决策** |
+| 封存起始 | 2026-09-13（Phase 1 移出全部用户入口之日） |
+| **到期日** | **2026-10-13** |
+| 期满条件 | 需同时具备：数据授权、Provider、数据 SLA、数据预算、更新策略 |
 
-**D3 仍是 F5 阶段 2 的唯一阻塞项**：没有数据授权、Provider、SLA、预算、纠错责任人五项决策，索引就只能保持为空，任何材料都不得声称已有单位库或实时职位覆盖。
+**到期若五项仍未具备，则整块删除**：`organization` search UI、`/api/f5/organizations/*` 路由、
+`services/organization_service.py`、`tools/providers/organization.py`、7 张索引表、
+对应 tests 与 docs。
+
+**当前必须守住的口径**：任何材料都不得声称已有单位库或实时职位覆盖。索引恒空是设计状态，不是缺陷。
+
+### 10.6 D5/D6 · 仓库体积口径
+
+`workflows/`（1519 行、0 引用）与 `deliverables/`（历史证据材料）**保留原地**，Phase 7 统一归档。
+本阶段不删，避免在核心闭环尚未打通时扩大改动面。
+
+### 10.7 D8 · 诊断 → 证据的转换策略：方案 A（已采纳）
+
+**诊断只产出候选证据（`status='pending'`），由用户确认后才进入可信事实。**
+
+实现上必须带**实质内容过滤**，否则会把版块标题写成职业事实：
+
+| 来源 | 是否可以成为证据 | 说明 |
+| --- | --- | --- |
+| JD 匹配命中的**整句**（`covered` / `weak` 的 `evidence`） | ✅ 可以 | 是完整陈述句，天然是职业事实 |
+| 诊断 `source_spans` 中的**实质陈述**（如「编写接口文档并推动联调，与前端约定统一的错误码规范」） | ✅ 可以 | 需通过实质过滤 |
+| 诊断 `source_spans` 中的**版块标题 / 短片段**（如「实习经历」「技能」） | ❌ 不可以 | 实测合成样本里 `structure` 子项的 span 就是「实习经历」 |
+
+**为什么不是方案 B**：B 让诊断直接落 `confirmed`，等于把"模型抽取"当成"用户陈述"，
+与 §3.2 的不变量直接冲突。而 A 与 DoD #18「≤3 分钟到第一个 Decision」不冲突 ——
+确认可以批量化（一次列出全部候选，用户勾掉不对的）。
+
+---
 
 ---
 
@@ -287,3 +331,48 @@ Voice remnants（删除）、retired routes（删除 + `/assets/*` 修正）。
 **Phase 2 入口条件已满足**：D4 已决策（允许迁移 `applications` 生产数据到新 7 态模型），
 migration 可以落笔。仍需 D5（`workflows/` 去留）、D6（`deliverables/` 归档）决定仓库体积口径，
 D3 阻塞 F5 阶段 2。
+
+---
+
+## 12. Phase 3 完成记录（2026-09-14）
+
+Phase 3（Core Flow）后端闭环打通，一个提交：14 文件，**+2044 / −71**。
+
+**新增能力**：`/api/profile`（含证据 confirm/reject/edit/delete）、`/api/target-jobs`
+（CRUD + analyse + decision）、`POST /api/wf04/start` 支持 `targetJobId` 按缺口定向出题。
+详见 `docs/phase3-report.md` 与 `CHANGELOG.md` 同日条目。
+
+**门禁**：pytest 423 passed（54.74s）、Node 36/36、schema OK、敏感扫描 246 文件无发现、
+`git diff --check` 干净、public↔docs web 资产逐字节一致、双方言 DDL 各 29 表、
+vercel 死路由 = 0、真实 HTTP 冒烟 **37/37**。
+
+**DoD 变化**：#7（Evidence 为 source of truth）、#8（APPLY/STRETCH/PASS）、
+#9（≥3 条依据）、#11（Interview 按 Gap 定向）四项达成；#12 部分达成。
+
+**Phase 3 结束时仍不可用的东西**（口径）：
+
+- **闭环在界面上不可见** —— 11 条新路由没有任何页面消费，`js/job-upload.js` 仍无宿主。
+  对外不得出现"上传简历 + 贴 JD 就能拿到投递建议"这类描述（Phase 6 才成立）。
+- 规则降级路径（未配置模型时）产出 **0 条**候选证据（引文是定长窗口，被完整性过滤挡掉）。
+  这是刻意选择，但意味着无模型环境下用户建不了证据档案。
+
+### 12.1 D9 · 面试新事实由谁抽取（待决策，阻塞 Phase 4 的面试侧）
+
+| 方案 | 做法 | 代价 |
+| --- | --- | --- |
+| **A（倾向）** | 模型在评估轮顺带抽取候选事实（claim + 引文），走 `candidate_evidence()` 落 pending | 多一次模型调用；依赖提示词质量 |
+| B | 不自动抽取，只给"把某轮回答存为候选证据"的按钮 | 零模型成本；用户需自己判断哪轮值得存 |
+
+域层已强制 `candidate_evidence()` 只产 pending 且有测试，**两种方案都不会破坏 DoD #12**；
+差别只在体验与成本。
+
+### 12.2 其余决策点状态
+
+| ID | 状态 |
+| --- | --- |
+| D3 单位/职位检索 | ⏸ 封存中，**期限 2026-10-13**（见 §10.5） |
+| D5 `workflows/` | ✅ 保留原地，Phase 7 归档 |
+| D6 `deliverables/` | ✅ 保留原地，Phase 7 归档 |
+| D7 进入即强制注册弹窗 | ⏳ Phase 6 实现 |
+| D8 诊断 → 证据 | ✅ 方案 A，已在 Phase 3 落地 |
+| **D9 面试新事实抽取** | ⏳ **待决策**（见 §12.1） |
