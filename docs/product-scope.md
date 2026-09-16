@@ -394,7 +394,7 @@ vercel 死路由 = 0、真实 HTTP 冒烟 **37/37**。
 ## 13. Phase 4 完成记录（2026-09-16）
 
 Phase 4（Action Loop：Gap Action Plan + Application 状态回流）后端闭环打通，
-一个提交 **`<待回填>`**：17 文件，**+2310 / −15**。
+一个提交 **`e4b7da3`**：17 文件，**+2314 / −15**。
 
 **新增能力**：`/api/actions`（清单 / 批量或单条开单 / start / complete / outcome / drop / 删除）、
 `/api/wf07/applications/<id>/outcome` 与 `/outcomes`（一次结果同时推进 7 态状态机并反向写

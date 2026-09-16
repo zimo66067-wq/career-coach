@@ -1,7 +1,7 @@
 # phase4-report.md · Phase 4（Action Loop）
 
 - 日期：2026-09-16
-- 提交：**`<待回填>`**（17 文件，+2310 / −15）
+- 提交：**`e4b7da3`**（17 文件，+2314 / −15）
 - 阶段目标：**F4 → Gap Action Plan + Application 状态回流**。
   Phase 3 只回答"我差什么"和"能不能投"，用户拿到结论之后无事可做；Phase 4 补的是闭环的另一半：
   **把缺口翻成今天就能做的一件事，让做完之后发生的事回流成新证据。**
@@ -19,7 +19,7 @@
 ## 1. 修改摘要
 
 ```
-17 files changed, 2310 insertions(+), 15 deletions(-)   (<待回填>)
+17 files changed, 2314 insertions(+), 15 deletions(-)   (e4b7da3)
 ```
 
 | 新增 | 行数 | 作用 |
@@ -41,7 +41,7 @@
 | `services/target_job_service.py` | +3 | 删除岗位时一并清掉派生行动（见 §7 缺陷 1） |
 | `repositories/target_job.py` | +5 | `get_gap`（行动计划需要 `expected_artifact`） |
 
-文档：`docs/phase4-report.md`（274 行，新建）、`docs/product-scope.md`（+91，DoD 表逐行更新 + §13）、
+文档：`docs/phase4-report.md`（278 行，新建）、`docs/product-scope.md`（+91，DoD 表逐行更新 + §13）、
 `docs/domain-model.md`（1 行状态：行动闭环与结果回流从 ⏳ 改为 ✅）、`CHANGELOG.md`（+46，3 条）。
 
 ### 路由（8 条）
