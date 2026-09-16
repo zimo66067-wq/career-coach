@@ -296,7 +296,7 @@ SQLite 与 PostgreSQL 两份 DDL 同步维护（`tools/database.py`）；`schema
 | TargetJob 全链路（JD → Requirements → EvidenceMatch → Gap → Decision） | ✅ Phase 3 |
 | 面试按缺口定向出题（`targetJobId` → `questionPlan`） | ✅ Phase 3 |
 | 面试**新事实自动抽取** | ⏳ 域层已强制 pending 且有测试，但引擎尚不产出候选事实（待定 D9） |
-| 行动闭环与结果回流 | ⏳ Phase 4 |
+| 行动闭环与结果回流 | ✅ Phase 4 完成（2026-09-16） |
 | 前端消费（导航 / 目标岗位工作区） | ⏳ Phase 6 |
 
 **口径**：后端闭环已可用，但**没有任何页面消费这些接口**（`js/job-upload.js` 仍无宿主）。

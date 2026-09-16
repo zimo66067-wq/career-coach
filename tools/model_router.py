@@ -37,6 +37,7 @@ TASK_PROMPTS = {
     "jd_match_explain": "prompts/match/explain.md",
     "interview_question": "prompts/interview/interviewer.md",
     "interview_review": "prompts/interview/review.md",
+    "interview_evidence": "prompts/interview/evidence.md",
     "seven_day_plan": "prompts/plan/seven-day.md",
     "cover_letter": "prompts/apply/cover-letter.md",
 }
@@ -74,6 +75,7 @@ MODEL_PARAMS = {
     "jd_match_explain":     {"temperature": 0.3, "max_tokens": 2048, "timeout": 20},
     "interview_question":   {"temperature": 0.4, "max_tokens": 1024, "timeout": 15},
     "interview_review":     {"temperature": 0.3, "max_tokens": 4096, "timeout": 30},
+    "interview_evidence":   {"temperature": 0.1, "max_tokens": 2048, "timeout": 30},
     "seven_day_plan":       {"temperature": 0.2, "max_tokens": 2048, "timeout": 20},
     "cover_letter":         {"temperature": 0.3, "max_tokens": 1024, "timeout": 20},
 }
@@ -117,6 +119,10 @@ DEGRADED_OUTPUTS = {
     "interview_review": {
         "note": "model_unavailable_degraded: report skeleton, manual review required",
         "report": "## Interview Review (rule-degraded)\n\nmodel unavailable, skeleton:\n1. overall\n2. per-turn\n3. prep\n4. plan linkage\n",
+    },
+    "interview_evidence": {
+        "note": "model_unavailable_degraded: no extraction, caller falls back to answer_quote",
+        "candidates": [],
     },
     "seven_day_plan": {
         "note": "model_unavailable_degraded: plan skeleton, manual review required",

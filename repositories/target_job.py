@@ -181,6 +181,11 @@ def find_gap(target_job_id, requirement_id, gap_type):
     )
 
 
+def get_gap(gap_id):
+    """按主键取单条缺口 —— 行动计划需要它的 ``expected_artifact`` 才能开单。"""
+    return one("SELECT * FROM gaps WHERE id = ?", (gap_id,))
+
+
 def update_gap_content(gap_id, record):
     """刷新缺口的说明字段，但**不动 status**。
 

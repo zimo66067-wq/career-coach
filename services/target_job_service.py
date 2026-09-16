@@ -30,6 +30,7 @@ from domain.target_job import (
     requirement_from_profile_item,
 )
 from domain.target_job import decide as domain_decide
+from repositories import action as action_repo
 from repositories import target_job as repo
 from tools import database
 
@@ -267,6 +268,8 @@ def delete_target_job(target_job_id, owner_key):
     """
     get_target_job(target_job_id, owner_key)
     repo.delete_matches_for_target(target_job_id)
+    # 先删行动再删缺口：行动靠 gap_id 认路，缺口一旦没了，这些行就再也没人认领
+    action_repo.delete_for_target(target_job_id, owner_key)
     repo.delete_gaps_for_target(target_job_id)
     repo.delete_requirements_for_target(target_job_id)
     repo.delete_decisions_for_target(target_job_id)

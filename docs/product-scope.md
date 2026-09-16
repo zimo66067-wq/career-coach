@@ -201,19 +201,19 @@ CareerProfile        TargetJob                InterviewSession        Action
 | 7 Career Evidence 为 source of truth | ✅ Phase 2 建实体；**Phase 3 已接到 HTTP 且只读已确认证据**（`usable_evidence()`） | ✅ **已达成**（Phase 3） |
 | 8 Target Job 输出 APPLY/STRETCH/PASS | ✅ Phase 3：`blocking` 驱动，三个分支均有测试（`test_the_rule_reaches_all_three_verdicts`） | ✅ **已达成**（Phase 3，后端） |
 | 9 每个 Decision ≥3 条 evidence | ✅ Phase 3：四类可核对依据（要求判定 / 匹配概览 / 缺口 / 证据盘点），不足即拒判 | ✅ **已达成**（Phase 3） |
-| 10 Cover Letter 用 Target Job + Evidence | 仍只读 F1 诊断 | Phase 4 |
+| 10 Cover Letter 用 Target Job + Evidence | 仍只读 F1 诊断 | ⏳ **未做**。DoD 表把它标为 Phase 4，但 `phase3-report §9` 对 Phase 4 的定义是 Action Loop，两者口径冲突（见 §13.4）。待裁决：Phase 4b 或并入 Phase 6 |
 | 11 Interview 按 Gap 定向 | ✅ Phase 3：`targetJobId` → 缺口按 P0→P1→P2 排序出题，返回 `questionPlan` | ✅ **已达成**（Phase 3，后端） |
-| 12 Interview 新事实需用户确认 | ✅ 域层 `candidate_evidence()` 强制 pending 且有测试；⏳ 引擎尚不自动抽取候选事实（待 D9） | 部分达成 |
-| 13 Service 不反向依赖 API | 3 处倒置 → **2 处**（`task_service → api.f2_major` 随 D1 消失）；Phase 3 新增代码无新倒置 | Phase 5 |
+| 12 Interview 新事实需用户确认 | ✅ **Phase 4 端到端打通**：D9=A 落地，`wf04/end` 一次性抽取；模型路径与降级路径都由 `candidate_evidence()` 收口，只产 pending（9 项测试锁死） | ✅ **已达成**（Phase 4） |
+| 13 Service 不反向依赖 API | 3 处倒置 → **2 处**（`task_service → api.f2_major` 随 D1 消失）；Phase 3 / Phase 4 新增代码均无新倒置（静态校验：domain 层 0 处越层 import） | Phase 5 |
 | 14 .env 无重复/废弃 | 4 个重复变量 + 2 个无消费者 | Phase 7 |
 | 15 前端只有一套 canonical | public / docs / ui 三份 | Phase 6（D1 已保证三份同步删除、public==docs 逐字节一致） |
 | 16-18 Coverage 85/90/75 | Python 79%（Phase 0 基线）；JS 未测 | Phase 15（须在 CI 的 Python 3.11 上重测） |
-| 19 CI 全绿 | ✅ pytest 423 passed + node 36/36 | 已达成 |
+| 19 CI 全绿 | ✅ pytest **457** passed + node 36/36 | 已达成 |
 | 20 High/Critical 依赖漏洞 = 0 | ✅ pip-audit 无发现 | 已达成 |
-| 21 关键 AI 输出有 fallback | 大部分有（模型失败回退规则）；Phase 3 的规则路径本身即降级实现 | 待逐项核查 |
-| 22 删除链路自动化测试 | ✅ **`tests/test_phase1_deletions.py` 24 项**；Phase 3 另加目标岗位删除级联（含 requirements/gaps/decisions 无孤儿） | ✅ **已达成** |
+| 21 关键 AI 输出有 fallback | 大部分有（模型失败回退规则）；Phase 3 的规则路径本身即降级实现；**Phase 4 的面试抽取失败不抛错、降级兜底并透出 `degraded`** | 待逐项核查 |
+| 22 删除链路自动化测试 | ✅ **`tests/test_phase1_deletions.py` 24 项**；Phase 3 加目标岗位删除级联；**Phase 4 修掉一处真实的孤儿行泄漏**（删岗位未清派生行动，见 `phase4-report §7` 缺陷 1） | ✅ **已达成** |
 | 23 README 与实际 IA 一致 | 已修正项目状态、页面数、F4 口径与已删变量 | 命名体系仍用 F1–F5（Phase 6/7 统一） |
-| 24 无 dead routes | ✅ **0 个**；Phase 3 新增 5 条重写后仍为 0（静态目标存在 + 每条 `_route` 有处理器） | ✅ **已达成** |
+| 24 无 dead routes | ✅ **0 个**；Phase 4 新增 3 条重写（共 **44** 条）后仍为 0，并新增**正向**检查（新接口必须在生产入口有重写） | ✅ **已达成** |
 | 25 无明显 dead code | 已清除：专业匹配+任务框架、C7、KB 页、语音链路、陈旧测试产物 | 剩余：`ui/prototype` 陈旧分叉、4 个推送脚本、5 个未调用 prompt（Phase 6/7） |
 
 ---
@@ -356,15 +356,27 @@ vercel 死路由 = 0、真实 HTTP 冒烟 **37/37**。
 - 规则降级路径（未配置模型时）产出 **0 条**候选证据（引文是定长窗口，被完整性过滤挡掉）。
   这是刻意选择，但意味着无模型环境下用户建不了证据档案。
 
-### 12.1 D9 · 面试新事实由谁抽取（待决策，阻塞 Phase 4 的面试侧）
+### 12.1 D9 · 面试新事实由谁抽取：方案 A（已采纳，2026-09-16）
 
 | 方案 | 做法 | 代价 |
 | --- | --- | --- |
-| **A（倾向）** | 模型在评估轮顺带抽取候选事实（claim + 引文），走 `candidate_evidence()` 落 pending | 多一次模型调用；依赖提示词质量 |
+| **A ✅ 已采纳** | 模型在评估轮顺带抽取候选事实（claim + 引文），走 `candidate_evidence()` 落 pending | 多一次模型调用；依赖提示词质量 |
 | B | 不自动抽取，只给"把某轮回答存为候选证据"的按钮 | 零模型成本；用户需自己判断哪轮值得存 |
 
 域层已强制 `candidate_evidence()` 只产 pending 且有测试，**两种方案都不会破坏 DoD #12**；
 差别只在体验与成本。
+
+**产品负责人 2026-09-16 裁决：取方案 A。**
+
+**实现时机的偏离（同一方案内，需明示）**：抽取挂在 `POST /api/wf04/end`（结束面试时**一次性**抽取
+全部轮次），而不是逐轮抽取。理由是逐轮抽取的代价与收益不成比例：
+
+- 成本是轮数 × 模型调用，而候选证据最终要被用户**批量确认**，逐轮落库只会让确认列表变长；
+- 同一段经历会在多轮里反复出现，逐轮抽取必然产生重复候选，还得再去重；
+- 结束时才有完整对话，抽取质量更高（能看到全局，而不是单轮片段）。
+
+`extract_candidates()` 是独立函数，若将来要改逐轮，只需在 `answer_interview` 里加一行调用，
+域层与过滤链不需要任何改动。
 
 ### 12.2 其余决策点状态
 
@@ -375,4 +387,63 @@ vercel 死路由 = 0、真实 HTTP 冒烟 **37/37**。
 | D6 `deliverables/` | ✅ 保留原地，Phase 7 归档 |
 | D7 进入即强制注册弹窗 | ⏳ Phase 6 实现 |
 | D8 诊断 → 证据 | ✅ 方案 A，已在 Phase 3 落地 |
-| **D9 面试新事实抽取** | ⏳ **待决策**（见 §12.1） |
+| **D9 面试新事实抽取** | ✅ **方案 A**（2026-09-16 裁决），Phase 4 落地（见 §12.1） |
+
+---
+
+## 13. Phase 4 完成记录（2026-09-16）
+
+Phase 4（Action Loop：Gap Action Plan + Application 状态回流）后端闭环打通，
+一个提交 **`<待回填>`**：17 文件，**+2310 / −15**。
+
+**新增能力**：`/api/actions`（清单 / 批量或单条开单 / start / complete / outcome / drop / 删除）、
+`/api/wf07/applications/<id>/outcome` 与 `/outcomes`（一次结果同时推进 7 态状态机并反向写
+**待确认**证据）、`POST /api/wf04/end` 接入 **D9=A 一次性抽取**。
+详见 `docs/phase4-report.md` 与 `CHANGELOG.md` 同日条目。
+
+**门禁**：pytest **457** passed（138.59s）、Node 36/36、schema 32 项 OK、敏感扫描 249 文件无发现、
+`git diff --check` 干净、双方言 DDL 各 29 表、vercel 死路由 = 0（44 条重写）、
+真实 HTTP 冒烟 **57/57**（真进程 + 真端口）。
+
+**DoD 变化**：#12（Interview 新事实需用户确认）由"部分达成"变为**达成**；
+#19（CI 全绿）、#22（删除链路）、#24（无 dead routes）随本阶段数字更新。
+**#10（Cover Letter）仍未做**，见 §13.4。
+
+### 13.1 三条不变的领域不变量
+
+| 不变量 | 本阶段的落地 |
+| --- | --- |
+| 事实必须可回指来源 | 面试候选的引文必须是回答的**逐字子串**（模型改写的整条丢弃）；结果回流证据的引文是用户写的备注 |
+| AI 不能写入已确认事实 | D9=A 与结果回流两条新写入路径都只产 `pending`，域层收口 |
+| 关键判定可解释 | 开单不改变 Decision；缺口是否解决只由**重新分析**决定 |
+
+### 13.2 "开单 / 完成 / 放弃"都不等于"缺口解决了"
+
+这是本阶段最容易写错、也最容易骗人的一处，已写成三条独立测试：
+
+- **开单** → 缺口 `open → doing`，仍在"未解决"集合内，**Decision 不变**；
+- **完成**（行动 `done`）→ 只记"我做了这件事"，缺口状态不动；
+- **放弃**（行动 `dropped`）→ 不关闭缺口，仅允许重新开单。
+  缺口只有在**重新分析**发现被覆盖时才变 `cleared`。
+
+否则"打了个勾"就等于"能力补齐了"，而那是假的。
+
+### 13.3 结果回流的三本账
+
+**结果始终落库 / 状态推进可能被拒（如实报 `statusApplied=false`）/ 证据只能 pending** ——
+三者互不连坐。已投递后补记"被拒"是事实，倒流补记"进入面试"也是事实，但状态机不允许倒流时
+**保留原状态并如实回报**，而不是丢掉结果或静默改写历史。
+
+### 13.4 口径冲突（需裁决）
+
+**DoD #10（Cover Letter 用 Target Job + Evidence）在两个文档里归属不同**：
+
+- `§9 DoD 表`：标为 **Phase 4**；
+- `phase3-report §9`：Phase 4 = **Action Loop（Gap Action Plan + Application 状态回流）**。
+
+本阶段按后者执行，**#10 未做**（求职信仍只读 F1 诊断）。两个口径需二选一：
+**A** 承认 Phase 4 = Action Loop，#10 另立 Phase 4b 或并入 Phase 6；
+**B** Phase 4 不关闭，同一阶段内把 #10 做完再结。
+
+**Phase 4 结束时仍不可用的东西**（口径）：8 条新路由没有任何页面消费，
+因此对外不得出现"面试结束后自动生成行动计划""记一次投递结果就能更新档案"这类描述（Phase 6 才成立）。

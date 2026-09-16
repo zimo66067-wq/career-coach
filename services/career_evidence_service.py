@@ -23,13 +23,24 @@ application_outcome 三个来源强制拒绝 ``confirmed``，这里是第二道�
 
 JD 匹配命中的**整句**天然是完整陈述，是质量最高的候选来源。
 """
+import json
+import logging
+
 from domain.career_profile import new_profile
+from domain.errors import DomainError
 from domain.evidence import EvidenceType, new_evidence
 from repositories import career_evidence as evidence_repo
 from repositories import career_profile as profile_repo
 from tools import database
+from tools.deidentify import deidentify
+
+logger = logging.getLogger(__name__)
 
 SOURCE_RESUME = "resume"
+
+#: 面试来源的候选证据由 ``domain.interview.candidate_evidence`` 打标，
+#: 这里只用于文档与测试断言，不参与写入。
+SOURCE_INTERVIEW = "interview"
 
 #: 诊断子项 → 证据类别。
 #: 刻意**不包含** structure / ats_readability：它们衡量的是文档组织与可读性，
@@ -175,6 +186,191 @@ def candidates_from_requirements(owner_key, session_id, requirements, resume_tex
             "origin": "requirement:%s" % requirement.get("id"),
         })
     return candidates
+
+
+#: 面试单轮最多保留的候选条数（模型可能不守 prompt 约束，服务层兜底限流）
+MAX_CANDIDATES_PER_TURN = 2
+
+
+def _interview_turns(turns):
+    """筛选**有效轮次**，并把回答**脱敏**后作为事实来源。
+
+    引擎在 ASR 置信度过低时不记录轮次（``subscores`` 为 ``None``、``answer_quote``
+    为空）。这类轮次没有可靠原文，不能拿去生成证据。
+
+    ``turn["answer"]`` 是用户**原始**输入 —— 引擎的 ``_deidentify_answer`` 只用于
+    外发模型的入参，不写回 session。所以这里必须自己再脱敏一次，与简历路径保持一致：
+    证据的唯一事实来源是脱敏后文本。含 PII 的引文脱敏后对不上原文，会被
+    ``is_complete_span`` 丢弃 —— 这是期望行为，而不是 bug。
+    """
+    valid = []
+    for index, turn in enumerate(turns or []):
+        if not isinstance(turn, dict):
+            continue
+        raw = str(turn.get("answer") or "")
+        if not raw or not turn.get("subscores"):
+            continue
+        answer = _compact(deidentify(raw)[0])
+        if not answer:
+            continue
+        turn_id = turn.get("turn_id")
+        valid.append({
+            "turn_id": index + 1 if turn_id is None else turn_id,
+            "answer": answer,
+            # 引文与事实来源同口径（都过 _compact），否则内部空白差异会让校验失败
+            "answer_quote": _compact(turn.get("answer_quote")),
+        })
+    return valid
+
+
+def _interview_record(owner_key, session_id, turn, claim, quote, evidence_type):
+    """经域层生成候选证据 —— 事实锁（quote 必须是 answer 的逐字子串）在这里生效。"""
+    from domain import interview as interview_domain
+
+    return interview_domain.candidate_evidence(
+        {"session_id": str(session_id)},
+        {"owner_key": owner_key},
+        claim=claim,
+        quote=quote,
+        answer_text=turn["answer"],
+        evidence_type=evidence_type,
+        turn_id=turn["turn_id"],
+    )
+
+
+def candidates_from_interview(owner_key, session_id, turns, extracted=None):
+    """面试有效轮次 → 候选证据记录（**全部 pending**）。
+
+    ``extracted`` 是模型抽取结果 ``[{"claim","quote","evidence_type","turn_id"}]``。
+
+    - 传 ``None``（模型不可用 / 降级 / 解析失败）→ **逐轮用 ``answer_quote`` 兜底**。
+      它是引擎按「优先含数字的句子，否则最长句」算出的**完整句子**，属于用户原话，
+      因此既不是编造，也能通过完整性校验（与简历规则路径的定长截断窗口不同）。
+    - 模型可用 → **以模型的判断为准**：它说某轮没有事实就不补，避免把"我明白了"
+      这类礼节性回答也塞进证据档案。引文对不上原文的条目直接丢弃。
+
+    两条路径都由域层 ``candidate_evidence()`` 收口，因此不可能产出 confirmed。
+    """
+    turns_by_id = {}
+    for turn in _interview_turns(turns):
+        turns_by_id.setdefault(str(turn["turn_id"]), turn)
+
+    records, dropped = [], 0
+
+    if extracted is None:
+        for turn in turns_by_id.values():
+            quote = turn["answer_quote"]
+            if not quote or not is_substantive_claim(quote):
+                dropped += 1
+                continue
+            if not is_complete_span(turn["answer"], quote):
+                dropped += 1
+                continue
+            try:
+                records.append(_interview_record(
+                    owner_key, session_id, turn, claim=quote, quote=quote,
+                    evidence_type=None,
+                ))
+            except DomainError:
+                dropped += 1
+        return records, dropped
+
+    per_turn = {}
+    for item in extracted:
+        if not isinstance(item, dict):
+            dropped += 1
+            continue
+        turn = turns_by_id.get(str(item.get("turn_id")))
+        if turn is None:
+            dropped += 1
+            continue
+        index = str(turn["turn_id"])
+        if len(per_turn.get(index, [])) >= MAX_CANDIDATES_PER_TURN:
+            dropped += 1
+            continue
+        quote = _raw_quote(item.get("quote"))
+        claim = _compact(item.get("claim")) or quote
+        if not quote or not is_substantive_claim(quote):
+            dropped += 1
+            continue
+        if not is_complete_span(turn["answer"], quote):
+            # 模型改写了原文（换字、截断、拼接）→ 丢弃，绝不用改写的引文当证据
+            dropped += 1
+            continue
+        try:
+            record = _interview_record(
+                owner_key, session_id, turn, claim=claim, quote=quote,
+                evidence_type=item.get("evidence_type"),
+            )
+        except DomainError:
+            dropped += 1
+            continue
+        per_turn.setdefault(index, []).append(record)
+        records.append(record)
+
+    return records, dropped
+
+
+def persist_records(owner_key, records):
+    """落库已由域层构造好的证据记录，按 ``(source_id, source_quote)`` 去重。
+
+    去重键与 ``persist_candidates`` 一致，因此同一场面试重复结束不会堆记录，
+    用户否决过的条目也不会被重新塞回来。
+    """
+    created, skipped = [], 0
+    for record in records:
+        if evidence_repo.exists_for_source(
+            owner_key, record["source_type"], record["source_id"], record["source_quote"]
+        ):
+            skipped += 1
+            continue
+        created.append(evidence_repo.create(record))
+    return created, skipped
+
+
+def extract_candidates(owner_key, session_id, turns, router=None):
+    """D9 方案 A：面试结束后一次性抽取候选事实。
+
+    **实现时机的偏离**：挂在结束时一次性抽取，而不是逐轮抽取。成本是轮数 × 模型调用，
+    而候选最终要被用户批量确认 —— 逐轮落库只会让确认列表变长，且同一段经历会在多轮
+    里重复出现。结束时才有完整对话，抽取质量也更高。
+
+    模型调用失败**不抛错**：降级为 ``answer_quote`` 兜底，面试结果本身不受影响。
+    """
+    extracted = None
+    if router is not None:
+        payload = [
+            {
+                "turn_id": turn["turn_id"],
+                "question": _compact(turn.get("question")),
+                "answer": turn["answer"],
+            }
+            for turn in _interview_turns(turns)
+        ]
+        if payload:
+            try:
+                result = router.call(
+                    "interview_evidence",
+                    json.dumps(payload, ensure_ascii=False),
+                    context={"turn_count": len(payload)},
+                )
+                if result.get("status") == "success" and isinstance(result.get("output"), dict):
+                    candidates = result["output"].get("candidates")
+                    if isinstance(candidates, list):
+                        extracted = candidates
+            except Exception as exc:  # noqa: BLE001 - 抽取失败不得影响面试结束
+                logger.warning("[evidence] interview extraction failed: %s", type(exc).__name__)
+
+    records, dropped = candidates_from_interview(
+        owner_key, session_id, turns, extracted=extracted
+    )
+    created, skipped = persist_records(owner_key, records)
+    return {
+        "created": created,
+        "skipped": skipped,
+        "dropped": dropped,
+        "degraded": extracted is None,
+    }
 
 
 def ensure_profile(owner_key):

@@ -88,7 +88,10 @@ from services.apply_service import (  # noqa: E402
     delete_application,
     generate_cover_letter,
     list_applications_for,
+    list_outcomes_for,
+    record_outcome_feedback,
 )
+from services import action_plan_service  # noqa: E402
 from services import career_evidence_service as evidence_service  # noqa: E402
 from services import target_job_service  # noqa: E402
 from services.target_job_service import TargetJobError  # noqa: E402
@@ -675,9 +678,10 @@ def route_api(**_ignored):
             "f5/organizations/status", "f5/organizations/suggest",
             "f5/organizations/discover", "f5/organizations/detail",
             "f5/organizations/jobs",
-            "profile", "profile/evidence/candidates", "target-jobs",
+            "profile", "profile/evidence/candidates", "target-jobs", "actions",
         } or (route.startswith("history/") or route.startswith("f5/")
-              or route.startswith("profile/evidence/") or route.startswith("target-jobs/")):
+              or route.startswith("profile/evidence/") or route.startswith("target-jobs/")
+              or route.startswith("actions/") or route.startswith("wf07/applications/")):
             return ("", 204)
         raise ApiError("not_found", "接口不存在。", 404)
 
@@ -833,6 +837,102 @@ def route_api(**_ignored):
         if request.method == "DELETE" and not action:
             target_job_service.delete_target_job(target_job_id, owner)
             return api_response({"deleted": True, "id": target_job_id})
+
+        raise ApiError("not_found", "接口不存在。", 404)
+
+    # ------------------------------------------------------------------ #
+    # Gap Action Plan（Phase 4）：把缺口翻成可执行、可验证的行动
+    # ------------------------------------------------------------------ #
+    if route == "actions" and request.method == "GET":
+        require_consent()
+        status = str(request.args.get("status") or "").strip() or None
+        items = action_plan_service.list_actions(_task_owner_key(), status=status)
+        return api_response({"actions": items, "total": len(items)})
+
+    if route == "actions" and request.method == "POST":
+        require_consent()
+        enforce_usage("action_plan_hour", 30, 3600)
+        body = require_json_object("行动计划请求")
+        owner = _task_owner_key()
+
+        # 两种开单方式：给 targetJobId 就按该岗位未解决缺口整体铺开（幂等），
+        # 给 gapId 就只开这一条。两者都走服务层的同一套校验。
+        if body.get("targetJobId") is not None:
+            try:
+                target_job_id = int(body["targetJobId"])
+            except (TypeError, ValueError):
+                raise ApiError("invalid_request", "目标岗位 ID 无效。", 422)
+            plan = action_plan_service.plan_for_target(target_job_id, owner)
+            return api_response({
+                "targetJobId": target_job_id,
+                "created": plan["created"],
+                "existing": plan["existing"],
+                "skipped": plan["skipped"],
+                "createdCount": len(plan["created"]),
+                "existingCount": len(plan["existing"]),
+            }, 201 if plan["created"] else 200)
+
+        if body.get("gapId") is not None:
+            try:
+                gap_id = int(body["gapId"])
+            except (TypeError, ValueError):
+                raise ApiError("invalid_request", "缺口 ID 无效。", 422)
+            record, opened = action_plan_service.open_action(gap_id, owner)
+            return api_response({"action": record, "opened": opened}, 201 if opened else 200)
+
+        raise ApiError(
+            "invalid_request",
+            "请提供 targetJobId（按岗位铺开）或 gapId（单条开单）。",
+            422,
+        )
+
+    if route.startswith("actions/"):
+        parts = route.split("/")
+        if len(parts) not in (2, 3):
+            raise ApiError("not_found", "接口不存在。", 404)
+        try:
+            action_id = int(parts[1])
+        except (TypeError, ValueError):
+            raise ApiError("invalid_request", "行动 ID 无效。", 422)
+        verb = parts[2] if len(parts) == 3 else ""
+
+        if request.method == "GET" and not verb:
+            require_consent()
+            owner = _task_owner_key()
+            return api_response({"action": action_plan_service.get_action(action_id, owner)})
+
+        if request.method == "DELETE" and not verb:
+            require_consent()
+            owner = _task_owner_key()
+            action_plan_service.delete_action(action_id, owner)
+            return api_response({"deleted": True, "id": action_id})
+
+        if request.method == "POST" and verb in ("start", "complete", "outcome", "drop"):
+            require_consent()
+            owner = _task_owner_key()
+
+            if verb == "start":
+                return api_response({"action": action_plan_service.start_action(action_id, owner)})
+
+            if verb == "drop":
+                return api_response({"action": action_plan_service.drop_action(action_id, owner)})
+
+            if verb == "complete":
+                body = require_json_object("完成请求") if request.data else {}
+                artifact = str(body.get("artifact") or "").strip() or None
+                return api_response({
+                    "action": action_plan_service.complete_action(
+                        action_id, owner, artifact=artifact
+                    )
+                })
+
+            body = require_json_object("结果记录请求")
+            outcome = str(body.get("outcome") or "").strip()
+            if not outcome:
+                raise ApiError("invalid_request", "请描述做完之后发生了什么。", 422)
+            return api_response({
+                "action": action_plan_service.record_action_outcome(action_id, owner, outcome)
+            })
 
         raise ApiError("not_found", "接口不存在。", 404)
 
@@ -1140,6 +1240,39 @@ def route_api(**_ignored):
         deleted = delete_application(app_id, _task_owner_key())
         return api_response({"application": deleted, "status": "DELETED"})
 
+    # 投递结果回流（Phase 4）：一次结果同时推进申请状态并反向写**待确认**证据。
+    if route.startswith("wf07/applications/") and request.method in ("GET", "POST"):
+        require_consent()
+        parts = route.split("/")
+        if len(parts) != 4:
+            raise ApiError("not_found", "接口不存在。", 404)
+        try:
+            application_id = int(parts[2])
+        except (TypeError, ValueError):
+            raise ApiError("invalid_request", "申请记录 ID 无效。", 422)
+        verb = parts[3]
+        owner = _task_owner_key()
+
+        if verb == "outcomes" and request.method == "GET":
+            return api_response({"outcomes": list_outcomes_for(application_id, owner)})
+
+        if verb == "outcome" and request.method == "POST":
+            body = require_json_object("结果记录请求")
+            outcome = str(body.get("outcome") or "").strip().lower()
+            if not outcome:
+                raise ApiError(
+                    "invalid_request",
+                    "请提供 outcome（applied / interview / offer / rejected / "
+                    "withdrawn / no_response）。",
+                    422,
+                )
+            note = str(body.get("note") or "").strip() or None
+            return api_response(
+                record_outcome_feedback(application_id, owner, outcome, note=note)
+            )
+
+        raise ApiError("not_found", "接口不存在。", 404)
+
     if route == "health" and request.method == "GET":
         return api_response({
             "status": "ok",
@@ -1149,7 +1282,7 @@ def route_api(**_ignored):
                 "wf01": "available", "wf02": "available", "wf03": "available",
                 "wf04": "available", "wf05": "available", "wf06": "available",
                 "wf07": "available",
-                "profile": "available", "target_jobs": "available",
+                "profile": "available", "target_jobs": "available", "actions": "available",
             },
             # 领域收敛迁移的可观测性：迁移失败不静默（见 repositories/migrations.py）
             "migrations": migration_status(),
@@ -1328,7 +1461,35 @@ def route_api(**_ignored):
         if not body.get("session_id"):
             raise ApiError("session_required", "缺少面试会话标识。", 422)
         ensure_session_access(body.get("session_id"))
-        return api_response(end_interview(body))
+        result = end_interview(body)
+
+        # D9 方案 A：面试结束后**一次性**抽取候选事实，落成待确认证据。
+        # 必须带 targetJobId —— 面试新发现的事实要挂在某个目标岗位上（域层约束），
+        # 没有岗位就没有归属，宁可不抽，也不生成无主证据。
+        target_job_id = body.get("targetJobId")
+        if target_job_id is not None:
+            try:
+                target_job_id = int(target_job_id)
+            except (TypeError, ValueError):
+                raise ApiError("invalid_request", "目标岗位 ID 无效。", 422)
+            owner = _task_owner_key()
+            target_job_service.get_target_job(target_job_id, owner)  # 归属校验
+            try:
+                router = build_model_router()
+            except ApiError:
+                router = None
+            extraction = evidence_service.extract_candidates(
+                owner, result.get("session_id"), result.get("turns") or [], router=router
+            )
+            result["candidateEvidence"] = {
+                "created": len(extraction["created"]),
+                "skipped": extraction["skipped"],
+                "dropped": extraction["dropped"],
+                "degraded": extraction["degraded"],
+                "ids": [record["id"] for record in extraction["created"]],
+            }
+            result["targetJobId"] = target_job_id
+        return api_response(result)
 
     if route == "wf05/ability" and request.method == "POST":
         require_consent()
@@ -1432,6 +1593,16 @@ for _rule in (
     "/api/target-jobs/<id>",
     "/api/target-jobs/<id>/analyse",
     "/api/target-jobs/<id>/decision",
+    # Phase 4 · 行动闭环：缺口 → 可执行行动
+    "/api/actions",
+    "/api/actions/<id>",
+    "/api/actions/<id>/start",
+    "/api/actions/<id>/complete",
+    "/api/actions/<id>/outcome",
+    "/api/actions/<id>/drop",
+    # Phase 4 · 投递结果回流
+    "/api/wf07/applications/<id>/outcome",
+    "/api/wf07/applications/<id>/outcomes",
 ):
     app.add_url_rule(_rule, endpoint="route_" + _rule.replace("/", "_") or "root", view_func=route_api,
                      methods=["GET", "POST", "DELETE", "OPTIONS"])

@@ -4,6 +4,52 @@
 
 ## [Unreleased]
 
+### Added - 2026-09-16 行动闭环：Gap Action Plan + 投递结果回流（Phase 4）
+
+Phase 3 只回答"我差什么"和"能不能投"，用户拿到结论之后**无事可做**。Phase 4 补的是闭环的
+另一半：把缺口翻成今天就能做的一件事，让做完之后发生的事回流成新证据。
+
+- `services/action_plan_service.py`：缺口 → 可执行行动。四条硬约束 ——
+  **开单需要可验证成果物**（域层 `open_from_gap()` 拒绝没有 `expected_artifact` 的缺口，
+  服务层不绕过，缺成果物的缺口如实报进 `skipped` 并给原因）；**幂等**（`todo`/`doing` 期间不重复开单）；
+  **开单即让缺口进 `doing` 但仍属未解决**（`OPEN_GAP_STATUSES`，所以开单不会让 Decision 变乐观）；
+  **完成 ≠ 缺口解决**（行动 `done` 只记"我做了这件事"，缺口是否补齐只由**重新分析**决定）
+- `services/apply_service.record_outcome_feedback()`：三本账分开算 —— 结果始终落库 /
+  状态推进可能被拒并如实回报 `statusApplied=false`（倒流补记不改写历史）/ 证据只能 `pending`
+  （`source_type=application_outcome`，"被拒""拿 offer"都只是推断）
+- **D9 方案 A 落地**：`POST /api/wf04/end` 增可选 `targetJobId`，结束后**一次性**抽取面试新事实
+  （`prompts/interview/evidence.md`，逐字引文铁律）。模型路径与降级路径都由
+  `domain.interview.candidate_evidence()` 收口，**只产 pending**；引文必须是回答的**逐字子串**，
+  模型改写原文整条丢弃；模型说"这轮没有事实"时**不允许**用 `answer_quote` 兜底补一条
+- 8 条路由：`/api/actions`（清单 / 批量或单条开单 / start / complete / outcome / drop / 删除）、
+  `/api/wf07/applications/<id>/outcome` 与 `/outcomes`；`vercel.json` 增 3 条重写（共 **44** 条）
+- `repositories.action.list_with_gap_context()`：一次 LEFT JOIN 取缺口上下文，P0 优先排序
+- `tools/model_router.py` 注册 `interview_evidence` 任务（temperature 0.1 / timeout 30s / 降级空数组）
+- `tests/test_action_loop.py`（**34 项**）：9 项面试抽取 + 13 项行动计划 + 7 项结果回流 + 3 项契约
+- `/api/health` 的能力表增 `actions`
+
+### Fixed - 2026-09-16 删除目标岗位时遗留孤儿行动（Phase 4 自查）
+
+`delete_target_job` 的契约明确写着"从它派生出来的个人数据必须一并消失，不能留下可以反推出
+岗位与要求的孤儿行"，但原实现删了 requirements / matches / gaps / decisions，**唯独没删 actions**。
+而行动的 `task` / `artifact` 文案正是缺口 `action` / `expected_artifact` 的复制，也就是**被改写过的
+JD 要求**；`list_with_gap_context` 的 `LEFT JOIN` 让整行照常出现在清单里 ——
+**LEFT JOIN 的容错把数据泄漏伪装成了健壮性**。
+
+修法：新增 `repositories.action.delete_for_target()`，在删 `gaps` **之前**调用
+（行动靠 `gap_id` 认路，顺序反了就再也认不出来），并补测试
+`test_deleting_a_target_job_also_removes_its_actions`。
+这是"测试通过、门禁全绿"却真实存在的漏洞，只有照删除契约逐条核对派生数据才发现。
+
+### Changed - 2026-09-16 Phase 4 门禁口径
+
+- pytest **423 → 457**（+34，本阶段新增用例）；node 36/36 不变
+- vercel 重写 **41 → 44** 条，死路由仍为 0，并新增**正向**检查：
+  新接口必须在生产入口有重写（只在本地注册 = 线上 404）
+- 真实 HTTP 冒烟 **37 → 57** 项（`scripts/phase4-http-smoke.py`，真进程 + 真端口）
+- 新增 `scripts/sensitive-scan.py`：与 CI 步骤 6 同口径的敏感信息扫描（本地门禁跑，避免本地过、CI 挂）
+- 双方言 DDL 仍各 **29** 张表，无漂移；`actions` / `application_outcomes` 双方言均在
+
 ### Added - 2026-09-14 核心闭环：职业证据档案 + 目标岗位分析（Phase 3）
 
 把 domain / repositories 两层接到 HTTP 上，打通

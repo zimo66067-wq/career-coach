@@ -150,3 +150,79 @@ def delete_application(app_id, owner_key):
     if row is None:
         raise ApiError("not_found", "申请记录不存在或无权访问。", 404)
     return row
+
+
+# ------------------------------------------------------------------ #
+# 结果回流（Phase 4）：投递结果 → 状态推进 + 反向写证据
+# ------------------------------------------------------------------ #
+
+def record_outcome_feedback(application_id, owner_key, outcome, note=None):
+    """记录一次投递结果：推进 7 态状态，并反向写一条**待确认**证据。
+
+    三件事分开算账：
+
+    1. **结果始终落库** —— 结果发生过就是事实，不因为状态机拒绝推进而丢弃。
+    2. **状态推进可能被拒绝** —— 例如已 ``rejected`` 再补记 ``interview`` 是非法迁移。
+       此时保留原状态并如实回报 ``statusApplied=False``，而不是静默改写历史。
+    3. **证据只能是 pending** —— ``domain.application.evidence_from_outcome`` 强制
+       ``source_type=application_outcome``，用户确认后才进可信事实。被拒/拿 offer 都只是
+       **推断**（"我缺什么 / 我强在哪"），不能直接当事实用。
+
+    Returns:
+        dict: {application, outcome, evidence, evidenceCreated, statusApplied, requestedStatus}
+    """
+    from domain import application as application_domain
+    from domain.errors import DomainError
+    from repositories import application as application_repo
+    from services import career_evidence_service as evidence_service
+    from tools import database
+
+    application = application_repo.get_for_owner(application_id, owner_key)
+    if application is None:
+        raise ApiError("not_found", "申请记录不存在或无权访问。", 404)
+
+    now = database.utc_iso()
+    try:
+        record, next_status = application_domain.record_outcome(
+            application, outcome, note=note, now=now
+        )
+        evidence_record = application_domain.evidence_from_outcome(
+            application, outcome, note=note, now=now
+        )
+    except DomainError as error:
+        raise ApiError(error.code, error.message, 422)
+
+    status_applied = False
+    if next_status and next_status != application.get("status"):
+        try:
+            application_domain.transition(application.get("status"), next_status)
+        except DomainError:
+            # 非法推进（补记历史结果时会遇到）—— 记结果，不改状态
+            status_applied = False
+        else:
+            application_repo.set_status(application_id, owner_key, next_status)
+            status_applied = True
+
+    application_repo.add_outcome(record)
+    evidence_service.ensure_profile(owner_key)
+    created, skipped = evidence_service.persist_records(owner_key, [evidence_record])
+
+    return {
+        "application": application_repo.get_for_owner(application_id, owner_key),
+        "outcome": record,
+        "evidence": created[0] if created else None,
+        "evidenceCreated": bool(created),
+        "evidenceSkipped": skipped,
+        "statusApplied": status_applied,
+        "requestedStatus": next_status,
+    }
+
+
+def list_outcomes_for(application_id, owner_key):
+    """一次申请的完整结果时间线。"""
+    from repositories import application as application_repo
+
+    application = application_repo.get_for_owner(application_id, owner_key)
+    if application is None:
+        raise ApiError("not_found", "申请记录不存在或无权访问。", 404)
+    return application_repo.list_outcomes(application_id)

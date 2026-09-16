@@ -158,6 +158,10 @@
       "destination": "/api?_route=wf07/cover-letter"
     },
     {
+      "source": "/api/wf07/applications/(.*)",
+      "destination": "/api?_route=wf07/applications/$1"
+    },
+    {
       "source": "/api/wf07/applications",
       "destination": "/api?_route=wf07/applications"
     },
@@ -200,6 +204,14 @@
     {
       "source": "/api/target-jobs",
       "destination": "/api?_route=target-jobs"
+    },
+    {
+      "source": "/api/actions/(.*)",
+      "destination": "/api?_route=actions/$1"
+    },
+    {
+      "source": "/api/actions",
+      "destination": "/api?_route=actions"
     }
   ]
 }
