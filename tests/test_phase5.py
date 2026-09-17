@@ -12,6 +12,7 @@ import services.apply_service as apply_service
 import services.diagnosis_service as diagnosis_service
 import services.interview_service as interview_service
 import services.match_service as match_service
+from tools.providers import model as model_provider
 
 RESUME = (
     "项目经历：负责后端接口开发并完成上线验证，持续跟进问题闭环。"
@@ -72,7 +73,7 @@ def upload_and_diagnose(raw, token):
 def test_model_provider_mock_first_without_key(monkeypatch):
     monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
     monkeypatch.setenv("MODEL_PROVIDER", "mock")
-    router = api_module.build_model_router()
+    router = model_provider.build_model_router()
     result = router.call("resume_diagnosis", "项目经历：负责开发并上线。")
     assert result["status"] == "success"
     assert isinstance(result["output"], dict)
@@ -87,7 +88,7 @@ def test_model_provider_default_requires_key(monkeypatch):
     monkeypatch.delenv("MODEL_PROVIDER", raising=False)
     monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
     try:
-        api_module.build_model_router()
+        model_provider.build_model_router()
     except api_module.ApiError as error:
         assert error.code == "model_not_configured"
     else:
@@ -114,9 +115,12 @@ def test_services_layer_exposes_expected_entry_points():
 
 
 def test_services_diagnose_matches_previous_rule_fallback(monkeypatch):
+    """**不加任何请求上下文**直接调服务 —— Phase 5 之前这里必须
+    `with api_module.app.test_request_context("/")`，因为服务里兜底 trace 用的是
+    `tools.trace.trace_id()`（要 Flask 请求上下文）。现在 trace 由调用方注入、
+    工厂只依赖 tools.providers.model，服务可以脱离 web 层被测试。"""
     monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
-    with api_module.app.test_request_context("/"):
-        profile, score, _trace, mode, notice = diagnosis_service.diagnose_resume(RESUME)
+    profile, score, _trace, mode, notice = diagnosis_service.diagnose_resume(RESUME)
     assert mode == "rule_fallback"
     assert 0 <= score <= 100
     assert profile["version"] == "1.0"

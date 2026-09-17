@@ -9,9 +9,10 @@ import json
 from tools.api_errors import ApiError
 from tools.contracts import RESUME_PROFILE_VALIDATOR, SUBSCORE_DEFAULTS
 from tools.deidentify import deidentify
+from tools.providers import model as model_provider
 from tools.redflag import JSON_NOISE, RE_NUMBER, RE_PLACEHOLDER
 from tools.rescore import calc_R, round2
-from tools.trace import trace_id
+from tools.trace import new_trace_id
 from tools.validate_schema import business_rules
 
 
@@ -300,7 +301,7 @@ def build_rule_based_resume_profile(resume_text):
 def rule_fallback_diagnosis(resume_text, reason, trace=None):
     """Return a usable, explicitly labeled result rather than an opaque 503."""
     fallback_profile = build_rule_based_resume_profile(resume_text)
-    fallback_trace = trace or trace_id()
+    fallback_trace = trace or new_trace_id()
     print(json.dumps({
         "event": "resume_rule_fallback",
         "trace_id": fallback_trace,
@@ -318,46 +319,56 @@ def rule_fallback_diagnosis(resume_text, reason, trace=None):
     )
 
 
-def diagnose_resume(resume_text):
+def diagnose_resume(resume_text, trace=None):
+    """诊断一份简历。**不依赖 web 层**：调用方（路由）可以把 trace id 传进来。
+
+    Phase 5 之前这里 `from api.index import build_model_router`，顺带还用
+    `tools.trace.trace_id()` 兜底 —— 后者要 Flask 请求上下文，于是服务的单测必须
+    `with app.test_request_context()` 才能跑（`test_phase5.py` 里那个 workaround 就是它）。
+    现在两层依赖都掉头了：工厂只从 `tools.providers.model` 取，trace 由调用方注入。
+    """
     cleaned_text, _mapping = deidentify(resume_text)
     try:
-        from api.index import build_model_router  # runtime lookup keeps monkeypatch compat
-
-        router = build_model_router()
+        router = model_provider.build_model_router()
         result = router.call("resume_diagnosis", cleaned_text)
     except ApiError as error:
         if error.code == "model_not_configured":
-            return rule_fallback_diagnosis(cleaned_text, error.code)
+            return rule_fallback_diagnosis(cleaned_text, error.code, trace)
         raise
     except Exception as error:
-        return rule_fallback_diagnosis(cleaned_text, "router_exception:%s" % type(error).__name__)
+        return rule_fallback_diagnosis(
+            cleaned_text, "router_exception:%s" % type(error).__name__, trace
+        )
 
     if not isinstance(result, dict) or result.get("status") != "success" or not isinstance(result.get("output"), dict):
         result_trace = result.get("trace_id") if isinstance(result, dict) else None
-        return rule_fallback_diagnosis(cleaned_text, "model_unavailable", result_trace)
+        return rule_fallback_diagnosis(cleaned_text, "model_unavailable", result_trace or trace)
 
     profile = normalize_resume_profile(result["output"], cleaned_text)
     validation_errors = profile_validation_errors(profile, cleaned_text)
     if validation_errors:
         print(json.dumps({
             "event": "resume_validation_rejected",
-            "trace_id": result.get("trace_id"),
+            "trace_id": result.get("trace_id") or trace,
             "error_codes": sorted(set(validation_errors))[:20],
         }, ensure_ascii=False), flush=True)
-        return rule_fallback_diagnosis(cleaned_text, "validation_rejected", result.get("trace_id"))
+        return rule_fallback_diagnosis(
+            cleaned_text, "validation_rejected", result.get("trace_id") or trace
+        )
 
     score_r = round2(calc_R({
         key: value["score"] for key, value in profile["subscores"].items()
     }))
+    result_trace = result.get("trace_id") or trace or new_trace_id()
     if result.get("degraded"):
         return (
             profile,
             score_r,
-            result.get("trace_id") or trace_id(),
+            result_trace,
             "fallback_model",
             "主模型暂时不可用，本次由备用模型完成诊断。",
         )
-    return profile, score_r, result.get("trace_id") or trace_id(), "model", ""
+    return profile, score_r, result_trace, "model", ""
 
 
 # ------------------------------------------------------------------ #

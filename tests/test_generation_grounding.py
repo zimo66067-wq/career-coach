@@ -3,6 +3,7 @@ import json
 
 from services import apply_service
 from tools import database, optimizer
+from tools.providers import model as model_provider
 
 
 QUOTE = "负责订单接口开发并将平均响应从八百毫秒降低到两百毫秒"
@@ -41,7 +42,7 @@ def test_cover_letter_accepts_grounded_structured_model_output(tmp_path, monkeyp
     output = {
         "candidate": "贵公司后端开发工程师岗位与我的经历匹配：我负责订单接口开发并完成性能优化，希望进一步沟通。"
     }
-    monkeypatch.setattr(apply_service, "build_model_router", lambda: Router(output))
+    monkeypatch.setattr(model_provider, "build_model_router", lambda: Router(output))
     result = apply_service.generate_cover_letter(sid, "示例公司", "后端开发工程师")
     assert result["basis"] == "model"
     assert result["candidate"] == output["candidate"]
@@ -50,7 +51,7 @@ def test_cover_letter_accepts_grounded_structured_model_output(tmp_path, monkeyp
 def test_cover_letter_relabels_ungrounded_model_text_as_rule(tmp_path, monkeypatch):
     sid = _saved_session(tmp_path, monkeypatch)
     monkeypatch.setattr(
-        apply_service,
+        model_provider,
         "build_model_router",
         lambda: Router("示例公司后端开发工程师岗位非常适合我，我拥有十年团队管理经验和亿元项目成果。"),
     )

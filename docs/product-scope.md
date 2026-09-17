@@ -204,7 +204,7 @@ CareerProfile        TargetJob                InterviewSession        Action
 | 10 Cover Letter 用 Target Job + Evidence | ✅ **Phase 4b 达成（后端）**：`wf07/cover-letter` 带 `targetJobId` 即走接地路径 —— 事实底座 = 岗位要求（P0→P1→P2，≤5 条）+ `usable_evidence()`（只含 confirmed，≤3 条），缺口只进元数据不进正文，无已确认证据时**不请模型**（15 项测试 + 冒烟锁定） | 前端 F5 页面尚未传 `targetJobId`（Phase 6 接线），详见 `phase4b-report.md §7` |
 | 11 Interview 按 Gap 定向 | ✅ Phase 3：`targetJobId` → 缺口按 P0→P1→P2 排序出题，返回 `questionPlan` | ✅ **已达成**（Phase 3，后端） |
 | 12 Interview 新事实需用户确认 | ✅ **Phase 4 端到端打通**：D9=A 落地，`wf04/end` 一次性抽取；模型路径与降级路径都由 `candidate_evidence()` 收口，只产 pending（9 项测试锁死） | ✅ **已达成**（Phase 4） |
-| 13 Service 不反向依赖 API | 3 处倒置 → **2 处**（`task_service → api.f2_major` 随 D1 消失）；Phase 3 / Phase 4 新增代码均无新倒置（静态校验：domain 层 0 处越层 import） | Phase 5 |
+| 13 Service 不反向依赖 API | ✅ **Phase 5 达成**：两处倒置已修（`diagnosis_service` / `interview_service` 不再 import api，模型工厂收敛为 `tools.providers.model` 唯一归属地）；新增静态门禁 `tests/test_layering.py`（8 项，进 pytest，含判据自检） | ✅ **已达成**（Phase 5）。`tools/` 归并进 domain+providers 属 Phase 7 |
 | 14 .env 无重复/废弃 | 4 个重复变量 + 2 个无消费者 | Phase 7 |
 | 15 前端只有一套 canonical | public / docs / ui 三份 | Phase 6（D1 已保证三份同步删除、public==docs 逐字节一致） |
 | 16-18 Coverage 85/90/75 | Python 79%（Phase 0 基线）；JS 未测 | Phase 15（须在 CI 的 Python 3.11 上重测） |
@@ -469,3 +469,38 @@ vercel 死路由 **0**（44 条重写 / 38 条 API 路由）、双方言 DDL 各
 
 **口径**：这是**后端能力**。前端 F5 页面尚未传 `targetJobId`，用户在页面上生成的求职信
 仍走旧路径；"求职信会自动引用你的目标岗位与已确认经历"在 Phase 6 接线前**不得对外说**。
+
+---
+
+## 14. Phase 5 完成记录（2026-09-17 · 依赖倒置）
+
+提交 **`<待回填>`**（<待回填> 文件，<待回填>）；门禁 pytest **<待回填>**、真实 HTTP 冒烟 **70/70**、
+vercel 死路由 **0**（44 条重写 / 38 条 API 路由）、双方言 DDL 各 29 张表。
+
+**目标**：DoD #13「Service 不反向依赖 API」—— 修掉 `dependency-map.md §3.1` 从 Phase 0
+就点出、被 Phase 2 推到本阶段的两处倒置，并加静态门禁防回潮。
+
+**修了什么**
+
+1. **两处明面倒置**：`diagnosis_service` / `interview_service` 里的
+   `from api.index import build_model_router`（都写在函数体内，注释理由是"monkeypatch compat"）
+   → 改依赖 `tools.providers.model`（叶子模块，模块级 import 不再触发循环导入）。
+2. **一处分层之外的真问题**：`tools.trace.trace_id()` 要 Flask 请求上下文，而诊断服务用它
+   兜底 → **服务的单测必须 `with app.test_request_context()` 才能跑**。
+   修法：`tools/trace.py` 拆出纯函数 `new_trace_id()`、flask 改函数内延迟导入；
+   web 层解析 `X-Trace-Id` 后**注入**服务（`diagnose_resume(resume_text, trace=...)`）。
+   `test_phase5.py` 里那个 `test_request_context` workaround 已删除 —— 去掉它本身就是验收。
+3. **工厂收敛为单一归属地**：`build_model_router` 全仓库只有一处定义，
+   其余模块一律 `from tools.providers import model as model_provider` 后属性查找。
+   此前"打错桩不报错、只是不生效"，现在打错直接 AttributeError。
+
+**门禁**：新增 `tests/test_layering.py`（**8 项，进 pytest**）：跨层 import（含函数体内）、
+传递 Flask 依赖（只按模块级 import 计算）、工厂单一归属地与"无人重新绑定"、
+以及**判据自检**（喂故意越层的假源码，证明检查会红）。
+细节与四个实现坑见 `docs/phase5-report.md §4`。
+
+**仍未做（已排期）**：`dependency-map.md`「Phase 5 验收」第 4 条（`tools/` 归并进
+`domain/` + `providers/`）与 §4.1 的 `api/index.py` 拆文件 —— 两者都是跨阶段重构，
+属 Phase 7；不塞进本期，是为了让"倒置已修"这个结论保持可验证。
+
+**口径**：本阶段是结构与测试改动，**对外能力零变化**。发布说明不得出现"性能提升/新增能力"。

@@ -41,6 +41,24 @@
 >
 > 新增参考：`docs/domain-model.md`。
 
+> **Phase 5 更新（2026-09-17）**：§3.1 / §3.2 的倒置**已修**，验证方式从"手工 grep 一次"
+> 升级为**门禁**：
+>
+> - **§3.1 两处 Service → API 倒置已消失**：`diagnosis_service` / `interview_service`
+>   改为依赖 `tools.providers.model`（叶子模块，模块级 import 不再有循环导入问题）。
+>   同时发现并修掉了它们的**第二层依赖**：`tools.trace.trace_id()` 要 Flask 请求上下文，
+>   服务用它兜底 → 服务单测必须 `with app.test_request_context()`。现在 trace 由 web 层
+>   解析后**注入**服务，`tools/trace.py` 的 flask 改为函数内延迟导入。
+> - **§3.2 收敛完成**：`build_model_router` 全仓库**只有一处定义**（`tools/providers/model.py`），
+>   其余模块一律 `from tools.providers import model as model_provider` 后属性查找。
+>   打桩点因此唯一，打错会 AttributeError（此前打错是**静默失效**）。
+> - **新增门禁** `tests/test_layering.py`（8 项，进 pytest）：跨层 import（含函数体内）、
+>   传递 Flask 依赖（只算模块级）、工厂单一归属地、**判据自检**（喂假源码证明它会红）。
+> - **仍未做**：本文件「Phase 5 验收」第 4 条——`tools/` 归并进 `domain/` + `providers/`；
+>   以及 §4.1 的 `api/index.py` 拆文件。两者都是跨阶段重构，已记入 `phase5-report.md §7`。
+>
+> 细节见 `docs/phase5-report.md`。
+
 ---
 
 ## 1. 实际目录与规模

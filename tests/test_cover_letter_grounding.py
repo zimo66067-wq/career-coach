@@ -20,6 +20,8 @@ from pathlib import Path
 
 import pytest
 
+from tools.providers import model as model_provider
+
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures-synthetic"
 RESUME = (FIXTURES / "resumes" / "resume-01-swe.txt").read_text(encoding="utf-8")
@@ -293,12 +295,10 @@ def test_uncovered_requirements_are_reported_but_never_claimed(client):
 # ------------------------------------------------------------------ #
 
 def test_model_prose_is_used_when_it_stays_grounded(client, monkeypatch):
-    from services import apply_service
-
     session_id, target_id, confirmed, _ = _ready(client, confirmed=1)
     claim = confirmed[0]["claim"]
     stub = StubRouter({"candidate": "我应聘%s的%s岗位。%s。期待进一步沟通。" % (COMPANY, POSITION, claim)})
-    monkeypatch.setattr(apply_service, "build_model_router", lambda: stub)
+    monkeypatch.setattr(model_provider, "build_model_router", lambda: stub)
 
     body = _letter(client, session_id, target_id)
     assert body["basis"] == "model"
@@ -312,12 +312,11 @@ def test_model_prose_is_used_when_it_stays_grounded(client, monkeypatch):
 
 def test_model_prose_that_invents_experience_is_rejected(client, monkeypatch):
     """模型写了一段没有任何证据支撑的漂亮话 → 退回规则模板，而不是放行。"""
-    from services import apply_service
 
     session_id, target_id, _, _ = _ready(client, confirmed=1)
     invented = "我在字节跳动负责过千万级并发系统，把 QPS 提升了 300%%。"
     stub = StubRouter({"candidate": "尊敬%s：我应聘%s。%s" % (COMPANY, POSITION, invented)})
-    monkeypatch.setattr(apply_service, "build_model_router", lambda: stub)
+    monkeypatch.setattr(model_provider, "build_model_router", lambda: stub)
 
     body = _letter(client, session_id, target_id)
     assert body["basis"] == "rule", "无证据支撑的模型输出必须被拒"
@@ -326,14 +325,13 @@ def test_model_prose_that_invents_experience_is_rejected(client, monkeypatch):
 
 def test_the_model_is_not_even_asked_when_there_is_no_confirmed_evidence(client, monkeypatch):
     """规则 1 的正面证明：没有事实底座时模型调用次数为 0。"""
-    from services import apply_service
 
     session_id = _session(client)
     target_id = _target_job(client, session_id)
     _analyse(client, target_id)
 
     stub = StubRouter({"candidate": "我应聘%s的%s岗位，我很有信心。" % (COMPANY, POSITION)})
-    monkeypatch.setattr(apply_service, "build_model_router", lambda: stub)
+    monkeypatch.setattr(model_provider, "build_model_router", lambda: stub)
 
     body = _letter(client, session_id, target_id)
     assert body["grounding"] == "target_job_no_evidence"

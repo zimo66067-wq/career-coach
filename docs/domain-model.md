@@ -26,6 +26,11 @@ Routes  →  Services  →  Domain  →  Repositories / Providers
 不 import `services`。这一条让域规则可以在没有数据库、没有网络的情况下被测试
 （`tests/test_domain_model.py`，46 项，0.7 秒跑完）。
 
+**Phase 5 起这条规则由门禁强制**（`tests/test_layering.py`，8 项，进 pytest）：
+`services/` 不得 import `api.*` 或 Flask（含函数体内），`domain/` 与 `services/` 不得
+**传递依赖** Flask（只按模块级 import 计算），`build_model_router` 只允许一处定义且
+无人重新绑定。判据本身也有自检（喂假源码证明它会红）。
+
 ---
 
 ## 2. 实体关系
@@ -282,6 +287,7 @@ SQLite 与 PostgreSQL 两份 DDL 同步维护（`tools/database.py`）；`schema
 | `tests/test_domain_model.py` | 49 | 三条不变量、Decision 规则与 `blocking`、状态机、行动闭环、出题优先级 |
 | `tests/test_migrations.py` | 15 | 新库冷启动、幂等、**真实老库**（旧 applications 无新列 + 脏状态；旧 gaps 无 blocking）、档案回填不造证据、health 自愈与如实上报 |
 | `tests/test_career_flow.py` | 31 | 端到端闭环（HTTP 层）：候选证据、解析过滤、三种结论、归属隔离、删除级联、面试定向出题 |
+| `tests/test_layering.py` | 8 | **分层门禁**（Phase 5）：跨层 import（含函数体内）、传递 Flask 依赖、`build_model_router` 单一归属地、判据自检 |
 
 迁移测试不是拿新库跑一遍就完事：它用手写的旧 DDL 建**真的缺列、且枚举值是脏数据**的库，
 再断言迁移结果。

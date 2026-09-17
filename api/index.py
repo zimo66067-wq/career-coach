@@ -123,7 +123,7 @@ from services.organization_service import (  # noqa: E402
 )
 from tools.api_errors import ApiError  # noqa: E402
 from tools.contracts import MAX_TEXT_CHARS, MIN_TEXT_CHARS  # noqa: E402
-from tools.providers.model import build_model_router  # noqa: E402
+from tools.providers import model as model_provider  # noqa: E402
 from tools.trace import trace_id  # noqa: E402
 from tools.upload_security import UploadSecurityError, validate_upload  # noqa: E402
 
@@ -1172,7 +1172,7 @@ def route_api(**_ignored):
         if suggestion is None:
             raise ApiError("suggestion_required", "暂无可用诊断建议。", 422)
         try:
-            router = build_model_router()
+            router = model_provider.build_model_router()
         except ApiError:
             router = None
         return api_response(
@@ -1355,8 +1355,9 @@ def route_api(**_ignored):
                 )
             except Exception:
                 app.logger.exception("DB save resume failed")
+        # trace 由 web 层解析（透传 X-Trace-Id）后注入：服务层不再碰请求上下文（Phase 5）
         profile, score_r, model_trace_id, diagnosis_mode, diagnosis_notice = diagnose_resume(
-            resume_text
+            resume_text, trace=trace_id()
         )
         try:
             save_diagnosis(
@@ -1487,7 +1488,7 @@ def route_api(**_ignored):
             owner = _task_owner_key()
             target_job_service.get_target_job(target_job_id, owner)  # 归属校验
             try:
-                router = build_model_router()
+                router = model_provider.build_model_router()
             except ApiError:
                 router = None
             extraction = evidence_service.extract_candidates(

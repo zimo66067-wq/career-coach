@@ -19,7 +19,7 @@ from tools.database import (
     list_applications as _list_rows,
     save_application as _save_row,
 )
-from tools.providers.model import build_model_router
+from tools.providers import model as model_provider
 
 
 def _profile_from_detail(detail):
@@ -205,7 +205,7 @@ def _grounded_letter(session_id, context):
     router = None
     if evidence:
         try:
-            router = build_model_router()
+            router = model_provider.build_model_router()
         except ApiError:
             router = None
 
@@ -279,7 +279,7 @@ def generate_cover_letter(session_id, company="", position="", target_job_id=Non
 
     evidence = _evidence_quotes(profile)
     try:
-        router = build_model_router()
+        router = model_provider.build_model_router()
     except ApiError:
         router = None
     if router is not None:

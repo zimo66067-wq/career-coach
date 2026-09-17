@@ -18,6 +18,7 @@ from jsonschema import Draft202012Validator
 import api.index as api_module
 from tools import deidentify, radar_adapter, rescore, validate_schema
 from tools.interview_engine import InterviewEngine
+from tools.providers import model as model_provider
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,7 +86,8 @@ def consented_client(monkeypatch, router=None):
         str(Path(tempfile.mkdtemp(prefix="career_coach_test_")) / ("test_%s.db" % uuid.uuid4().hex[:8])),
     )
     if router is not None:
-        monkeypatch.setattr(api_module, "build_model_router", lambda: router)
+        # Phase 5：单一归属地（tools.providers.model），api 与服务层共用这一个打桩点
+        monkeypatch.setattr(model_provider, "build_model_router", lambda: router)
     api_module.app.config.update(TESTING=True)
     raw = api_module.app.test_client()
     consent = raw.post("/api/wf01/consent", json={"accepted": True})

@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import api.index as api_module
 from tools.model_router import ZhipuModelRouter
+from tools.providers import model as model_provider
 
 
 RESUME = "项目经历：负责接口开发并完成上线验证，持续跟进问题闭环。"
@@ -68,7 +69,9 @@ class FakeRouter:
 
 def raw_client(monkeypatch, router=None):
     if router is not None:
-        monkeypatch.setattr(api_module, "build_model_router", lambda: router)
+        # Phase 5：模型工厂只有一个归属地（tools.providers.model），api / services 都从这里取，
+        # 所以打桩也只需要打这一个点 —— 打错了会直接 AttributeError，不会静默失效。
+        monkeypatch.setattr(model_provider, "build_model_router", lambda: router)
     monkeypatch.setenv("DUMATE_CONSENT_SECRET", "test-consent-secret")
     monkeypatch.delenv("DUMATE_CONSENT_MAX_AGE_SECONDS", raising=False)
     if not hasattr(monkeypatch, "_career_test_db"):
@@ -321,7 +324,7 @@ def test_model_router_requires_zhipu_key(monkeypatch):
     monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
     monkeypatch.setenv("DUMATE_MODEL", "glm-4.7-flash")
     try:
-        api_module.build_model_router()
+        model_provider.build_model_router()
     except api_module.ApiError as error:
         assert error.code == "model_not_configured"
     else:

@@ -4,6 +4,37 @@
 
 ## [Unreleased]
 
+### Changed - 2026-09-17 依赖倒置：模型工厂收敛 + 分层门禁（Phase 5）
+
+DoD #13「Service 不反向依赖 API」。两处倒置（`diagnosis_service` / `interview_service` 里
+**写在函数体内**的 `from api.index import build_model_router`）从 Phase 0 就点出，
+一直拖到现在才修 —— 修完还发现它们有第二层依赖。
+
+- **工厂收敛为单一归属地**：`build_model_router` 只保留 `tools/providers/model.py` 一处定义，
+  其余模块（api 层 + 三个服务）一律 `from tools.providers import model as model_provider`
+  后**属性查找**。此前多处绑定导致"打桩打错地方不报错、只是不生效"；
+  收敛后打错会 `AttributeError`（`monkeypatch.setattr` 默认 `raising=True`）
+- **移除传递 Flask 依赖**：`tools.trace.trace_id()` 要 Flask 请求上下文，诊断服务用它兜底，
+  于是**服务的单测必须 `with app.test_request_context()` 才能跑**。改为：
+  `tools/trace.py` 拆出纯函数 `new_trace_id()`、flask 改函数内延迟导入；
+  web 层解析 `X-Trace-Id` 后用 `diagnose_resume(resume_text, trace=...)` **注入**服务
+- `services/diagnosis_service.diagnose_resume()` 新增可选 `trace` 入参（缺省用纯函数生成）
+- `services/interview_service.build_interview_router()` / `services/apply_service` 同步收敛
+- **新增门禁** `tests/test_layering.py`（**8 项**，进 pytest）：跨层 import（含函数体内的）、
+  domain/services 的**传递 Flask 依赖**（只按模块级 import 计算）、`build_model_router`
+  单一归属地且无人重新绑定、**判据自检**（喂故意越层的假源码证明它会红）
+- 6 个测试文件 + `scripts/run-rehearsal.py` 的打桩点统一改到 `tools.providers.model`
+
+提交：**`<待回填>`**（<待回填> 文件，<待回填>）。
+
+### Changed - 2026-09-17 Phase 5 门禁口径
+
+- pytest **473 → 481**（+8 项分层门禁）；node 36/36 不变
+- **分层静态校验从"手工 grep 一次"升级为 pytest 门禁**（此前报告里的
+  "domain 层 0 处越层 import"是跑一次命令得出的，不可回归；现在是 8 项常驻用例）
+- 真实 HTTP 冒烟仍 **70/70**（本阶段未改路由与冒烟脚本）
+- vercel 重写仍 **44** 条 / 死路由 0；双方言 DDL 仍各 **29** 张表；敏感扫描无发现
+
 ### Added - 2026-09-17 求职信接目标岗位与已确认证据（Phase 4b · DoD #10）
 
 DoD #10 不是"再写一版提示词"，而是**换掉事实底座**：旧路径读的是 F1 诊断里模型抽的 span 引文 ——

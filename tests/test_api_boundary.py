@@ -16,6 +16,7 @@ import pytest
 from itsdangerous import BadSignature, SignatureExpired
 
 import api.index as api_module
+from tools.providers import model as model_provider
 
 
 RESUME = "项目经历：负责接口开发并完成上线验证，持续跟进问题闭环。"
@@ -331,7 +332,8 @@ def test_cors_attacker_origin_rejected(monkeypatch):
 
 
 def test_trace_id_passthrough_when_valid(client, monkeypatch):
-    monkeypatch.setattr(api_module, "build_model_router", lambda: FakeRouter(valid_profile()))
+    # Phase 5：模型工厂的唯一归属地是 tools.providers.model（api 与服务层都从它取）
+    monkeypatch.setattr(model_provider, "build_model_router", lambda: FakeRouter(valid_profile()))
     response = client.post(
         "/api/wf02/diagnose",
         json={"resumeText": RESUME},
@@ -342,7 +344,8 @@ def test_trace_id_passthrough_when_valid(client, monkeypatch):
 
 
 def test_trace_id_generated_when_invalid(client, monkeypatch):
-    monkeypatch.setattr(api_module, "build_model_router", lambda: FakeRouter(valid_profile()))
+    # Phase 5：模型工厂的唯一归属地是 tools.providers.model（api 与服务层都从它取）
+    monkeypatch.setattr(model_provider, "build_model_router", lambda: FakeRouter(valid_profile()))
     response = client.post(
         "/api/wf02/diagnose",
         json={"resumeText": RESUME},
