@@ -1,7 +1,7 @@
 # phase6b1-report.md · Phase 6b-1（目标岗位工作区 + 退役 wf03 前端路径）
 
 - 日期：2026-09-17
-- 提交：**`<待回填>`**（25 文件，+1991 / −1652）
+- 提交：**`d9b662c`**（27 文件，+2345 / −1654）
 - 阶段目标：`product-scope.md §7` 的 **Target Job Workspace** ——
   「分析这个岗位，能不能投」（建岗 → 拆要求 → 对照简历 → APPLY/STRETCH/PASS + 依据），
   以及它依赖的 **Action Loop 接线**（`/api/actions` 从零前端消费到有消费方）。
@@ -33,7 +33,7 @@
 ## 1. 修改摘要
 
 ```
-25 files changed, 1991 insertions(+), 1652 deletions(-)
+27 files changed, 2345 insertions(+), 1654 deletions(-)
 ```
 
 | 动作 | 对象 | 要点 |
@@ -194,9 +194,9 @@ F3 靠 `matchResult` 缓存里的 `gaps` 出题（而 `matchResult` 已随 wf03 
 | 8 | 真实 HTTP 冒烟 | **70 / 70** |
 | 9 | 发布镜像不变量 | **28 个非 md 文件逐字节相同**，exit 0 |
 
-node 用例数由 42 变为 40：删去 `tests/test_job_upload.js`（3 条）与
-`test_upload_progress.js` 的两条 JD 用例（−5），新增 `test_phase6b_contract.js`（+5），
-并新增 1 条（`data-bridge 暴露带进度上传方法` 里断言退役方法为 `undefined`）。
+node 用例数由 42 变为 40，逐项对齐：删去 `tests/test_job_upload.js`（**5 条**）与
+`test_upload_progress.js` 的两条 JD 用例（−7），新增 `test_phase6b_contract.js`（**5 条**），
+`test_upload_progress.js` 内改为断言退役方法为 `undefined`（±0）。42 − 7 + 5 = **40**。
 
 ---
 
