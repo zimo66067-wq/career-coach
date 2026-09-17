@@ -32,7 +32,7 @@ test('no publish asset references the retired ui/ tree', () => {
 });
 
 test('no page loads the same stylesheet or script twice', () => {
-  // Phase 6a 修掉 public/pages/f4-report.html 里重复的 sidebar.css <link>。
+  // Phase 6a 修掉 public/pages/action-loop.html 里重复的 sidebar.css <link>。
   const offenders = [];
   for (const rel of publishFiles.filter((name) => name.endsWith('.html'))) {
     const html = read(rel);

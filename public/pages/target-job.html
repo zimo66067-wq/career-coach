@@ -48,16 +48,15 @@
   #tjCitations li { font-size: 13px; color: var(--zy-ink-2, #4b5261); line-height: 1.85; }
 </style>
 </head>
-<body data-page="tj">
+<body data-page="target">
 <a class="skip-link" href="#main">跳到主要内容</a>
 <nav class="topnav" aria-label="主导航">
   <button class="zy-sidebar-toggle" id="zySidebarToggle" type="button" aria-label="切换侧边栏" aria-expanded="true">☰</button>
-  <span class="brand">职跃AI</span>
-  <a class="nav" data-page="home" href="../index.html">首页</a>
-  <a class="nav" data-page="f1" href="f1-resume.html">F1 简历诊断</a>
-  <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
-  <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
-  <a class="nav" data-page="f5" href="f5-apply.html">F5 投递</a>
+  <a class="brand" href="../index.html">职跃AI</a>
+  <a class="nav" data-page="resume" href="resume-evidence.html">简历证据</a>
+  <a class="nav" data-page="target" href="target-job.html">目标岗位</a>
+  <a class="nav" data-page="interview" href="interview-practice.html">模拟面试</a>
+  <a class="nav" data-page="action" href="action-loop.html">行动闭环</a>
 </nav>
 <div class="wrap" id="main">
   <h1 class="page-title">目标岗位工作区</h1>
@@ -79,7 +78,7 @@
       <button class="btn ghost" id="tjAnalyse" type="button">分析这个岗位</button>
       <button class="btn ghost" id="tjPlanActions" type="button">把缺口铺成行动</button>
     </div>
-    <p class="tj-msg" id="tjMsg">粘贴 JD 后点「建立岗位」；分析需要先用 <a href="f1-resume.html">简历诊断</a> 提交过简历。</p>
+    <p class="tj-msg" id="tjMsg">粘贴 JD 后点「建立岗位」；分析需要先用 <a href="resume-evidence.html">简历诊断</a> 提交过简历。</p>
     <p class="tj-dropped zy-hidden" id="tjDropped"></p>
   </section>
 
@@ -154,6 +153,15 @@
       </div>
     </div>
   </div>
+
+  <section class="tj-card">
+    <h3 class="tj-section" style="margin-top:0">这个岗位的下一步</h3>
+    <p class="tj-dropped" style="margin-top:0">分析出结论不等于事情做完：缺口要变成能验证的行动，投递要留下记录 —— 决策的复审只能靠重新分析。</p>
+    <div class="tj-actions">
+      <a class="btn" href="action-loop.html">去行动闭环看清单</a>
+      <a class="btn ghost" href="job-apply.html">生成求职信 / 记录投递</a>
+    </div>
+  </section>
 </div>
 <script src="../js/mock-data.js"></script>
 <script src="../js/app.js"></script>

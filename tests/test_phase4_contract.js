@@ -1,8 +1,8 @@
 ﻿/* test_phase4_contract.js
  *
  * Phase 4 frontend contract checks:
- *  - f3-interview.html + f3-interview.js (SSE follow-up stream, session snapshot)
- *  - f1-resume.html + optimizer.js (rewrite preview modal, apply flow)
+ *  - interview-practice.html + interview-practice.js (SSE follow-up stream, session snapshot)
+ *  - resume-evidence.html + optimizer.js (rewrite preview modal, apply flow)
  * All scripts are also smoke-loaded in a stub DOM context to catch load-time crashes.
  *
  * 2026-09-13：kb.html / kb.js 的独立「面经知识库」产品页已下线（Phase 1），
@@ -51,7 +51,7 @@ function makeContext() {
     removeItem: function (k) { delete storage[k]; }
   };
   const context = {
-    location: { search: '', pathname: '/pages/f1-resume.html', hash: '' },
+    location: { search: '', pathname: '/pages/resume-evidence.html', hash: '' },
     document: {
       addEventListener: function () {},
       getElementById: function () { return elementStub(); },
@@ -89,30 +89,30 @@ function smokeLoad(name, rel) {
   assert.doesNotThrow(() => vm.runInNewContext(source, context, { filename: name }));
 }
 
-test('f3-interview.html contains the streamed interview controls', () => {
-  const html = read('pages/f3-interview.html');
+test('interview-practice.html contains the streamed interview controls', () => {
+  const html = read('pages/interview-practice.html');
   assert.match(html, /id="f3StartBtn"/);
   assert.match(html, /id="f3Answer"/);
   assert.match(html, /id="f3SendAnswer"/);
   assert.match(html, /id="f3EndInterview"/);
   assert.match(html, /id="f3StreamingBubble"/);
   assert.match(html, /id="f3TurnNo"/);
-  assert.match(html, /src="\.\.\/js\/f3-interview\.js"/);
+  assert.match(html, /src="\.\.\/js\/interview-practice\.js"/);
 });
 
-test('f3-interview.js streams SSE follow-ups and snapshots the session', () => {
-  const src = read('js/f3-interview.js');
+test('interview-practice.js streams SSE follow-ups and snapshots the session', () => {
+  const src = read('js/interview-practice.js');
   assert.match(src, /\/api\/wf04\/stream/);
   assert.match(src, /f3_session_snapshot_v1/);
   assert.match(src, /getReader/);
   assert.match(src, /function streamFollowUp/);
   assert.match(src, /"fragment"/);
   assert.match(src, /"done"/);
-  smokeLoad('f3-interview.js', 'js/f3-interview.js');
+  smokeLoad('interview-practice.js', 'js/interview-practice.js');
 });
 
-test('f1-resume.html includes optimizer.js and the rewrite button markup', () => {
-  const html = read('pages/f1-resume.html');
+test('resume-evidence.html includes optimizer.js and the rewrite button markup', () => {
+  const html = read('pages/resume-evidence.html');
   assert.match(html, /src="\.\.\/js\/optimizer\.js"/);
   assert.match(html, /data-suggestion-id/);
   assert.match(html, /应用建议改写/);

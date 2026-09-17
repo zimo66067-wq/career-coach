@@ -25,10 +25,10 @@
 | `css/main.css` | 重写 | 公共组件全面升级；旧 CSS 变量全部映射到新 token，class 契约不变 |
 | `css/states.css` | 重写 | 五状态视觉升级；状态切换选择器原样保留 |
 | `index.html` | 改版 | Hero 视觉焦点；引入 tokens.css；skip-link；保留 data-bridge.js |
-| `pages/f1-resume.html` | 改版 | 处理中新增「AI 阶段步进器+呼吸光+流动线」；保留 DataBridge 主链路与 fetchSync |
+| `pages/resume-evidence.html` | 改版 | 处理中新增「AI 阶段步进器+呼吸光+流动线」；保留 DataBridge 主链路与 fetchSync |
 | `pages/f2-match.html` | 改版 | 语义流动轨迹；覆盖条配色同步新语义色；保留 DataBridge |
-| `pages/f3-interview.html` | 改版 | 面试官在线区（呼吸光+语音波形）；语音组件配色对齐设计系统；voice.js 逻辑零改动 |
-| `pages/f4-report.html` | 改版 | C0 数字递增动画（终值=真实基线）；保留 DataBridge |
+| `pages/interview-practice.html` | 改版 | 面试官在线区（呼吸光+语音波形）；语音组件配色对齐设计系统；voice.js 逻辑零改动 |
+| `pages/action-loop.html` | 改版 | C0 数字递增动画（终值=真实基线）；保留 DataBridge |
 | `pages/states.html` | 改版 | tokens.css + skip-link |
 | `js/radar.js` | 修改 | 雷达配色对齐设计系统；平滑路径动画；reduced-motion 关闭动画 |
 | `js/app.js` | 修改 | 生产默认空态；状态悬浮器与合成数据仅在 `?demo=1&state=` 下启用 |

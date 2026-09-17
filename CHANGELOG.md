@@ -4,6 +4,70 @@
 
 ## [Unreleased]
 
+### Changed - 2026-09-17 一级导航收敛到 4 个工作区（Phase 6b-2b）
+
+`product-scope.md §7` 定下的四个一级工作区（简历证据 / 目标岗位 / 模拟面试 / 行动闭环）
+到此才第一次成为**导航的事实**：此前导航是 5 项、且首页占着一格。这次同时把"首页只能靠
+导航进入"改成品牌区可点 —— 少一个格子，但没少一条回首页的路（有判据锁死品牌链接）。
+
+- `index.html` 导航由 5 项改为 4 项：`<a class="brand" href="index.html">职跃AI</a>` +
+  简历证据 / 目标岗位 / 模拟面试 / 行动闭环；「首页」导航项取消
+- 投递页（原 F5）**退出导航**，作为目标岗位的二级页保留：`pages/target-job.html`
+  新增出口区链入 `action-loop.html` 与 `job-apply.html`，它不会因为下架而变得不可达
+- `pages/states.html` 状态矩阵同步为 3 行（简历证据 / 模拟面试 / 行动闭环）
+- `tests/test_phase1_deletions.py` 的导航判据重写：**标签必须逐字等于**这四个工作区，
+  并显式禁止「面经知识库 / 岗位匹配 / 知识库 / 首页」回流、禁止标签里出现 `F[1-5]`、
+  要求品牌区指向 `index.html` —— 把"≤4 个一级工作区"从口号变成会失败的门禁
+
+### Changed - 2026-09-17 页面与脚本改名为用户语言文件名，全量去除 F 代号（Phase 6b-2b）
+
+DoD #2 要求用户可见面不出现内部代号。**URL 也是用户可见面**，所以这次连文件名一起换，
+而不是只在界面上改文案：
+
+| 旧 | 新 |
+| --- | --- |
+| `pages/f1-resume.html` | `pages/resume-evidence.html` |
+| `pages/f3-interview.html` | `pages/interview-practice.html` |
+| `pages/f4-report.html` | `pages/action-loop.html` |
+| `pages/f5-apply.html` | `pages/job-apply.html` |
+| `js/f3-interview.js` | `js/interview-practice.js` |
+| `js/f5-apply.js` | `js/job-apply.js` |
+
+- 两棵发布树（`public/` 与 `docs/`）同时改名，改后逐字节一致（镜像不变量未被破坏）
+- 页面 `data-page` 取值同步改为 `resume / target / interview / action / apply`
+- 新增判据：**发布树里不得再有带 F 代号的路径或可见文本**（`.md` 属历史记录，不在范围内）
+- 4 个测试文件里以正则字面量写死的旧文件名（`test_phase4_contract.js`、
+  `test_phase5_contract.js`、`test_quick_demo.js` 等）一并更新 —— 字符串替换扫不到
+  转义过的正则，这正是改名最容易漏的一类残留
+
+### Removed - 2026-09-17 能力报告页里的死进度追踪器（Phase 6b-2b）
+
+`f4-report.html` 内联着一段「F1–F3 完成进度追踪器」，引用 6 个早已不存在的 DOM id
+（`progressSummary` / `progressBarFill` / `connector1` / `connector2` / `progress-step` /
+`progress-tracker`），**每次加载必抛 TypeError**，且它自己也带着 F 代号。
+
+- 删掉该内联脚本与配套的 `.progress-tracker` 样式（约 137 行）
+- 保留仍在使用中的行程进度指示，节点改名为 resume-evidence / target-job-analysis /
+  interview-practice，并把「2/目标岗位分析」由不可点文本改成指向 `target-job.html` 的链接
+- 新增通用判据：**页面的内联脚本不得 `getElementById` 一个该页没有声明的 id** ——
+  这类死代码不会让测试变红，只会让控制台每次都报错
+
+### Added - 2026-09-17 活文档路径门禁（Phase 6b-2b）
+
+改名之后，`docs/architecture.md §2`、`docs/product-scope.md §1` 的页面表格仍指着旧文件名。
+它没被任何判据抓到，因为路径扫描只覆盖发布树且排除 `.md` —— 文档是给人看的，真人会照着
+它去找文件，这条路径同样会烂。
+
+- 新增 `scripts/live-doc-path-check.py`：活文档（architecture / dependency-map /
+  product-scope / 两棵 README）里的每个 `pages/*.html` 引用，要么指向真实存在的文件，
+  要么**同一行或本节标题**带有「已删除 / 已下线 / 已修 / 审计 / 完成记录」之类明确的历史措辞
+- 门槛刻意收窄到"同一行或本节标题"：早期版本用了"上下 ±10 行"的窗口，变异测试显示
+  §2 现况表格里任何一行都能被 8 行之外的注记开脱 —— 下次再改名就抓不到了
+- 门禁自检（引用集合非空 + 正反两个探针），并已变异测试：往 §2 塞 `action-loop-NOPE.html`
+  → exit 1；塞带「已删除」标记的死链 → exit 0
+- 文档本身按新口径修正：4 个改名页给出「旧名 → 新名」对照，两个已删除页面划掉并注明
+  何时删的，两个审计快照表格的标题写明是快照（用词刻意不带历史标记，否则会削弱门禁）
+
 ### Added - 2026-09-17 行动闭环落位到能力报告页（Phase 6b-2a）
 
 `product-scope.md §7` 的第 4 个一级工作区 Action Loop 首次到用户面前：

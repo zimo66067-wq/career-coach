@@ -29,7 +29,7 @@ function makeContext(search, fetchImpl, initialStorage, apiBase, xhrClass) {
     removeItem: function (k) { delete storage[k]; }
   };
   const context = {
-    location: { search: search || '', pathname: '/pages/f1-resume.html', hash: '' },
+    location: { search: search || '', pathname: '/pages/resume-evidence.html', hash: '' },
     document: { addEventListener: function () {} },
     sessionStorage: sessionStorage,
     console: { warn: function () {}, log: function () {}, error: function () {} },
@@ -191,7 +191,7 @@ test('resume-upload 流程优先使用带进度上传，不破坏旧契约', asy
 });
 
 test('页面包含上传进度元素与错误映射', () => {
-  const f1 = fs.readFileSync(path.join(root, 'docs', 'pages', 'f1-resume.html'), 'utf8');
+  const f1 = fs.readFileSync(path.join(root, 'docs', 'pages', 'resume-evidence.html'), 'utf8');
   assert.equal(f1.includes('id="resumeUploadProgress"'), true);
   assert.equal(f1.includes('id="resumeUploadProgressBar"'), true);
   assert.equal(f1.includes('id="resumeUploadProgressText"'), true);

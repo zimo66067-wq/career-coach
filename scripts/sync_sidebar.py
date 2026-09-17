@@ -16,11 +16,11 @@ ROOT = Path(__file__).resolve().parents[1]
 TREES = [ROOT / "public", ROOT / "docs"]
 PAGES = [
     "index.html",
-    "pages/f1-resume.html",
+    "pages/resume-evidence.html",
     "pages/target-job.html",
-    "pages/f3-interview.html",
-    "pages/f4-report.html",
-    "pages/f5-apply.html",
+    "pages/interview-practice.html",
+    "pages/action-loop.html",
+    "pages/job-apply.html",
     "pages/states.html",
 ]
 

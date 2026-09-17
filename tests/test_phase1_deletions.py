@@ -176,10 +176,10 @@ def test_publish_trees_remain_byte_identical():
         "js/account.js",
         "js/radar.js",
         "js/mock-data.js",
-        "pages/f1-resume.html",
-        "pages/f3-interview.html",
-        "pages/f4-report.html",
-        "pages/f5-apply.html",
+        "pages/resume-evidence.html",
+        "pages/interview-practice.html",
+        "pages/action-loop.html",
+        "pages/job-apply.html",
         "pages/states.html",
         "assets/favicon.svg",
         "assets/logo.svg",
@@ -300,9 +300,11 @@ def test_no_dead_routes_in_vercel_config():
 
 
 def test_user_navigation_has_no_retired_entries():
-    """导航不得再出现已下线能力，也不得超过 DoD 的 4 项上限 + 首页。"""
+    """一级导航恰好是 4 个一级工作区，不含 F 代号；首页由品牌区进入，不再占导航位。"""
     html = (ROOT / "public" / "index.html").read_text(encoding="utf-8")
     labels = re.findall(r'class="nav"[^>]*>([^<]*)<', html)
-    assert labels == ["首页", "F1 简历诊断", "F3 模拟面试", "F4 能力报告", "F5 投递"], labels
-    for banned in ("面经知识库", "岗位匹配", "知识库"):
+    assert labels == ["简历证据", "目标岗位", "模拟面试", "行动闭环"], labels
+    for banned in ("面经知识库", "岗位匹配", "知识库", "首页"):
         assert banned not in " ".join(labels), banned
+    assert not re.search(r"F[1-5]", " ".join(labels)), labels
+    assert re.search(r'<a class="brand" href="index\.html">职跃AI</a>', html), "品牌区必须能回首页"

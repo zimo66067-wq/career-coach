@@ -9,7 +9,9 @@
 
 ---
 
-## 1. 当前用户可见信息架构（实测）
+## 1. 用户可见信息架构（快照：7 项导航、5 项带代号）
+
+> **已过时（Phase 6b-2，2026-09-17）**：本节是审计当时的信息架构快照，当时 5 项直接以内部代号命名。归属该节的三条结论**已全部落地**：一级导航**收敛到 4 个**工作区（简历证据 / 目标岗位 / 模拟面试 / 行动闭环），**用户可见面（含 URL）不再出现 F 代号**，首页由品牌区进入。下面的实测表与行数不再代表现状，保留作为审计记录。
 
 `public/index.html` 与所有页面的侧边栏导航**审计时**实测为 **7 项，其中 5 项直接用内部代号命名**；D1 已移除 F2 一项，现为 **6 项、4 项带代号**（完整 IA 重构见 Phase 6）：
 
@@ -19,13 +21,13 @@
 
 | 代号 | 页面 | 行数 | 用户看到的名称 | D1 后 |
 | --- | --- | --- | --- | --- |
-| — | `public/index.html` | 127 | 首页 | 保留 |
-| F1 | `public/pages/f1-resume.html` | 235 | F1 简历诊断 | 保留 |
+| — | `public/index.html` | 127 | 首页 | 保留（Phase 6b-2 起由品牌区进入，不再占一级导航位） |
+| F1 | ~~`public/pages/f1-resume.html`~~ → `public/pages/resume-evidence.html` | 235 | 简历证据 | 保留（Phase 6b-2 改名） |
 | ~~F2~~ | ~~`public/pages/f2-match.html`~~ | 214 | ~~F2 岗位匹配~~ | **已删除** |
-| F3 | `public/pages/f3-interview.html` | 296 | F3 模拟面试 | 保留 |
-| F4 | `public/pages/f4-report.html` | 483 | F4 能力报告 | 保留（行程节点改为不可点击） |
-| F5 | `public/pages/f5-apply.html` | 138 | F5 投递 | 保留 |
-| KB | `public/pages/kb.html` | 105 | 面经知识库 | 保留 |
+| F3 | ~~`public/pages/f3-interview.html`~~ → `public/pages/interview-practice.html` | 296 | 模拟面试 | 保留（Phase 6b-2 改名） |
+| F4 | ~~`public/pages/f4-report.html`~~ → `public/pages/action-loop.html` | 483 | 行动闭环（能力报告 + 缺口行动清单） | 保留（Phase 6b-2 改名；一级导航第 4 项，行程节点改为不可点击） |
+| F5 | ~~`public/pages/f5-apply.html`~~ → `public/pages/job-apply.html` | 138 | 投递与求职信 | 保留（Phase 6b-2 改名；二级页，不再是导航项） |
+| KB | ~~`public/pages/kb.html`~~ | 105 | ~~面经知识库~~ | **已删除（Phase 6a 入口下线，题库下沉为面试引擎内部数据源）** |
 | — | `public/pages/states.html` | 116 | （状态样例页，非业务） | 保留 |
 
 - **6 项 > DoD 要求的 ≤4**（D1 净减 1）。

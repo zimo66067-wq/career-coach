@@ -7,7 +7,7 @@
  * 用法：
  *   <button id="quickDemoF1" type="button">一键体验 F1</button>
  *   <script src="js/quick-demo.js"></script>
- *   或直接访问 f1-resume.html?quick=1 自动执行。
+ *   或直接访问 resume-evidence.html?quick=1 自动执行。
  */
 (function () {
   'use strict';

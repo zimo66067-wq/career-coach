@@ -2,8 +2,8 @@
  *
  * Phase 5 frontend contract checks:
  *  - data-bridge exposes the F5 apply API (cover letter + application CRUD)
- *  - f5-apply.html contains the apply workflow controls
- *  - f5-apply.js smoke-loads in a stub DOM context
+ *  - job-apply.html contains the apply workflow controls
+ *  - job-apply.js smoke-loads in a stub DOM context
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -50,7 +50,7 @@ function makeContext() {
     removeItem: function (k) { delete storage[k]; }
   };
   const context = {
-    location: { search: '', pathname: '/pages/f5-apply.html', hash: '' },
+    location: { search: '', pathname: '/pages/job-apply.html', hash: '' },
     document: {
       readyState: 'complete',
       addEventListener: function () {},
@@ -97,8 +97,8 @@ test('data-bridge exposes the F5 apply API and endpoints', () => {
   assert.equal(bridge._endpoints.applications, '/api/wf07/applications');
 });
 
-test('f5-apply.html contains the apply workflow controls', () => {
-  const html = read('pages/f5-apply.html');
+test('job-apply.html contains the apply workflow controls', () => {
+  const html = read('pages/job-apply.html');
   assert.match(html, /id="f5Company"/);
   assert.match(html, /id="f5Position"/);
   assert.match(html, /id="f5Generate"/);
@@ -106,12 +106,12 @@ test('f5-apply.html contains the apply workflow controls', () => {
   assert.match(html, /id="f5PreviewBody"/);
   assert.match(html, /id="f5Confirm"/);
   assert.match(html, /id="f5Applications"/);
-  assert.match(html, /src="\.\.\/js\/f5-apply\.js"/);
+  assert.match(html, /src="\.\.\/js\/job-apply\.js"/);
   assert.match(html, /待确认/);
 });
 
-test('f5-apply.html states the current organization-search boundary', () => {
-  const html = read('pages/f5-apply.html');
+test('job-apply.html states the current organization-search boundary', () => {
+  const html = read('pages/job-apply.html');
   assert.match(html, /id="f5CapabilityBoundary"/);
   assert.match(html, /当前不提供公司或单位搜索/);
   assert.match(html, /不会核验单位主体、招聘状态或职位真伪/);
@@ -119,9 +119,9 @@ test('f5-apply.html states the current organization-search boundary', () => {
   assert.match(html, /模型不会被当作企业事实来源/);
 });
 
-test('f5-apply.html declares the F5 index as unconfigured and never as working search', () => {
-  const html = read('pages/f5-apply.html');
-  const docsHtml = fs.readFileSync(path.join(root, 'docs', 'pages', 'f5-apply.html'), 'utf8');
+test('job-apply.html declares the F5 index as unconfigured and never as working search', () => {
+  const html = read('pages/job-apply.html');
+  const docsHtml = fs.readFileSync(path.join(root, 'docs', 'pages', 'job-apply.html'), 'utf8');
 
   assert.equal(html, docsHtml, 'public/docs F5 page must stay mirrored');
   assert.match(html, /id="f5OrgSearchStatus"/);
@@ -141,18 +141,28 @@ test('f5-apply.html declares the F5 index as unconfigured and never as working s
   assert.doesNotMatch(html, /id="f5Org(Search|Query|Keyword)"/);
 });
 
-test('f5-apply.js smoke-loads without load-time crashes', () => {
-  const source = read('js/f5-apply.js');
+test('job-apply.js smoke-loads without load-time crashes', () => {
+  const source = read('js/job-apply.js');
   const context = makeContext();
   vm.runInNewContext(appSource, context, { filename: 'app.js' });
   vm.runInNewContext(bridgeSource, context, { filename: 'data-bridge.js' });
-  assert.doesNotThrow(() => vm.runInNewContext(source, context, { filename: 'f5-apply.js' }));
+  assert.doesNotThrow(() => vm.runInNewContext(source, context, { filename: 'job-apply.js' }));
 });
 
-test('all pages expose the F5 navigation entry', () => {
-  const pages = ['index.html', 'pages/f1-resume.html',
-    'pages/f3-interview.html', 'pages/f4-report.html', 'pages/f5-apply.html'];
+test('投递页不再是导航项，但它必须仍然可达', () => {
+  // §7 把 Cover Letter / Application / Outcome 划归 Target Job 工作区 —— 所以投递页
+  // 从一级导航退出，成为目标岗位的子页。退出导航意味着它唯一的入口没了，
+  // 因此这里同时锁死"可达"，否则它会静默变成孤儿页。
+  const pages = ['index.html', 'pages/resume-evidence.html', 'pages/target-job.html',
+    'pages/interview-practice.html', 'pages/action-loop.html', 'pages/job-apply.html'];
   for (const rel of pages) {
-    assert.match(read(rel), /data-page="f5"/, rel);
+    const html = read(rel);
+    assert.doesNotMatch(html, /data-page="f5"/, rel + ' 不应再出现 F5 一级导航项');
+    for (const page of ['resume', 'target', 'interview', 'action']) {
+      assert.match(html, new RegExp('data-page="' + page + '"'),
+        rel + ' 缺少一级工作区导航项 ' + page);
+    }
   }
+  assert.match(read('pages/target-job.html'), /href="job-apply\.html"/,
+    '投递子页必须能从目标岗位工作区进入');
 });

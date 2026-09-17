@@ -66,6 +66,7 @@ a:focus-visible, button:focus-visible, .btn:focus-visible,
   backdrop-filter: saturate(1.6) blur(14px);
   border-bottom: 1px solid var(--zy-line);
 }
+.topnav a.brand { text-decoration: none; }
 .topnav .brand {
   font-weight: 700; font-size: 15.5px; letter-spacing: .01em;
   background: var(--zy-grad-ai); -webkit-background-clip: text;

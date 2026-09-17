@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 test('F1 页面含一键体验按钮、演示标注与脚本引用', () => {
-  const html = read('docs/pages/f1-resume.html');
+  const html = read('docs/pages/resume-evidence.html');
   assert.match(html, /id="quickDemoF1"/);
   assert.match(html, /quick-demo\.js/);
   assert.match(html, /demo-badge|演示数据/);
@@ -18,7 +18,7 @@ test('F1 页面含一键体验按钮、演示标注与脚本引用', () => {
 test('首页提供 Quick Demo 入口', () => {
   const html = read('docs/index.html');
   assert.match(html, /hero-cta/);
-  assert.match(html, /f1-resume\.html\?quick=1/);
+  assert.match(html, /resume-evidence\.html\?quick=1/);
   assert.match(html, /quick-demo\.js/);
 });
 
@@ -27,7 +27,7 @@ test('quick-demo.js 暴露 QuickDemo.start 且必须标注演示数据', () => {
   const els = new Map();
   const context = {
     console,
-    location: { search: '', href: 'https://example.test/pages/f1-resume.html' },
+    location: { search: '', href: 'https://example.test/pages/resume-evidence.html' },
     history: { replaceState: function () {} },
     document: {
       readyState: 'loading',

@@ -26,9 +26,9 @@ const FORBIDDEN = [
 
 test('F3 is a typing chat: required elements present, no voice wiring, mirrors synced', () => {
   for (const dir of ['docs', 'public']) {
-    const html = fs.readFileSync(path.join(root, dir, 'pages', 'f3-interview.html'), 'utf8');
+    const html = fs.readFileSync(path.join(root, dir, 'pages', 'interview-practice.html'), 'utf8');
     for (const id of REQUIRED_IDS) {
-      assert.ok(html.includes('id="' + id + '"'), dir + '/pages/f3-interview.html missing id="' + id + '"');
+      assert.ok(html.includes('id="' + id + '"'), dir + '/pages/interview-practice.html missing id="' + id + '"');
     }
     for (const bad of FORBIDDEN) {
       assert.ok(!html.includes(bad), dir + ' f3 must not contain voice wiring: ' + bad);
@@ -36,10 +36,10 @@ test('F3 is a typing chat: required elements present, no voice wiring, mirrors s
   }
 });
 
-test('f3-interview.js exposes the typing conversation API', () => {
-  const js = fs.readFileSync(path.join(root, 'public', 'js', 'f3-interview.js'), 'utf8');
+test('interview-practice.js exposes the typing conversation API', () => {
+  const js = fs.readFileSync(path.join(root, 'public', 'js', 'interview-practice.js'), 'utf8');
   for (const api of ['startInterview', 'submitAnswer', 'finishInterview', 'getState']) {
-    assert.ok(js.includes(api), 'f3-interview.js missing ' + api);
+    assert.ok(js.includes(api), 'interview-practice.js missing ' + api);
   }
   assert.ok(js.includes('f3_session_snapshot_v1'), 'f3 must keep session snapshot');
   assert.ok(js.includes('/api/wf04/stream'), 'f3 must call the SSE stream endpoint');
@@ -50,7 +50,7 @@ test('f3-interview.js exposes the typing conversation API', () => {
 });
 
 test('F5 confirmation actions are native keyboard-accessible buttons', () => {
-  const html = fs.readFileSync(path.join(root, 'public', 'pages', 'f5-apply.html'), 'utf8');
+  const html = fs.readFileSync(path.join(root, 'public', 'pages', 'job-apply.html'), 'utf8');
   assert.match(html, /<button class="btn primary" id="f5Generate" type="button">/);
   assert.match(html, /<button class="btn primary" id="f5Confirm" type="button" disabled>/);
 });

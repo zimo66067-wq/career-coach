@@ -17,16 +17,15 @@
 <a class="skip-link" href="#main">跳到主要内容</a>
 <nav class="topnav" aria-label="主导航">
   <button class="zy-sidebar-toggle" id="zySidebarToggle" type="button" aria-label="切换侧边栏" aria-expanded="true">☰</button>
-  <span class="brand">职跃AI</span>
-  <a class="nav" data-page="home" href="../index.html">首页</a>
-  <a class="nav" data-page="f1" href="f1-resume.html">F1 简历诊断</a>
-  <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
-  <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
-  <a class="nav" data-page="f5" href="f5-apply.html">F5 投递</a>
+  <a class="brand" href="../index.html">职跃AI</a>
+  <a class="nav" data-page="resume" href="resume-evidence.html">简历证据</a>
+  <a class="nav" data-page="target" href="target-job.html">目标岗位</a>
+  <a class="nav" data-page="interview" href="interview-practice.html">模拟面试</a>
+  <a class="nav" data-page="action" href="action-loop.html">行动闭环</a>
 </nav>
 <div class="wrap" id="main">
   <h1 class="page-title">状态墙 · 五状态演示入口</h1>
-  <p class="page-sub">4 个功能页 × 5 种状态，共 20 个演示入口；链接会显式开启演示模式，不会作为产品默认结果</p>
+  <p class="page-sub">3 个功能页 × 5 种状态，共 15 个演示入口；链接会显式开启演示模式，不会作为产品默认结果</p>
 
   <div class="card">
     <table class="dim state-matrix">
@@ -49,9 +48,9 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   var pages = [
-    ["F1 简历诊断", "f1-resume.html"],
-    ["F3 模拟面试", "f3-interview.html"],
-    ["F4 能力报告", "f4-report.html"]
+    ["简历证据", "resume-evidence.html"],
+    ["模拟面试", "interview-practice.html"],
+    ["行动闭环", "action-loop.html"]
   ];
   var states = ["empty", "processing", "success", "error", "degraded"];
   document.getElementById("matrix").innerHTML = pages.map(function (p) {

@@ -73,22 +73,24 @@
 
 ---
 
-## 2. 用户页面（8 个 HTML）
+## 2. 用户页面（快照：8 个 HTML）
+
+> **审计基线与现状的差异（Phase 6b，2026-09-17）**：下表是审计当时的快照，其行数/导航列已不再逐字成立 —— Phase 1 删掉 `f2-match.html` 并从导航移除，Phase 6a 删掉 `ui/` 整树与 `kb.html` 入口，**Phase 6b-2 把一级导航收敛为 4 个工作区（简历证据 / 目标岗位 / 模拟面试 / 行动闭环），首页改由品牌区进入，并给 4 个页面换了不带 F 代号的文件名**。当前页面清单以 `public/README.md` 的表格为准；下表中已改名的行按新路径列出，`f2-match.html` / `kb.html` 两行留作审计记录。
 
 | 页面 | 行数 | 作用 | 是否进导航 |
 | --- | --- | --- | --- |
 | `public/index.html` | 127 | 落地页 + 快速演示 | ✅ 首页 |
-| `public/pages/f1-resume.html` | 235 | 简历上传 / 粘贴 / 诊断 / 改写 | ✅ |
-| `public/pages/f2-match.html` | 214 | 专业选择 → 画像 → 匹配 / JD 匹配 | ✅ |
-| `public/pages/f3-interview.html` | 296 | 文字模拟面试（含追问） | ✅ |
-| `public/pages/f4-report.html` | 483 | 能力报告 + 雷达图 + 七天情景 | ✅ |
-| `public/pages/f5-apply.html` | 138 | 求职信 + 申请跟踪 + 单位检索边界 | ✅ |
-| `public/pages/kb.html` | 105 | 面经知识库（BM25/向量） | ✅ |
+| `public/pages/resume-evidence.html` | 235 | 简历上传 / 粘贴 / 诊断 / 改写 | ✅ 简历证据 |
+| ~~`public/pages/f2-match.html`~~ | 214 | ~~专业选择 → 画像 → 匹配 / JD 匹配~~ | **已删除（Phase 1）** |
+| `public/pages/interview-practice.html` | 296 | 文字模拟面试（含追问） | ✅ 模拟面试 |
+| `public/pages/action-loop.html` | 483 | 能力报告 + 雷达图 + 行动闭环（缺口 → 行动 → 复测） | ✅ 行动闭环 |
+| `public/pages/job-apply.html` | 138 | 求职信（接地到当前目标岗位）+ 申请跟踪 + 单位检索边界 | ⛔（二级页，由目标岗位/行动闭环链入） |
+| ~~`public/pages/kb.html`~~ | 105 | ~~面经知识库（BM25/向量）~~ | **已删除（Phase 6a 入口下线，题库下沉为面试引擎内部数据源）** |
 | `public/pages/states.html` | 116 | 空/加载/错误态样例 | ❌ |
 
 页面脚本装配（实测 `<script>` 标签）：`app.js`（壳/导航）+ `pages-api-config.js`（1 常量）+ `data-bridge.js`（唯一 API 客户端）+ `account.js` + 页面专属脚本。
 
-`public/js/voice.js`（318 行）**不被任何页面加载**。
+`public/js/voice.js`（318 行）**不被任何页面加载**；Phase 6b-2 时该文件已不在 `public/js/` 中（`ls public/js/` 无此项）。
 
 ---
 

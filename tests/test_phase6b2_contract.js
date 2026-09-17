@@ -19,6 +19,51 @@ const test = require('node:test');
 const root = path.resolve(__dirname, '..');
 const TREES = ['public', 'docs'];
 
+function walk(dir, prefix, out) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const rel = prefix ? prefix + '/' + entry.name : entry.name;
+    const absolute = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(absolute, rel, out);
+    else out.push(rel);
+  }
+  return out;
+}
+
+function pageFiles(tree) {
+  return walk(path.join(root, tree), '', [])
+    .filter((rel) => rel === 'index.html' || /^pages\/.+\.html$/.test(rel))
+    .sort();
+}
+
+/** 页面里"用户真正看得见"的文字：去掉脚本、样式、注释与全部标签（属性值随之消失）。 */
+function visibleText(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/g, ' ')
+    .replace(/<style[\s\S]*?<\/style>/g, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]+>/g, ' ');
+}
+
+/** 顶部导航的标签序列。 */
+function navLabels(tree, rel) {
+  const html = read(tree, rel);
+  const start = html.indexOf('<nav class="topnav"');
+  assert.ok(start > -1, rel + ' must declare the top nav');
+  const nav = html.slice(start, html.indexOf('</nav>', start));
+  return [...nav.matchAll(/class="nav"[^>]*>([^<]*)</g)].map((m) => m[1]);
+}
+
+/** 页面内联脚本 getElementById 到的、但页面上不存在的 id。 */
+function danglingIds(tree, rel) {
+  const html = read(tree, rel);
+  const declared = new Set([...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
+  const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
+    .map((m) => m[1]).join('\n');
+  const used = [...inline.matchAll(/getElementById\(\s*['"]([^'"]+)['"]/g)].map((m) => m[1]);
+  return [...new Set(used)].filter((id) => !declared.has(id)).sort();
+}
+
+
 function read(tree, rel) {
   return fs.readFileSync(path.join(root, tree, rel), 'utf8');
 }
@@ -77,10 +122,10 @@ function actionStatusesFromDomain() {
 
 test('the action loop panel exists on the report page and loads its controller', () => {
   for (const tree of TREES) {
-    const html = read(tree, 'pages/f4-report.html');
+    const html = read(tree, 'pages/action-loop.html');
     assert.ok(html.includes('js/action-loop.js'), tree + ' must load the action-loop controller');
     for (const id of ['actionLoopCard', 'alTargetLine', 'alPlanBtn', 'alRefreshBtn', 'alMsg', 'alSummary', 'alList']) {
-      assert.ok(hasId(tree, 'pages/f4-report.html', id), tree + ' is missing #' + id);
+      assert.ok(hasId(tree, 'pages/action-loop.html', id), tree + ' is missing #' + id);
     }
     // 面板必须在所有 state view 之外（否则 empty/error 态下行动清单会消失）
     const panelIndex = html.indexOf('id="actionLoopCard"');
@@ -136,22 +181,22 @@ test('the cover letter request carries targetJobId and shows its grounding', () 
     assert.ok(/body\.targetJobId\s*=/.test(block),
       tree + '/js/data-bridge.js must forward targetJobId to /api/wf07/cover-letter');
 
-    const page = read(tree, 'pages/f5-apply.html');
+    const page = read(tree, 'pages/job-apply.html');
     for (const id of ['f5TargetLine', 'f5Grounding', 'f5BasisBadge', 'f5EvidenceList', 'f5Notice']) {
-      assert.ok(hasId(tree, 'pages/f5-apply.html', id), tree + ' is missing #' + id);
+      assert.ok(hasId(tree, 'pages/job-apply.html', id), tree + ' is missing #' + id);
     }
-    assert.ok(page.includes('js/f5-apply.js'));
+    assert.ok(page.includes('js/job-apply.js'));
 
-    const controller = read(tree, 'js/f5-apply.js');
+    const controller = read(tree, 'js/job-apply.js');
     // 依据来自响应，不得在前端自造经历
-    assert.ok(/res\.evidence/.test(controller), tree + '/js/f5-apply.js must render the server-provided evidence list');
+    assert.ok(/res\.evidence/.test(controller), tree + '/js/job-apply.js must render the server-provided evidence list');
     assert.ok(/res\.requirements/.test(controller) && /res\.gaps/.test(controller),
-      tree + '/js/f5-apply.js must show the requirement base and the uncovered gaps');
+      tree + '/js/job-apply.js must show the requirement base and the uncovered gaps');
     assert.ok(/getCurrentTargetJob/.test(controller),
-      tree + '/js/f5-apply.js must read the current target job');
+      tree + '/js/job-apply.js must read the current target job');
     // 没有证据时必须明说"没有引用任何个人经历"，不能留白
     assert.ok(/没有引用任何个人经历/.test(controller),
-      tree + '/js/f5-apply.js must state the zero-evidence case explicitly');
+      tree + '/js/job-apply.js must state the zero-evidence case explicitly');
   }
 });
 
@@ -160,21 +205,21 @@ test('the cover letter request carries targetJobId and shows its grounding', () 
 test('the interview page renders questionPlan and its labels cover the domain kinds', () => {
   const kinds = questionKindsFromDomain();
   for (const tree of TREES) {
-    assert.ok(hasId(tree, 'pages/f3-interview.html', 'f3QuestionPlan'),
-      tree + '/pages/f3-interview.html is missing the question-plan panel');
-    const controller = read(tree, 'js/f3-interview.js');
-    assert.ok(/res\.questionPlan/.test(controller), tree + '/js/f3-interview.js must read questionPlan');
+    assert.ok(hasId(tree, 'pages/interview-practice.html', 'f3QuestionPlan'),
+      tree + '/pages/interview-practice.html is missing the question-plan panel');
+    const controller = read(tree, 'js/interview-practice.js');
+    assert.ok(/res\.questionPlan/.test(controller), tree + '/js/interview-practice.js must read questionPlan');
     const block = controller.slice(
       controller.indexOf('QUESTION_KIND_LABEL = {'),
       controller.indexOf('}', controller.indexOf('QUESTION_KIND_LABEL = {'))
     );
     assert.ok(block.length > 50, 'QUESTION_KIND_LABEL scan looks vacuous');
     for (const kind of kinds) {
-      assert.ok(block.includes(kind + ':'), tree + '/js/f3-interview.js must label the kind ' + kind);
+      assert.ok(block.includes(kind + ':'), tree + '/js/interview-practice.js must label the kind ' + kind);
     }
     // 出题口径必须来自目标岗位，所以岗位 id 要真的递过去
     assert.ok(/DB\.startInterview\([^)]*targetId\s*\)/.test(controller),
-      tree + '/js/f3-interview.js must pass the current target job to startInterview');
+      tree + '/js/interview-practice.js must pass the current target job to startInterview');
   }
 });
 
@@ -182,16 +227,16 @@ test('the interview page renders questionPlan and its labels cover the domain ki
 
 test('the honesty caveats stay on the page', () => {
   for (const tree of TREES) {
-    const report = read(tree, 'pages/f4-report.html');
+    const report = read(tree, 'pages/action-loop.html');
     // "行动完成不等于缺口解决"必须写在界面上
     assert.ok(/行动「已完成」不等于缺口「已解决」/.test(report),
-      tree + '/pages/f4-report.html must keep the "done ≠ resolved" caveat');
+      tree + '/pages/action-loop.html must keep the "done ≠ resolved" caveat');
     assert.ok(/没有可验证成果物的缺口不会开单/.test(report),
-      tree + '/pages/f4-report.html must keep the "no artifact, no action" caveat');
+      tree + '/pages/action-loop.html must keep the "no artifact, no action" caveat');
     // 缺口不写进求职信正文，也不得被声称具备
-    const apply = read(tree, 'js/f5-apply.js');
+    const apply = read(tree, 'js/job-apply.js');
     assert.ok(/缺口不写进正文/.test(apply),
-      tree + '/js/f5-apply.js must state that gaps stay out of the letter body');
+      tree + '/js/job-apply.js must state that gaps stay out of the letter body');
   }
 });
 
@@ -215,6 +260,69 @@ test('the phase 6b-2 checks themselves can fail', () => {
   assert.ok(statuses.includes('todo') && statuses.includes('dropped'), statuses.join('/'));
 
   // ④ 探测一个真实不存在的 id：判据必须能区分
-  assert.ok(!hasId('public', 'pages/f4-report.html', 'definitelyNotAnId'));
-  assert.ok(hasId('public', 'pages/f4-report.html', 'alList'));
+  assert.ok(!hasId('public', 'pages/action-loop.html', 'definitelyNotAnId'));
+  assert.ok(hasId('public', 'pages/action-loop.html', 'alList'));
+});
+
+// ── ⑥ IA 收敛：导航恰好 4 个一级工作区、去 F 代号、页面路径无代号 ──
+
+test('一级导航恰好是 4 个一级工作区，首页由品牌区进入', () => {
+  const expected = ['简历证据', '目标岗位', '模拟面试', '行动闭环'];
+  for (const tree of TREES) {
+    for (const rel of pageFiles(tree)) {
+      assert.deepEqual(navLabels(tree, rel), expected,
+        tree + '/' + rel + ' 的导航不是 4 个一级工作区');
+      assert.match(read(tree, rel), /<a class="brand" href="[^"]*index\.html">职跃AI<\/a>/,
+        tree + '/' + rel + ' 的品牌区必须能回首页');
+    }
+  }
+});
+
+test('no user-visible F codename survives in the publish trees', () => {
+  for (const tree of TREES) {
+    for (const rel of pageFiles(tree)) {
+      const text = visibleText(read(tree, rel));
+      const hit = text.match(/\bF[1-5]\b/);
+      // 提示必须能定位到上下文，但只在真的命中时才构造（否则 hit 为 null 会先炸）
+      const where = hit ? text.slice(Math.max(0, hit.index - 30), hit.index + 30) : '';
+      assert.ok(!hit, tree + '/' + rel + ' 的可见文本仍有 F 代号：' + where);
+    }
+  }
+  // URL 也是用户可见面：发布路径不得带 F 代号（.md 是历史记录，不在范围内）
+  for (const tree of TREES) {
+    const offenders = walk(path.join(root, tree), '', [])
+      .filter((rel) => !rel.endsWith('.md') && /f[1-5][-._]/i.test(rel));
+    assert.deepEqual(offenders, [], tree + ' 仍有带 F 代号的发布路径');
+  }
+});
+
+test('inline page scripts never address DOM ids the page does not declare', () => {
+  // f4-report.html 原来带一个进度追踪器，引用 6 个早已不存在的 id —— 每次加载抛
+  // TypeError，而且它自己也携带 F 代号。这条判据把"内联脚本引用的 id 必须存在"锁住。
+  for (const tree of TREES) {
+    for (const rel of pageFiles(tree)) {
+      assert.deepEqual(danglingIds(tree, rel), [],
+        tree + '/' + rel + ' 的内联脚本引用了不存在的 id');
+    }
+  }
+});
+
+test('the phase 6b-2b checks themselves can fail', () => {
+  // ① 可见文本探测器：能发现文案里的代号，且不会把属性值当文案
+  assert.ok(/\bF[1-5]\b/.test(visibleText('<div class="fno">F1 · 简历诊断</div>')),
+    'the visible-text scan must catch a codename in page copy');
+  assert.ok(!/\bF[1-5]\b/.test(visibleText('<button id="quickDemoF1" type="button"></button>')),
+    'the visible-text scan must ignore attribute values');
+  // ② 导航解析不是空集
+  assert.deepEqual(navLabels('public', 'index.html'), ['简历证据', '目标岗位', '模拟面试', '行动闭环']);
+  assert.deepEqual(navLabels('public', 'pages/resume-evidence.html'),
+    ['简历证据', '目标岗位', '模拟面试', '行动闭环']);
+  // ③ 悬挂 id 探测器：注入一个不存在的 id 必须被抓到
+  const probe = '<script>document.getElementById("definitelyNotAnId");</script>';
+  const declared = new Set([...'<div id="real"></div>'.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
+  const used = [...probe.matchAll(/getElementById\(\s*['"]([^'"]+)['"]/g)].map((m) => m[1]);
+  assert.deepEqual(used.filter((id) => !declared.has(id)), ['definitelyNotAnId']);
+  // ④ 路径扫描的判据本身有效：旧名确实匹配
+  assert.ok(/f[1-5][-._]/i.test('pages/f4-report.html'));
+  assert.ok(!/f[1-5][-._]/i.test('pages/action-loop.html'));
 });

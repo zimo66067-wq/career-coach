@@ -22,7 +22,7 @@ function configuredApiBase(hostname, origin, existing) {
 
 function loadApp(search) {
   const context = {
-    location: { search: search, pathname: '/pages/f1-resume.html', hash: '' },
+    location: { search: search, pathname: '/pages/resume-evidence.html', hash: '' },
     document: { addEventListener: function () {} }
   };
   context.window = context;
@@ -72,7 +72,7 @@ async function run() {
   assert.strictEqual(loadApp('?state=success').getState(), 'empty', 'state alone must not enter success');
   assert.strictEqual(loadApp('?demo=1&state=success').getState(), 'success', 'explicit demo can show success');
 
-  for (const name of ['f1-resume.html', 'f3-interview.html', 'f4-report.html']) {
+  for (const name of ['resume-evidence.html', 'interview-practice.html', 'action-loop.html']) {
     const html = fs.readFileSync(path.join(root, 'docs', 'pages', name), 'utf8');
     assert.ok(html.includes('data-state-view="empty"'), name + ' must retain an empty state');
     assert.ok(html.includes('window.APP.isDemoMode()'), name + ' must guard synthetic success rendering');

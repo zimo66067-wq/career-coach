@@ -1,4 +1,4 @@
-/* f3-interview.js · F3 打字式对话面试主链路
+/* interview-practice.js · F3 打字式对话面试主链路
  * - 生产模式真实调用 /api/wf04/start、/api/wf04/stream（SSE 流式追问/下一题）
  * - 每轮输出即时反馈（优点/不足/追问），结束生成综合报告（I 分/优点/不足/下一步）
  * - 会话快照保存到 sessionStorage，刷新后可恢复

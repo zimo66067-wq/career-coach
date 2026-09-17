@@ -31,7 +31,7 @@ function makeContext(search, fetchImpl, initialStorage, apiBase) {
     removeItem: function (k) { delete storage[k]; }
   }, storage);
   const context = {
-    location: { search: search || '', pathname: '/pages/f1-resume.html', hash: '' },
+    location: { search: search || '', pathname: '/pages/resume-evidence.html', hash: '' },
     document: { addEventListener: function () {} },
     sessionStorage: sessionStorage,
     console: { warn: function () {}, log: function () {}, error: function () {} },

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>F5 投递管理 · 职跃AI</title>
+<title>投递与求职信 · 职跃AI</title>
 <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../css/tokens.css">
 <link rel="stylesheet" href="../css/main.css">
@@ -37,24 +37,23 @@
   .f5-ground-item b { color: var(--zy-ink, #1b1e26); }
 </style>
 </head>
-<body data-page="f5">
+<body data-page="apply">
 <a class="skip-link" href="#main">跳到主要内容</a>
 <nav class="topnav" aria-label="主导航">
   <button class="zy-sidebar-toggle" id="zySidebarToggle" type="button" aria-label="切换侧边栏" aria-expanded="true">☰</button>
-  <span class="brand">职跃AI</span>
-  <a class="nav" data-page="home" href="../index.html">首页</a>
-  <a class="nav" data-page="f1" href="f1-resume.html">F1 简历诊断</a>
-  <a class="nav" data-page="f3" href="f3-interview.html">F3 模拟面试</a>
-  <a class="nav" data-page="f4" href="f4-report.html">F4 能力报告</a>
-  <a class="nav" data-page="f5" href="f5-apply.html">F5 投递</a>
+  <a class="brand" href="../index.html">职跃AI</a>
+  <a class="nav" data-page="resume" href="resume-evidence.html">简历证据</a>
+  <a class="nav" data-page="target" href="target-job.html">目标岗位</a>
+  <a class="nav" data-page="interview" href="interview-practice.html">模拟面试</a>
+  <a class="nav" data-page="action" href="action-loop.html">行动闭环</a>
 </nav>
 <div class="wrap" id="main">
-  <h1 class="page-title">F5 投递管理</h1>
+  <h1 class="page-title">投递与求职信</h1>
   <p class="page-sub">生成求职信 → 人工确认 → 保存到申请跟踪</p>
   <section class="f5-boundary" id="f5CapabilityBoundary" role="note" aria-labelledby="f5BoundaryTitle">
     <h2 id="f5BoundaryTitle">当前能力边界</h2>
     <ul>
-      <li>当前只会根据已完成的 F1 简历诊断、你手动填写的目标公司和职位生成求职信候选；确认后保存为申请记录。</li>
+      <li>当前只会根据已完成的简历诊断与你填写的目标公司和职位生成求职信候选；确认后保存为申请记录。</li>
       <li><strong>当前不提供公司或单位搜索，也不会核验单位主体、招聘状态或职位真伪。</strong>请先通过单位官网、权威登记信息和招聘原页面完成核验。</li>
       <li>面试题库只作为模拟面试引擎的内部数据源，不对外提供独立问答页，也不是单位或职位数据库；模型不会被当作企业事实来源。</li>
     </ul>
@@ -142,6 +141,6 @@
 <script src="../js/pages-api-config.js"></script>
 <script src="../js/data-bridge.js"></script>
 <script src="../js/account.js"></script>
-<script src="../js/f5-apply.js"></script>
+<script src="../js/job-apply.js"></script>
 </body>
 </html>

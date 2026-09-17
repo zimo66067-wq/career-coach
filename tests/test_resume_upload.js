@@ -117,7 +117,7 @@ async function run() {
   assert.strictEqual(staticResult.error, 'api_not_configured');
   delete context.window.location;
 
-  const page = fs.readFileSync('docs/pages/f1-resume.html', 'utf8');
+  const page = fs.readFileSync('docs/pages/resume-evidence.html', 'utf8');
   assert(page.includes('id="openResumeText"'), 'paste control must be actionable');
   assert(page.includes('id="startResumeDiagnosis"'), 'selected files must expose a next-step button');
   assert(page.includes('id="resumeTextEntry"'), 'paste form must be present');

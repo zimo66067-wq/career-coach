@@ -126,10 +126,11 @@ public/pages/*.html
    ├── ../js/data-bridge.js  ← 唯一 API 客户端，ENDPOINTS 映射 15 个端点
    ├── ../js/account.js      ← /api/auth/*, /api/history/*
    ├── ../js/pages-api-config.js（1 个常量，16 行）
-   └── 页面专属: resume-upload / optimizer / f2-major / f3-interview / radar / f5-apply / kb
+   └── 页面专属: resume-upload / optimizer / radar / target-job / evidence
+                  / interview-practice / action-loop / job-apply / quick-demo
 ```
 
-`public/js/voice.js` **没有任何页面 `<script>` 引用**，见 §4.3。
+`public/js/voice.js` **没有任何页面 `<script>` 引用**，且 Phase 6b-2 时该文件已不存在于 `public/js/`，见 §4.3。
 
 ---
 
