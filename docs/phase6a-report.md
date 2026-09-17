@@ -1,7 +1,7 @@
 # phase6a-report.md · Phase 6a（前端 canonical 唯一化与死树清理）
 
 - 日期：2026-09-17
-- 提交：**`<待回填>`**（<待回填> 文件，<待回填>）
+- 提交：**`a1586a5`**（46 文件，+749 / −4511；其中 25 项是删除）
 - 阶段目标：**DoD #15「前端只有一套 canonical」** + **DoD #25 的前端部分**。
 - 依据：`docs/product-scope.md §9` DoD 表 #15 行（原文 "public / docs / ui 三份 → Phase 6"）、
   `docs/dependency-map.md §4.4`（三份前端副本）、`docs/phase1-report.md` 遗留项 #5（`ui/prototype` 陈旧分叉）。
@@ -32,7 +32,7 @@
 ## 1. 修改摘要
 
 ```
-<待回填>
+46 files changed, 749 insertions(+), 4511 deletions(-)    ← 25 项删除：ui/ 24 + scripts/capture_ui.py 1
 ```
 
 | 动作 | 对象 | 要点 |
