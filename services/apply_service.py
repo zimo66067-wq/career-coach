@@ -8,6 +8,10 @@
 import json
 import re
 
+from domain.target_job import OPEN_GAP_STATUSES, REQUIREMENT_TYPES, priority_for
+from repositories import target_job as target_job_repo
+from services import career_evidence_service as evidence_service
+from services import target_job_service
 from tools.api_errors import ApiError
 from tools.database import (
     delete_application as _delete_row,
@@ -61,10 +65,211 @@ def _grounded_in_evidence(candidate, evidence):
     return False
 
 
-def generate_cover_letter(session_id, company="", position=""):
-    """生成求职信候选（人工确认后才落库）。"""
+# ------------------------------------------------------------------ #
+# DoD #10 · 求职信接地：岗位要求 + 已确认证据（Phase 4b）
+# ------------------------------------------------------------------ #
+#
+# 旧路径（不传 targetJobId）读的是 F1 诊断里模型抽的 span 引文 —— 那些**不是已确认事实**，
+# 只是"模型觉得相关"的简历片段。DoD #10 要求求职信同时用上目标岗位与职业证据，这里就按
+# Phase 3 定下的口径接：**下游只能读 `usable_evidence()`（= confirmed）**。
+#
+# 三条不可让步的规则：
+#
+# 1. **没有已确认证据就不请模型写。** 只给岗位要求、不给事实底座，模型一定会替用户编经历
+#    （它受了"要匹配 JD"的强暗示）。宁可只给一个带占位符的框架。
+# 2. **未覆盖的要求不许声称具备。** 缺口清单是"禁止声称"名单，不是写作素材；它只出现在
+#    接口返回的元数据里让界面提示用户，不进正文（正文是给雇主看的，不是内部备忘）。
+# 3. **正文里每一段经历都要能回指一条已确认证据。** 模型路径复用 `_grounded_in_evidence`
+#    做四字片段校验；过不了就退规则模板，而不是放行一段无法核验的漂亮话。
+
+#: 200 字的正文塞不下十几条要求 —— 贪多只会得到"我十分符合"这类空话。
+MAX_LETTER_REQUIREMENTS = 5
+MAX_LETTER_EVIDENCE = 3
+
+_PRIORITY_RANK = {"P0": 0, "P1": 1, "P2": 2}
+
+#: 没有任何已确认证据时，正文里给出的**明确占位**（不是编造，也不是沉默）。
+EVIDENCE_PLACEHOLDER = "（请在正文中补充 1-2 个可量化的项目成果）"
+
+
+def _letter_context(target_job_id, owner_key, company, position):
+    """把岗位与证据压成一份"只允许引用这些事实"的底座。"""
+    target = target_job_service.get_target_job(target_job_id, owner_key)  # 归属校验（非本人 404）
+    company = str(company or "").strip() or str(target.get("company") or "").strip()
+    position = str(position or "").strip() or str(target.get("position") or "").strip()
+
+    requirements = []
+    for row in target_job_service.requirements_of(target_job_id):
+        text = str(row.get("text") or "").strip()
+        if not text:
+            continue
+        kind = str(row.get("req_type") or "")
+        requirements.append({
+            "id": row["id"],
+            "text": text,
+            "req_type": kind,
+            "priority": priority_for(kind) if kind in REQUIREMENT_TYPES else "P2",
+            "ordinal": row.get("ordinal") or 0,
+        })
+    requirements.sort(key=lambda item: (
+        _PRIORITY_RANK.get(item["priority"], 9), item["ordinal"], item["id"]
+    ))
+    requirements = requirements[:MAX_LETTER_REQUIREMENTS]
+
+    gaps = []
+    for gap in target_job_repo.list_gaps(target_job_id):
+        if gap.get("status") not in OPEN_GAP_STATUSES:
+            continue
+        gaps.append({
+            "id": gap["id"],
+            "priority": gap.get("priority"),
+            "reason": str(gap.get("missing_evidence") or gap.get("reason") or "").strip(),
+        })
+    gaps.sort(key=lambda item: (_PRIORITY_RANK.get(item["priority"], 9), item["id"]))
+
+    evidence = []
+    for row in evidence_service.usable_evidence(owner_key):
+        claim = str(row.get("claim") or "").strip()
+        if not claim:
+            continue
+        evidence.append({
+            "id": row["id"],
+            "claim": claim,
+            "quote": str(row.get("source_quote") or "").strip(),
+        })
+    evidence = evidence[:MAX_LETTER_EVIDENCE]
+
+    return {"company": company, "position": position,
+            "requirements": requirements, "gaps": gaps, "evidence": evidence}
+
+
+def _grounded_prompt(company, position, requirements, evidence, gaps):
+    requirement_lines = "\n".join(
+        "- [%s] %s" % (item["priority"], item["text"]) for item in requirements
+    ) or "（岗位要求为空）"
+    evidence_lines = "\n".join("- %s" % item["claim"] for item in evidence)
+    gap_lines = "\n".join(
+        "- [%s] %s" % (item["priority"], item["reason"]) for item in gaps if item["reason"]
+    ) or "（无）"
+    return (
+        "目标公司：%s\n目标职位：%s\n\n"
+        "岗位要求（按优先级排序）：\n%s\n\n"
+        "已确认的职业证据（这是**唯一**允许引用的事实）：\n%s\n\n"
+        "尚未被证据覆盖的要求（**禁止**声称具备，也不要提及）：\n%s\n\n"
+        "请写一封不超过 200 字的中文求职信正文，优先回应有证据支撑的要求。"
+        % (company, position, requirement_lines, evidence_lines, gap_lines)
+    )
+
+
+def _grounded_template(company, position, evidence):
+    """规则降级：只写"职位 + 已确认经历"，没有证据就留明确占位。"""
+    salute = "尊敬的%s招聘负责人：" % ("%s " % company if company else "")
+    if not evidence:
+        return "\n".join([
+            salute,
+            "您好！我应聘「%s」岗位。" % position,
+            EVIDENCE_PLACEHOLDER,
+            "期待有机会与您进一步沟通，感谢您的时间。",
+            "此致敬礼",
+        ])
+    return "\n".join([
+        salute,
+        "您好！我应聘「%s」岗位，以下是我可以核实的经历与成果：" % position,
+        "；".join(item["claim"] for item in evidence) + "。",
+        "这些经历与岗位要求直接相关，期待有机会与您进一步沟通，感谢您的时间。",
+        "此致敬礼",
+    ])
+
+
+def _grounded_letter(session_id, context):
+    """带 targetJobId 的求职信：事实底座 = 岗位要求 + 已确认证据。"""
+    company = context["company"]
+    position = context["position"]
+    evidence = context["evidence"]
+    requirements = context["requirements"]
+    gaps = context["gaps"]
+    quotes = [item["quote"] or item["claim"] for item in evidence]
+
+    payload = {
+        "pending_confirm": True,
+        "session_id": session_id,
+        "company": company,
+        "position": position,
+        "evidence": [{"id": item["id"], "claim": item["claim"]} for item in evidence],
+        "requirements": [{"id": item["id"], "text": item["text"], "priority": item["priority"]}
+                         for item in requirements],
+        "gaps": [{"id": item["id"], "priority": item["priority"]} for item in gaps],
+    }
+
+    # 规则 1：没有已确认证据就不请模型写。空地会让模型替用户编经历。
+    router = None
+    if evidence:
+        try:
+            router = build_model_router()
+        except ApiError:
+            router = None
+
+    if router is not None:
+        try:
+            result = router.call(
+                "cover_letter", _grounded_prompt(company, position, requirements, evidence, gaps)
+            )
+            if result.get("status") == "success" and result.get("output"):
+                candidate = _output_text(
+                    result["output"], ("candidate", "cover_letter", "content", "text")
+                )
+                if (candidate and (company in candidate or position in candidate)
+                        and _grounded_in_evidence(candidate, quotes)):
+                    payload.update({
+                        "candidate": candidate,
+                        "basis": "model",
+                        "grounding": "target_job+evidence",
+                        "notice": _letter_notice(evidence, gaps),
+                    })
+                    return payload
+        except Exception:  # noqa: BLE001 - 模型失败一律降级，不影响出信
+            pass
+
+    payload.update({
+        "candidate": _grounded_template(company, position, evidence),
+        "basis": "rule",
+        "grounding": "target_job+evidence" if evidence else "target_job_no_evidence",
+        "notice": _letter_notice(evidence, gaps),
+    })
+    return payload
+
+
+def _letter_notice(evidence, gaps):
+    parts = []
+    if evidence:
+        parts.append("正文中的经历只来自你已确认的 %d 条职业证据，未确认的候选证据未被引用。"
+                     % len(evidence))
+    else:
+        parts.append("你还没有确认任何职业证据，正文只有框架、未引用任何经历 —— "
+                     "请先在证据档案里确认至少一条真实经历，再重新生成。")
+    if gaps:
+        parts.append("该岗位另有 %d 条要求没有已确认证据支撑，正文未声称具备。"
+                     % len(gaps))
+    return "".join(parts)
+
+
+def generate_cover_letter(session_id, company="", position="", target_job_id=None, owner_key=None):
+    """生成求职信候选（人工确认后才落库）。
+
+    ``target_job_id`` 给了就走 DoD #10 的接地路径（岗位要求 + **已确认**职业证据，见
+    ``_grounded_letter``）；不给则保持旧行为：只读 F1 诊断的 span 引文。
+    """
     company = str(company or "").strip()
     position = str(position or "").strip()
+
+    if target_job_id is not None:
+        if not owner_key:
+            raise ApiError("invalid_request", "缺少归属标识。", 422)
+        context = _letter_context(int(target_job_id), owner_key, company, position)
+        if not context["company"] or not context["position"]:
+            raise ApiError("apply_info_required", "请填写目标公司与职位。", 422)
+        return _grounded_letter(session_id, context)
+
     if not company or not position:
         raise ApiError("apply_info_required", "请填写目标公司与职位。", 422)
     detail = get_resume_detail(session_id)
@@ -94,6 +299,7 @@ def generate_cover_letter(session_id, company="", position=""):
                         "candidate": candidate,
                         "pending_confirm": True,
                         "basis": "model",
+                        "grounding": "diagnosis",
                         "session_id": session_id,
                         "company": company,
                         "position": position,
@@ -101,7 +307,7 @@ def generate_cover_letter(session_id, company="", position=""):
         except Exception:
             pass
 
-    highlights = "；".join(evidence[:3]) if evidence else "（请在正文中补充 1-2 个可量化的项目成果）"
+    highlights = "；".join(evidence[:3]) if evidence else EVIDENCE_PLACEHOLDER
     candidate = (
         "尊敬的招聘负责人：\n"
         "您好！我是「%s」岗位的求职者，结合个人经历与岗位要求，我的核心匹配点如下：\n"
@@ -114,6 +320,7 @@ def generate_cover_letter(session_id, company="", position=""):
         "candidate": candidate,
         "pending_confirm": True,
         "basis": "rule",
+        "grounding": "diagnosis",
         "session_id": session_id,
         "company": company,
         "position": position,

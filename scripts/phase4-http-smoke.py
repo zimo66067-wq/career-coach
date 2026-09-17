@@ -5,7 +5,8 @@
 处理器/CORS 预检"这一层。所以门禁里必须有一次**真端口**的验证。
 
 覆盖：Phase 4 新增三块（D9=A 面试抽取 / Gap Action Plan / 投递结果回流）+ 级联删除
-+ 归属隔离 + 已下线路由仍 404 + 预检 + 同意门。
++ 归属隔离 + 已下线路由仍 404 + 预检 + 同意门；Phase 4b 追加 **DoD #10 求职信接地**
+（无已确认证据时不得引用候选证据、他人借岗位 404、旧路径仍要 F1 诊断）。
 
 用法（仓库根目录）：
     .venv-audit/Scripts/python.exe scripts/phase4-http-smoke.py
@@ -266,6 +267,57 @@ def main():
         status, _ = request("POST", "/api/wf07/applications/%d/outcome" % app_id,
                             {"outcome": "offer"}, other_token)
         check("他人写结果 404", status == 404, status)
+
+        # ---- DoD #10 · 求职信接地（Phase 4b） ---------------------------
+        status, letter = request("POST", "/api/wf07/cover-letter",
+                                 {"session_id": session_id, "targetJobId": target_id,
+                                  "company": "示例科技", "position": "后端开发工程师"}, token)
+        check("求职信接地路径 200", status == 200, status)
+        check("求职信如实标记无已确认证据",
+              letter.get("grounding") == "target_job_no_evidence", letter.get("grounding"))
+        check("无证据时不引用任何候选证据", letter.get("evidence") == [], letter.get("evidence"))
+        check("求职信报出回应的要求", len(letter.get("requirements") or []) > 0)
+        check("求职信报出未覆盖要求", len(letter.get("gaps") or []) > 0)
+        check("求职信仍是待确认候选", letter.get("pending_confirm") is True)
+
+        pending_claims = [item["claim"] for item in profile["pending"]]
+        check("未确认证据一个字都没进正文",
+              all(claim not in letter["candidate"] for claim in pending_claims if claim),
+              len(pending_claims))
+
+        # 归属校验有两道，各自都要生效：先认会话归属，再认岗位归属。
+        status, borrowed_session = request("POST", "/api/wf07/cover-letter",
+                                           {"session_id": session_id, "targetJobId": target_id,
+                                            "company": "别家公司", "position": "别的职位"}, other_token)
+        check("他人借会话 404",
+              status == 404 and borrowed_session.get("error") == "session_not_found",
+              (status, borrowed_session.get("error")))
+
+        other_session = "iv_smoke_phase4_other"
+        status, _ = request("POST", "/api/wf04/start", {"session_id": other_session}, other_token)
+        check("他人自建会话 200", status == 200, status)
+        status, borrowed = request("POST", "/api/wf07/cover-letter",
+                                   {"session_id": other_session, "targetJobId": target_id,
+                                    "company": "别家公司", "position": "别的职位"}, other_token)
+        check("他人借岗位生成求职信 404",
+              status == 404 and borrowed.get("error") == "target_job_not_found",
+              (status, borrowed.get("error")))
+        check("报错不回显他人岗位",
+              "示例科技" not in json.dumps(borrowed, ensure_ascii=False), borrowed.get("error"))
+
+        status, bad_id = request("POST", "/api/wf07/cover-letter",
+                                 {"session_id": session_id, "targetJobId": "abc",
+                                  "company": "示例科技", "position": "后端开发工程师"}, token)
+        check("坏 targetJobId 422",
+              status == 422 and bad_id.get("error") == "invalid_request",
+              (status, bad_id.get("error")))
+
+        status, legacy = request("POST", "/api/wf07/cover-letter",
+                                 {"session_id": session_id, "company": "示例科技",
+                                  "position": "后端开发工程师"}, token)
+        check("旧路径未被改动（仍要 F1 诊断 422）",
+              status == 422 and legacy.get("error") == "diagnosis_required",
+              (status, legacy.get("error")))
 
         # ---- 级联删除 ---------------------------------------------------
         status, _ = request("DELETE", "/api/target-jobs/%d" % target_id, token=token)

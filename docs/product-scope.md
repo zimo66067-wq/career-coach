@@ -201,7 +201,7 @@ CareerProfile        TargetJob                InterviewSession        Action
 | 7 Career Evidence 为 source of truth | ✅ Phase 2 建实体；**Phase 3 已接到 HTTP 且只读已确认证据**（`usable_evidence()`） | ✅ **已达成**（Phase 3） |
 | 8 Target Job 输出 APPLY/STRETCH/PASS | ✅ Phase 3：`blocking` 驱动，三个分支均有测试（`test_the_rule_reaches_all_three_verdicts`） | ✅ **已达成**（Phase 3，后端） |
 | 9 每个 Decision ≥3 条 evidence | ✅ Phase 3：四类可核对依据（要求判定 / 匹配概览 / 缺口 / 证据盘点），不足即拒判 | ✅ **已达成**（Phase 3） |
-| 10 Cover Letter 用 Target Job + Evidence | 仍只读 F1 诊断 | ⏳ **未做**。DoD 表把它标为 Phase 4，但 `phase3-report §9` 对 Phase 4 的定义是 Action Loop，两者口径冲突（见 §13.4）。待裁决：Phase 4b 或并入 Phase 6 |
+| 10 Cover Letter 用 Target Job + Evidence | ✅ **Phase 4b 达成（后端）**：`wf07/cover-letter` 带 `targetJobId` 即走接地路径 —— 事实底座 = 岗位要求（P0→P1→P2，≤5 条）+ `usable_evidence()`（只含 confirmed，≤3 条），缺口只进元数据不进正文，无已确认证据时**不请模型**（15 项测试 + 冒烟锁定） | 前端 F5 页面尚未传 `targetJobId`（Phase 6 接线），详见 `phase4b-report.md §7` |
 | 11 Interview 按 Gap 定向 | ✅ Phase 3：`targetJobId` → 缺口按 P0→P1→P2 排序出题，返回 `questionPlan` | ✅ **已达成**（Phase 3，后端） |
 | 12 Interview 新事实需用户确认 | ✅ **Phase 4 端到端打通**：D9=A 落地，`wf04/end` 一次性抽取；模型路径与降级路径都由 `candidate_evidence()` 收口，只产 pending（9 项测试锁死） | ✅ **已达成**（Phase 4） |
 | 13 Service 不反向依赖 API | 3 处倒置 → **2 处**（`task_service → api.f2_major` 随 D1 消失）；Phase 3 / Phase 4 新增代码均无新倒置（静态校验：domain 层 0 处越层 import） | Phase 5 |
@@ -407,7 +407,7 @@ Phase 4（Action Loop：Gap Action Plan + Application 状态回流）后端闭�
 
 **DoD 变化**：#12（Interview 新事实需用户确认）由"部分达成"变为**达成**；
 #19（CI 全绿）、#22（删除链路）、#24（无 dead routes）随本阶段数字更新。
-**#10（Cover Letter）仍未做**，见 §13.4。
+**#10（Cover Letter）裁决为方案 A 并已由 Phase 4b 落地**，见 §13.4 与 §13.5。
 
 ### 13.1 三条不变的领域不变量
 
@@ -434,16 +434,35 @@ Phase 4（Action Loop：Gap Action Plan + Application 状态回流）后端闭�
 三者互不连坐。已投递后补记"被拒"是事实，倒流补记"进入面试"也是事实，但状态机不允许倒流时
 **保留原状态并如实回报**，而不是丢掉结果或静默改写历史。
 
-### 13.4 口径冲突（需裁决）
+### 13.4 口径冲突（已裁决）
 
 **DoD #10（Cover Letter 用 Target Job + Evidence）在两个文档里归属不同**：
 
 - `§9 DoD 表`：标为 **Phase 4**；
 - `phase3-report §9`：Phase 4 = **Action Loop（Gap Action Plan + Application 状态回流）**。
 
-本阶段按后者执行，**#10 未做**（求职信仍只读 F1 诊断）。两个口径需二选一：
-**A** 承认 Phase 4 = Action Loop，#10 另立 Phase 4b 或并入 Phase 6；
-**B** Phase 4 不关闭，同一阶段内把 #10 做完再结。
+**裁决：方案 A（2026-09-16）** —— 承认 Phase 4 = Action Loop，**#10 另立 Phase 4b** 单独结项。
+Phase 4b 已于 2026-09-17 完成（见 §13.5），两个文档的口径自此一致。
 
 **Phase 4 结束时仍不可用的东西**（口径）：8 条新路由没有任何页面消费，
 因此对外不得出现"面试结束后自动生成行动计划""记一次投递结果就能更新档案"这类描述（Phase 6 才成立）。
+
+### 13.5 Phase 4b 完成记录（2026-09-17 · DoD #10）
+
+**目标**：把求职信的事实底座从"F1 诊断里模型抽的 span 引文"换成
+**目标岗位要求 + 已确认职业证据**。前者只是"模型觉得相关"，后者才是用户确认过的事实 ——
+求职信是发给雇主的对外材料，底座错了，写得再漂亮也是替用户编经历。
+
+**接口**：`POST /api/wf07/cover-letter` 新增可选 `targetJobId`。
+不带 → 旧行为**完全不变**（新增 `grounding: "diagnosis"` 供前端区分）；
+带 → 接地路径，返回 `grounding` / `evidence` / `requirements` / `gaps` / `notice`。
+
+**三条不可让步的规则**（详见 `phase4b-report.md §2`）：
+
+1. **没有已确认证据就不请模型写** —— 空地会让模型替用户编经历；只给带明确占位的框架。
+   写成正面测试：替身路由的调用次数必须是 **0**。
+2. **未覆盖的要求是"禁止声称"名单** —— 它只进元数据让界面提示，不进正文。
+3. **正文每段经历都要能回指一条已确认证据** —— 模型输出过不了四字片段校验就退规则模板。
+
+**口径**：这是**后端能力**。前端 F5 页面尚未传 `targetJobId`，用户在页面上生成的求职信
+仍走旧路径；"求职信会自动引用你的目标岗位与已确认经历"在 Phase 6 接线前**不得对外说**。

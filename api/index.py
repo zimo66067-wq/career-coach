@@ -1204,11 +1204,23 @@ def route_api(**_ignored):
         if not session_id:
             raise ApiError("session_required", "缺少会话标识。", 422)
         ensure_session_access(session_id)
+
+        # DoD #10：带上 targetJobId 就走"岗位要求 + 已确认证据"的接地路径
+        # （公司/职位也可从岗位记录里取）。不带则保持旧行为（只读 F1 诊断）。
+        target_job_id = body.get("targetJobId")
+        if target_job_id is not None:
+            try:
+                target_job_id = int(target_job_id)
+            except (TypeError, ValueError):
+                raise ApiError("invalid_request", "目标岗位 ID 无效。", 422)
+
         return api_response(
             generate_cover_letter(
                 session_id,
                 company=body.get("company", ""),
                 position=body.get("position", ""),
+                target_job_id=target_job_id,
+                owner_key=_task_owner_key(),
             )
         )
 
