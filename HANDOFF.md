@@ -1,132 +1,74 @@
-# HANDOFF.md · 当前阶段交接文件 (P1-08)
+# HANDOFF.md · 交接入口（薄指针）
 
-> 本文件是 career-coach 仓库的根级 HANDOFF，描述当前阶段状态、已完成里程碑、未完成项与下一步。
-> 每次阶段切换或重要变更后更新。
-
----
-
-## 1. 当前阶段事实声明
-
-- **当前阶段**：G7（审查与交接完成）→ G8（校内验证准备中）。
-- **当前 commit hash**：`672102bfbaba7a72d00c8ec8c771e5bc3ec060de`。
-- **分支**：main。
-- **最后更新日期**：2026-08-01。
-- **最后操作**：创建 P1-06~P2-06 审计报告整改文件（.env.example、SECURITY.md、ci.yml、capability_matrix.md、deliverables README/G8/G9、docs/mobile-accessibility-testing.md、model-baking-log.md、observability.md、defense-evidence-index.md）。
-
-## 2. 已完成里程碑列表
-
-| 里程碑 | commit | 日期 | 说明 |
-|---|---|---|---|
-| 基线冻结（commit B） | `91f4fe3` | 2026-07-31 | docs/PRD、architecture、privacy；contracts 四 Schema + scoring.md；fixtures 23 份；workflows 占位 |
-| 前端原型与提示词（commit C） | `6e954ba` | 2026-07-31 | ui/prototype 六页五状态；prompts/ 七份；demo-script |
-| 工具链与测试（commit D） | `903fbb6` | 2026-07-31 | tools/ 八工具；tests/ 42 项 pytest 全绿；验收/彩排清单 |
-| 审查报告（commit E） | `3431620` | 2026-08-01 | docs/review.md 一审二审通过，结论 Go |
-| 工作流搭建（commit F） | `654e475` | 2026-08-01 | WF-01~06 六条工作流定义并接通 F1-F4 |
-| 验收清单勾选（commit G） | `672102b` | 2026-08-01 | gitignore 预览截图 + .dumate，验收清单 13 项全部勾选 |
-| 审计报告整改（本批） | 待提交 | 2026-08-01 | 12 个审计文件创建（.env.example、SECURITY.md、ci.yml 等） |
-
-## 3. 未完成项清单
-
-| # | 任务 | 优先级 | 说明 | 阻塞项 |
-|---|---|---|---|---|
-| 1 | 千帆 embedding 接通实测 | P0 | 需配 QIANFAN_API_KEY 并测硬性召回率 ≥85% | 需获取千帆凭证 |
-| 2 | F1 简历诊断模型实测（20 份） | P0 | 需 DuMate 侧跑 20 份简历，≥19 份抽取成功 | 需 DuMate 平台运行 |
-| 3 | F3 面试状态机实测 | P0 | 文字面试完整流转、追问引用上轮原句 | 需 DuMate 平台运行 |
-| 4 | F3 敏感问题阻断实测（20 条） | P0 | 20 条敏感问题全部阻断 | 需 DuMate 平台运行 |
-| 5 | F4 七天计划生成实测 | P0 | 恰好 7 条 / day 1-7 不重复 / 30-45 分钟 / 含 artifact | 需 DuMate 平台运行 |
-| 6 | 语音 ASR/TTS 链路实测 | P1 | 按键说话 → 文字转写 + TTS 播报 | 需配置 ASR/TTS 接口 |
-| 7 | G8 校内用户测试 | P0 | 招募 5-8 人，完成四功能测试 | 需主功能实测通过 |
-| 8 | G9 彩排（10 次） | P0 | 10 次完整彩排无阻断 | 需 G8 通过 |
-| 9 | 移动端真机测试 | P1 | 手机/平板截图与无障碍测试 | 需主功能实测通过 |
-| 10 | 跨环境匿名访问验证 | P0 | 退出登录/无痕/另一设备/手机热点 | 需 Skill 分享 URL |
-| 11 | CI 流水线首次运行 | P1 | 推送到 GitHub 后验证 ci.yml 全步骤通过 | 需推送到远程仓库 |
-| 12 | 方案 PDF / 演示 MP4 产出 | P0 | G9 最终交付物 | 需所有实测与彩排完成 |
-
-## 4. 当前 commit hash
-
-```
-672102bfbaba7a72d00c8ec8c771e5bc3ec060de
-```
-
-> 本批整改文件提交后将更新此 hash。
-
-## 5. 回滚点
-
-| 回滚点 | commit hash | 含义 |
-|---|---|---|
-| 回滚到验收清单勾选 | `672102b` | 全部 WorkBuddy 产物 + 工作流 + 验收清单（不含本批整改） |
-| 回滚到工作流搭建 | `654e475` | 基线 + UI + 工具链 + 审查 + 工作流（不含验收清单与整改） |
-| 回滚到审查报告 | `3431620` | 基线 + UI + 工具链 + 审查（不含工作流） |
-| 回滚到工具链 | `903fbb6` | 基线 + UI + 工具链（不含审查） |
-| 回滚到 UI 原型 | `6e954ba` | 基线 + UI（无工具链） |
-| 回滚到基线 | `91f4fe3` | 仅基线合同（无 UI/工具链/工作流） |
-
-## 6. 下一唯一任务
-
-**接通千帆 embedding 主路径并实测硬性召回率 ≥85%。**
-
-操作步骤：
-1. 在 `.env` 中填入 QIANFAN_API_KEY 和 QIANFAN_SECRET_KEY（从千帆控制台获取）。
-2. 运行 `python tools/match_requirements.py --backend embedding --jd tests/fixtures-synthetic/jobs/job-01-swe.txt --resume tests/fixtures-synthetic/resumes/resume-01-swe.txt`。
-3. 确认输出四态匹配结果，检查硬性要求召回率是否 ≥85%。
-4. 失败时降级为 BM25（exit 4），确认界面标注「简化匹配」。
-5. 成功后在 `docs/capability_matrix.md` 回填 N8 状态为「已验证」。
-
-> 完成此任务后，进入 DuMate 平台搭建并实测 F1-F4 主功能。
-
-## 7. 证据索引
-
-| 证据 | 文件路径 | 说明 |
-|---|---|---|
-| 产品需求文档 | `docs/PRD.md` | v1.0 冻结，四功能范围与验收门 |
-| 架构文档 | `docs/architecture.md` | 四层架构 + ADR 决策 |
-| 隐私策略 | `docs/privacy.md` | 去标识化 + 数据最小化 + 删除流程 |
-| 审查报告 | `docs/review.md` | 一审二审通过，Go |
-| 评分公式 | `contracts/scoring.md` | R/M/I/C0/C7 公式（冻结） |
-| 工具链验收 | `handoffs/003-tools-to-dumate.md` | 42 项 pytest 全绿 + 工具命令实测 |
-| 验收清单 | `tests/acceptance/acceptance-checklist.md` | 13 项全勾选 |
-| 彩排清单 | `tests/rehearsal/demo-checklist.md` | 会前检查 + 现场走查 + 故障预案 |
-| 安全策略 | `SECURITY.md` | 漏洞报告 + 密钥轮换 + 数据边界 + PII + 依赖扫描 |
-| 环境变量模板 | `.env.example` | 所有变量名与获取方式 |
-| CI 流水线 | `.github/workflows/ci.yml` | pytest + schema + 敏感信息扫描 |
-| 能力矩阵 | `docs/capability_matrix.md` | DuMate 平台能力实测记录 |
-| G8 测试计划 | `deliverables/g8-user-testing.md` | 校内验证 5-8 人测试 |
-| G9 提交清单 | `deliverables/g9-submission-checklist.md` | 10 次彩排 + 冻结清单 |
-| 移动端测试 | `docs/mobile-accessibility-testing.md` | 移动端 + 无障碍测试 |
-| 模型选择记录 | `docs/model-baking-log.md` | 盲测输入 + 对比维度 |
-| 可观测性 | `docs/observability.md` | trace_id + 错误分类 + 禁止记录清单 |
-| 答辩证据索引 | `docs/defense-evidence-index.md` | 20+ 评委问题 → 证据映射 |
+> **本文件不保存状态，只保存"去哪里找状态"。**
+>
+> Phase 7a（2026-09-17）把它从一份"当前阶段事实声明"退役成指针。原因不是它写错了，而是
+> **它是一份没有责任人的第二真相源**：它维护着当前阶段、当前 commit hash、里程碑表、
+> 未完成项清单、回滚点表和测试数字。这些副本最后一次同步是 2026-08-01（`672102b`），
+> 而仓库此后又走了 Phase 1 ~ 6b-3 十几个阶段 —— 于是「当前 commit」是旧的、
+> 「下一步唯一任务」是早已完成的、测试数字是 304 而现实是 482。
+>
+> 所以现在：**任何随时间变化的事实都不写在这里。**
 
 ---
 
-## 8. 2026-08-05 完整化轮（本地工作区，未推送）
+## 各问题的唯一去处
 
-> 本轮目标：对照设计文档恢复设计基线、接通 WF-04~06、补齐语音与测试，使项目在代码与单测层面达到设计文档定义的完整性。
+| 想知道 | 去看 |
+| --- | --- |
+| 产品做什么、不做什么；每个决策点的裁决与理由 | `docs/product-scope.md` |
+| 当前架构：技术栈、页面清单、API 路由、分层 | `docs/architecture.md` |
+| 模块依赖边、依赖违规、死资产清单、目标依赖结构 | `docs/dependency-map.md` |
+| 领域模型与不变量 | `docs/domain-model.md` |
+| 按时间累积的变更史 | `CHANGELOG.md` |
+| 每个阶段做了什么、怎么验证的、留下什么 | `docs/phase1-report.md` ~ `docs/phase6b3-report.md` |
+| 收敛式重构的整体安排 | `docs/remediation-and-completion-plan-2026-09-08.md` |
+| 隐私与数据最小化的设计基线 | `SECURITY.md`、`docs/design/privacy.md` |
+| 能力矩阵与实测记录 | `docs/capability_matrix.md` |
+| 验收清单 / 彩排清单 | `tests/acceptance/acceptance-checklist.md`、`tests/rehearsal/demo-checklist.md` |
+| 交付存档（阶段产物与证据材料） | `handoffs/`、`deliverables/` |
+| DuMate 侧的工作流定义 | `workflows/` |
+| 仓库总览与上手 | `README.md`、`docs/README.md` |
 
-### 已完成
+## 代码在哪里
 
-| 项 | 内容 | 验证 |
-|---|---|---|
-| 设计文档恢复 | docs/PRD、architecture、privacy、review、demo-script 从 git 历史恢复到 `docs/design/`，并写入《设计路径与技术路径蓝图》 | docs/index.md 已收录 |
-| WF-04~06 接通 | 移植 `tools/database.py`（SQLite 会话存储：简历/诊断/匹配/面试/能力），api/index.py 实现 wf04/start·answer·end、wf05/ability（含 radar_option）、wf06/delete、admin/resumes、admin/export | `test_api.py::test_wf04_to_wf06_full_session_flow` 全流程通过 |
-| 语音补齐 | 移植 main 的百度 ASR/TTS 实现（tools/voice_handler.py），文字主链路与 10 秒回退保留 | test_voice_browser / test_new_tools 通过 |
-| 敏感词补齐 | SENSITIVE_PATTERNS 补充「婚姻」（事实锁第 5 条覆盖） | pytest 全量通过 |
-| 测试纳入 | 未跟踪测试（test_api_boundary、test_e2e_full_chain、test_frontend_chain、test_interview_full_flow、test_match_boundary、test_model_router_providers）纳入并通过；ci.yml 增加 test_frontend_chain.js | Python 304/304、Node 11/11 |
-| 发布镜像 | docs/ 与 public/ 一致（test_publish_mirror.js） | 通过 |
+| 层 | 路径 |
+| --- | --- |
+| HTTP 入口（单函数分发） | `api/index.py` |
+| 编排与事务边界 | `services/` |
+| 领域规则（纯逻辑，不碰 DB 与框架） | `domain/` |
+| 表级读写（唯一拼 SQL 的地方） | `repositories/` |
+| 引擎 / 脱敏 / 评分 / provider | `tools/`、`tools/providers/` |
+| 前端 canonical（Vercel 静态根） | `public/` |
+| 前端发布镜像（GitHub Pages） | `docs/` |
 
-### 本轮测试结果（2026-08-05，.workbuddy venv Python 3.13 + pytest 9.1.1）
+> `public/` 与 `docs/` 中的所有非 `.md` 文件由 `tests/test_publish_mirror.js` 强制
+> **逐字节相同**。改完 `public/` 用 `scripts/sync_mirror.py` 同步镜像，再用 `--check` 复核。
 
-- `pytest tests/ -q`：**304 passed, 0 failed**
-- `node --test tests/*.js`：**11 passed, 0 failed**
+## 门禁怎么跑
 
-### 仍未闭环（外部条件，非代码缺口）
+每条判据的脚本都在 `scripts/` 下，自带用法说明与判据自检，**退出码 0 = 通过**：
 
-- 真实密钥复测：智谱/千帆模型与 embedding 调用需 ZHIPU_API_KEY / QIANFAN_API_KEY。
-- G8 用户验证（5-8 人）、G9 提交包冻结与 10 次彩排。
-- CI 首次在 GitHub Actions 运行、方案 PDF / 演示 MP4 / 分享 URL。
+    pytest tests/ -q                                 # 单元 + 契约 + 分层 + 迁移
+    node --test tests/*.js                           # 前端契约（含镜像与门禁判据）
+    python scripts/sensitive-scan.py                 # 敏感信息扫描
+    python scripts/vercel-dead-routes.py             # 重写源 ⊆ 处理分支（实证发请求）
+    python scripts/frontend-api-literal-check.py     # 前端字面量 ⊆ 重写源
+    python scripts/live-doc-path-check.py            # 活文档里的页面 / 脚本路径真实存在
+    python scripts/env-example-check.py              # .env.example 与代码读取点双向一致
+    python scripts/sync_mirror.py --check            # 发布镜像不变量
 
-### 建议下一步
+三个 JSON Schema 的 fixture 校验用 `python tools/validate_schema.py`；
+真实 HTTP 冒烟用 `python scripts/phase4-http-smoke.py`。完整的门禁顺序与"每步在防什么"
+见 `docs/phase6b3-report.md`（Phase 7a 新增的两步见 `docs/phase7a-report.md`）。
 
-1. 复核并提交本地工作区改动（含本轮文档与代码）到 feature 分支，再合入 main。
-2. 配置密钥后按 remaining-items.md 执行真实调用与 embedding 复测。
-3. 完成 G8/G9 后更新 capability_matrix.md 状态计数。
+## 仓库约定（不随时间变化的那部分）
+
+- `.env` 绝不入库；密钥只放部署密钥库。**变量清单以 `.env.example` 为唯一来源**，
+  模板与代码的双向一致由判据强制。
+- 判据必须**能变红**才算判据：新增判据要做一次变异注入，确认对应用例真的报错。
+- 判据的**观察面要等于它要判的语义**。太宽（把注释当成实现）和太窄（同义措辞不认）
+  都会失效 —— 两种失效本项目都实际踩过，各记在 `docs/phase6b3-report.md` 与
+  `docs/phase7a-report.md`。
+- 改完 `public/` 同步 `docs/`；改完活文档跑路径门禁；改完前端调用跑端点门禁；
+  改完环境变量跑 env 门禁。

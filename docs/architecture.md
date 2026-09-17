@@ -99,39 +99,61 @@
 
 ---
 
-## 3. API Route（40 条本地路由，48 条 Vercel 重写）
+## 3. API Route
 
-全部经 `api/index.py::route_api()` 单函数分发；Vercel 用 `? _route=` 重写把路径映射进来。
+**条数不写在这里**（写死的数字必漂移）。权威来源是代码本身：本地路由见 `api/index.py`
+末尾的 `for _rule in (...)` 列表，线上重写见 `vercel.json`，实测统计由
+`scripts/vercel-dead-routes.py` 打印。Phase 7a 校准时的实测值是 49 条本地路由 /
+44 条 Vercel 重写（其中 38 条 API 重写）。
+
+全部经 `api/index.py::route_api()` 单函数分发；线上入口是 `vercel.json` 的 `?_route=` 重写。
+
+> **Phase 7a 校准（2026-09-17）**：本表的数字与行按实测重置。旧版写「40 条本地路由，48 条
+> Vercel 重写」，两个数字都不是实测值；旧表还留着 7 条在 Phase 1 就已删除的路由
+> （`/api/f2/*`、`/api/f2_major`、`/api/knowledge/*`、`/api/tasks*`、`/api/wf04/asr`），
+> 而 Phase 3/4 新增的 3 组路由一条都没进表。删除项保留在顶部 Phase 1 更新注记里，本表只写现状。
 
 | 分组 | 路由 | 备注 |
 | --- | --- | --- |
 | 同意门 | `POST /api/wf01/consent` | 签发短时同意令牌，写操作前置 |
 | 简历 | `POST /api/wf01/upload`、`POST /api/wf02/diagnose` | |
 | 简历改写 | `POST /api/wf02/optimize`、`POST /api/wf02/apply-rewrite` | |
-| JD | `POST /api/wf03/upload`、`/jd`、`/match` | 四态匹配主链路 |
+| 目标岗位 | `GET/POST /api/target-jobs`、`GET/POST/DELETE /api/target-jobs/<id>`、`POST .../<id>/analyse`、`POST .../<id>/decision` | Phase 3 起**唯一**的匹配概念（`services/target_job_service.py`），产 Decision 与 Gap |
+| 证据档案 | `GET /api/profile`、`/api/profile/evidence/candidates`、`/api/profile/evidence/<id>/{confirm,reject,edit}` | Phase 3；职业证据的确认 / 驳回 / 修订 |
+| 行动闭环 | `GET/POST /api/actions`、`GET/DELETE /api/actions/<id>`、`POST /api/actions/<id>/{start,complete,outcome,drop}` | Phase 4；用户可见面板在 `pages/action-loop.html` |
 | 面试 | `POST /api/wf04/start`、`/answer`、`/end`、`/stream` | `/stream` 为 SSE |
-| 面试语音 | `POST /api/wf04/asr` | **死路由**（前端 0 引用） |
-| 能力 | `POST /api/wf05/ability` | 返回含 `C7_low`/`C7_high` |
+| 能力 | `POST /api/wf05/ability` | 只返回 `C0` 与六维分快照（`C7_low`/`C7_high` 已于 Phase 1 删除） |
 | 删除 | `POST /api/wf06/delete` | 会话级删除闭环 |
-| 投递 | `POST /api/wf07/cover-letter`、`GET/POST/DELETE /api/wf07/applications` | |
-| 专业匹配 | `GET /api/f2/health`、`/majors/tree`、`/majors/search`、`/majors/<code>`、`/intent`；`POST /api/f2/match` | **与 wf03 概念冲突** |
-| 退休垫片 | `/api/f2_major` → `retired/f2-major` | 恒 404 |
-| 单位检索 | `GET /api/f5/organizations/{status,suggest,detail,jobs}`、`POST .../discover` | 索引恒空 |
-| 知识库 | `GET /api/knowledge/search`、`/questions` | |
-| 账号 | `POST /api/auth/{register,login,logout}`、`GET /api/auth/me` | |
+| 投递 | `POST /api/wf07/cover-letter`、`GET/POST/DELETE /api/wf07/applications`、`/api/wf07/applications/<id>/{outcome,outcomes}` | Phase 4 的投递结果回流 |
+| 单位检索 | `GET /api/f5/organizations/{status,suggest,detail,jobs}`、`POST .../discover` | 索引恒空（D3 封存中，期限 2026-10-13） |
+| 账号 | `POST /api/auth/{register,login,logout}`、`GET /api/auth/me` | D7 门禁的登录态**唯一**来源 |
 | 历史 | `GET/POST/DELETE /api/history`、`/api/history/<id>` | |
-| 任务 | `GET/POST /api/tasks`、`/api/tasks/<id>`、`POST /api/tasks/<id>/next` | 仅服务 F2 大文件匹配 |
 | 运维 | `GET /api/health`、`/api/admin/resumes`、`/api/admin/export` | admin 需 `X-Admin-Password` |
+| JD（遗留） | `POST /api/wf03/upload`、`/jd`、`/match` | 前端消费方已于 Phase 6b-1 归零（`js/job-upload.js` 退役）；后端路由仍在，去留是独立决议 |
 
-**前端实际消费 15 个端点**（`public/js/data-bridge.js:12` 的 `ENDPOINTS` 映射 + `account.js` + `kb.js`）：
+**前端消费的端点不在这里另抄一份清单**。上一版这里写了一句手抄的端点计数并列了 15 个名字，
+实测那 15 个里 `uploadJD` / `submitJD` / `matchJD` / `majorMatch` / `tasks` 五个早已随
+对应功能退役，而 `/api/profile`、`/api/target-jobs`、`/api/actions` 三组新端点根本没被列进去；
+「消费端点的来源」里还写着 `kb.js` —— 该文件早已删除，而且那一行因为**不带 `js/` 前缀**，
+连扩面后的路径门禁都看不见它（裸脚本名这一形态是 Phase 7a 才补进观察面的）。
+
+手抄的计数只会持续漂移，所以换成三段可判据的不变量：
 
 ```
-uploadResume / uploadJD / diagnoseResume / submitJD / matchJD
-startInterview / submitAnswer / endInterview / getAbility / deleteData
-consent / coverLetter / applications / majorMatch / tasks
+前端字面量  ⊆  vercel 重写源  ⊆  route_api() 处理分支
 ```
 
-→ `/api/wf04/asr`、`/api/f2_major`、`/api/admin/*`、`/api/health`、`/api/f2/health`、`/api/f5/organizations/*` 均无用户界面消费。
+| 段 | 判据 | 说明 |
+| --- | --- | --- |
+| 前端字面量 ⊆ 重写源 | `scripts/frontend-api-literal-check.py`（Phase 7a 新增） | 静态扫 `public/js/*.js` 里写死的 `/api/...` 与 `api('/...')` 参数 |
+| 重写源 ⊆ 处理分支 | `scripts/vercel-dead-routes.py` | 实证：逐条重写按方法真发一次请求，看是否落到兜底 404 |
+| 活文档路径真实存在 | `scripts/live-doc-path-check.py` | 页面 `pages/*.html` 与脚本 `js/*.js`（含裸脚本名），Phase 7a 扩面 |
+
+唯一 API 客户端是 `public/js/data-bridge.js`（`ENDPOINTS` 映射 + `request()`）；账号与历史走
+`public/js/account.js` 的 `api()` 辅助函数。页面专属脚本不得各自拼 URL。
+
+→ 无用户界面消费的端点（`/api/admin/*`、`/api/health`、`/api/f5/organizations/*`）不在第一段链内
+—— 它们**不需要**前端引用，但仍在路由表里，且仍受第二段（重写源 ⊆ 处理分支）约束。
 
 ---
 

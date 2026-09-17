@@ -15,8 +15,8 @@
 >   §4.1「既是路由又是业务又是服务器」、§4.2 的**两套匹配逻辑并存**（已只剩一套）、
 >   §5 的 `/api/f2_major` 退休垫片
 > - §3.2 / §4.3 的 `tools.voice_handler ──► tools.providers.asr` 整条链已删除
-> - §4.3 / §7 所列的 `public/js/voice.js`、`tools/voice_handler.py`、`tools/providers/asr.py`、
->   `/api/wf04/asr`、3 个 ASR/TTS env 全部删除
+> - §4.3 / §7 所列的以下资产已于本阶段全部删除：`public/js/voice.js`、`tools/voice_handler.py`、
+>   `tools/providers/asr.py`、`/api/wf04/asr`、3 个 ASR/TTS env
 > - §1 的 `kb.html` / `kb.js` / `/api/knowledge/*` 已删除（`tools/knowledge.py` 保留为内部题库）
 > - C7 预测链（`rescore` → `scoring.md` §4 → schema `scenario_day7` → `radar.js` / `f4-report.html`）
 >   已整体删除
@@ -182,7 +182,7 @@ public/pages/*.html
 
 ## 4. 无效 / 退休 / 重复资产
 
-### 4.1 死路由
+### 4.1 死路由（Phase 0 审计快照；表中两条均已于 Phase 1 处理）
 
 | 路由 | 证据 | 结论 |
 | --- | --- | --- |
@@ -201,7 +201,7 @@ public/pages/*.html
 
 实际调用：`resume_diagnosis`、`resume_rewrite`、`interview_question`、`cover_letter`。
 
-### 4.3 旧语音能力残留（整条链路已断，代码仍在）
+### 4.3 旧语音能力残留（Phase 0 审计快照：链路当时已断、代码全留；该批资产已于 Phase 1 整条删除）
 
 | 资产 | 状态 |
 | --- | --- |
