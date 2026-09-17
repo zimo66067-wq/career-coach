@@ -207,7 +207,7 @@ CareerProfile        TargetJob                InterviewSession        Action
 | 11 Interview 按 Gap 定向 | ✅ Phase 3：`targetJobId` → 缺口按 P0→P1→P2 排序出题，返回 `questionPlan` | ✅ **已达成**（Phase 3，后端） |
 | 12 Interview 新事实需用户确认 | ✅ **Phase 4 端到端打通**：D9=A 落地，`wf04/end` 一次性抽取；模型路径与降级路径都由 `candidate_evidence()` 收口，只产 pending（9 项测试锁死） | ✅ **已达成**（Phase 4） |
 | 13 Service 不反向依赖 API | ✅ **Phase 5 达成**：两处倒置已修（`diagnosis_service` / `interview_service` 不再 import api，模型工厂收敛为 `tools.providers.model` 唯一归属地）；新增静态门禁 `tests/test_layering.py`（8 项，进 pytest，含判据自检） | ✅ **已达成**（Phase 5）。`tools/` 归并进 domain+providers 属 Phase 7 |
-| 14 .env 无重复/废弃 | 4 个重复变量 + 2 个无消费者 | Phase 7 |
+| 14 .env 无重复/废弃 | ✅ **Phase 7a 达成**：模板重写为 **29 个变量、无重复、每行合法**（旧版有一行未注释的 `====` 分隔符，`DUMATE_CONSENT_SECRET` / `_MAX_AGE_SECONDS` 各出现 3 次），删掉 0 消费者的 `LOG_LEVEL` / `ENV`，**并补上 13 个代码在读但模板漏掉的变量**（含服务端游客会话密钥 `DUMATE_GUEST_SECRET`）。新增判据 `scripts/env-example-check.py` 双向强制（模板 ⊆ 代码、代码 ⊆ 模板，例外须写理由） | ✅ **已达成**（Phase 7a，见 §19） |
 | 15 前端只有一套 canonical | ✅ **Phase 6a 达成**：`ui/prototype`（陈旧分叉）+ `ui/assets`（与 `public/assets` 逐字节重复）**整树已删**；`public/` 定为唯一 canonical，`docs/` 为发布镜像，非 `.md` 文件由 `tests/test_publish_mirror.js` 强制集合相同 + 逐字节相同（含判据自检） | ✅ **已达成**（Phase 6a）。`.md` 的公开范围属产品/隐私决策，未擅自增删 |
 | 16-18 Coverage 85/90/75 | Python 79%（Phase 0 基线）；JS 未测 | Phase 15（须在 CI 的 Python 3.11 上重测） |
 | 19 CI 全绿 | ✅ pytest **457** passed + node 36/36 | 已达成 |
@@ -230,7 +230,7 @@ CareerProfile        TargetJob                InterviewSession        Action
 
 **~~刻意未删~~ → 已于 Phase 6b-1（2026-09-17）退役**：`js/job-upload.js` 与 `data-bridge.js` 的
 `submitJD`/`matchJD`/`uploadJD*`。当时的理由是"它们属于要保留的 Target Job Analysis，只是缺宿主页面"。
-**该理由在 6b-1 侦察中被实测推翻**：`job-upload.js` 的通路是
+**该理由在 Phase 6b-1 的侦察中被实测推翻**：`job-upload.js` 的通路是
 `uploadJD → submitJD → matchJD`，即 `/api/wf03/{upload,jd,match}`，产出的是 `jobProfile` 与
 `matchResult`（匹配分数 + gaps）——**产不出 Decision，也产不出落库的 Gap 与 Action**。
 换句话说，即使给它建了宿主页面，它也交不出 §7 要求的 Target Job Workspace
@@ -240,7 +240,7 @@ CareerProfile        TargetJob                InterviewSession        Action
 
 **因此 6b-1 的处置是：新建控制器而非重新挂载**——
 
-- 删除 `public/js/job-upload.js` + `docs/js/job-upload.js` + `tests/test_job_upload.js`
+- 已删除 `public/js/job-upload.js` + `docs/js/job-upload.js` + `tests/test_job_upload.js`
   （实测：全部页面的 `<script>` 均未引用它；`submitJD`/`matchJD` 在全前端**只有它一个调用方**，
   所以它一走，`/api/wf03/*` 的前端消费方归零）。
 - 新建 `pages/target-job.html` + `js/target-job.js`，走 `/api/target-jobs` 与 `/api/actions`。
@@ -708,9 +708,11 @@ schema **32/32 VALID**、真实 HTTP 冒烟 **70/70**、vercel 死路由 **0**�
 发布说明应写"新增行动闭环、投递与面试接入当前目标岗位"，不得宣传为"能自动替你投递"，
 也不得轻描淡写为"只是改了个名字"—— 对用户而言，导航与 URL 是他每天直接看到的那一层。
 
-**下一步**：Phase 6b-3（D7 进入即强制注册/登录，`§10.3`）—— **已完成，见 §18**；Phase 7（`tools/` → `domain/` +
-`providers/`、`api/index.py` 拆分、`/api/wf03/*` 后端路由去留、`HANDOFF.md` 去留、
-`.env` 重复变量、`public/*.md` 公开范围）；D3 期限 **2026-10-13**。
+**下一步**：Phase 6b-3（D7 进入即强制注册/登录，`§10.3`）—— **已完成，见 §18**；
+Phase 7a（门禁扩面与文档真相）—— **已完成，见 §19**；
+Phase 7b（`/api/wf03/*` 后端路由去留、`public/*.md` 公开范围）、
+7c（`api/index.py` 拆分，实测 1621 行）、7d（`tools/` → `domain/` + `providers/` 归并）；
+D3 期限 **2026-10-13**。
 
 ---
 
@@ -806,11 +808,84 @@ schema **32/32 VALID**、真实 HTTP 冒烟 **70/70**、vercel 死路由 **0**�
 
 ### 18.8 遗留
 
-- `docs/architecture.md:121` 提到前端消费端点的来源里有 `js/kb.js`，该文件**已不存在**
-  （活文档路径门禁只覆盖 `pages/*.html`，`js/*.js` 不在观察面内）。本轮不动它（会牵动
-  端点计数口径），记入 Phase 7：**把活文档路径门禁的范围从"页面"扩到"脚本"**。
+- ~~`docs/architecture.md` 提到前端消费端点的来源里有 `js/kb.js`~~ —— **已修（Phase 7a，2026-09-17）**。
+  该文件早已不存在，而当时那条引用写成**裸脚本名**（不带 `js/` 前缀），所以带前缀的路径扫描看不见它。
+  Phase 7a 把活文档门禁的观察面从 `pages/*.html` 扩到 `js/*.js` **并覆盖反引号里的裸脚本名**，
+  同时把「前端实际消费 N 个端点」这句手抄计数换成三段可判据的不变量（见 `architecture.md §3`）。
+  **可复用的教训**：判据的观察面要覆盖作者**真实会写**的写法，而不是我们自己偏爱的那一种 ——
+  否则"扩面"只是换了个地方继续漏。
 - 门禁从 10 步不变（新增的 15 项判据并入既有第 2 步 `node --test`）。
 
-**下一步**：Phase 7（`tools/` → `domain/` + `providers/`、`api/index.py` 拆分、
-`/api/wf03/*` 后端路由去留、`HANDOFF.md` 去留、`.env` 重复变量、`public/*.md` 公开范围、
-活文档门禁范围扩到脚本）；D3 期限 **2026-10-13**。
+**下一步**：Phase 7a（门禁扩面与文档真相）—— **已完成，见 §19**；Phase 7b/7c/7d 见 §19.5；
+D3 期限 **2026-10-13**。
+
+---
+
+## 19. Phase 7a 完成记录（2026-09-17 · 门禁扩面与文档真相）
+
+Phase 7 的第一个子阶段。**没有新能力，对外行为零变化** —— 改的全部是"判据的观察面"与
+"文档说的实话"。完整报告见 `docs/phase7a-report.md`。
+
+**口径一句话**：这是同一件事的四次重复 —— **把一条已存在的约定变成判据，并让判据的观察面
+对准作者真实会写的写法**。四次里三次抓到的是同一类失败：约定一直在，判据没在看。
+
+### 19.1 活文档路径门禁 → 脚本层（观察面扩三种形态）
+
+Phase 6b-3 记下的那处**裸脚本名**陈旧引用（`kb.js`，本轮已修，见 §18.8），
+**扩成 `pages|js` 也抓不到** —— 带目录前缀的规则看不见不带前缀的写法。所以扩面收三种形态：
+页面 `pages/*.html`、带目录的脚本 `js/*.js`、**反引号内的裸脚本名**（形如 `radar.js`
+这种不写 `js/` 的写法）。
+
+扩面后抓到 **11 处**，其中**只有 1 处是真漂移**（`architecture.md` 把 `kb.js` 列为端点来源，该文件早已删除），
+其余 10 处都是"历史语境但标记写法不在判据词表里"。
+
+### 19.2 判据太窄 —— 6b-3 那条教训的镜像
+
+- 6b-3：判据观察面比语义**宽**（`includes('localStorage')` 扫全文，命中文件头那句安全说明）；
+- 7a：判据观察面比语义**窄** —— `"已删除" in "已整条删除"` 为 **False**，于是一条
+  **完全正确的**历史注记被判成漂移。
+
+窄的那一侧更阴：**判据红了会引导人去改正确的东西。** 修法是加同义容忍正则
+（`已(?:于<状语>)?(?:整条|整块|全部|整体)?(?:删除|删掉|移除|退役|下线|废弃|作废)`），
+边界由两个**相反方向**的探针钉住：认「已整条删除」，不认裸「删除」（那是动作条目）。
+刻意不放「快照」——6b-2b 实测过它会让整节落进豁免区。
+
+### 19.3 端点计数退役 → 三段不变量
+
+`architecture.md §3` 的「前端实际消费 15 个端点」实测已烂：15 个名字里 5 个退役、
+Phase 3/4 的 3 组新端点一个没列、来源里还写着已删除的 `kb.js`；同节路由表还留着 7 条
+Phase 1 已删的路由，两个数字也从未实测过（写 40/48，实测 49/44）。
+
+处置：**删掉这句话**，换成可判据的不变量 —— **前端字面量 ⊆ vercel 重写源 ⊆ `route_api()` 处理分支**。
+第一段由新增的 `scripts/frontend-api-literal-check.py` 判（实测 22 个写死的路径，全部命中），
+后两段沿用 `scripts/vercel-dead-routes.py`。文档只描述分组与含义，**条数交给脚本打印**。
+
+### 19.4 `.env.example` 双向一致（本轮最实质的一处发现）
+
+旧模板有三类毛病：一行**未注释**的 `====` 分隔符、一整块重复（两个变量各 3 次）、
+以及**漏掉 13 个代码里真的在读取的变量** —— 含服务端游客会话密钥 `DUMATE_GUEST_SECRET`
+（代码里有回退，**所以漏配不会被任何测试发现**）。
+
+第 3 类最危险：**模板短了不会红。** 重写为 29 个变量、无重复、每行合法，新增
+`scripts/env-example-check.py` 双向判，并给白名单加"必须写理由 + 名单里的键必须仍被读取"
+两条自检（防止名单腐烂成护身符）。
+
+### 19.5 `HANDOFF.md` 退役为薄指针（含勘误）
+
+`HANDOFF.md` 作为"第二真相源"已腐烂 6 周（停在 2026-08-01）。**决策：不重写，退役成指针** ——
+理由不是"它写错了"，而是**它没有触发条件**：没有判据、没有流程在它过期时报错。
+新增判据：不得出现 40 位 commit hash 与测试计数；它指到的每个仓库内路径必须真实存在。
+
+**勘误**：`api/index.py`「3000+ 行」这个数字在 5 份 phase report 里传播，
+实测 **1621 行**，且从未为真（Phase 0 基线 1282 行）。不改写历史报告，改在此记一条，
+并作为 7c 的输入 —— 拆分规模比文档暗示的小一半。
+
+### 19.6 遗留（Phase 7 还剩三段）
+
+| 段 | 内容 |
+| --- | --- |
+| **7b** | `/api/wf03/*` 后端路由去留（前端消费方已于 6b-1 归零）；`public/*.md` 15 份对公网可读的公开范围 |
+| **7c** | `api/index.py` 拆分（实测 1621 行） |
+| **7d** | `tools/` → `domain/` + `providers/` 归并（`dependency-map.md`「保留期不超过两个 Phase」已到期） |
+
+**下一步**：Phase 7b。`D3`（单位/职位检索）期限 **2026-10-13** 不变。
