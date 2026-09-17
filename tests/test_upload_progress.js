@@ -1,10 +1,15 @@
 /* test_upload_progress.js · 阶段2：上传进度（XHR onprogress）+ 错误码映射契约
  *
  * 覆盖：
- *  - data-bridge 暴露 uploadResumeWithProgress / uploadJDWithProgress
+ *  - data-bridge 暴露 uploadResumeWithProgress
  *  - 进度回调百分比、成功落缓存、scanned_pdf 错误映射
- *  - resume-upload / job-upload 优先使用进度上传且不破坏旧契约
- *  - 页面包含进度条元素（F1/F2）
+ *  - resume-upload 优先使用进度上传且不破坏旧契约
+ *  - 页面包含进度条元素（F1）
+ *
+ * Phase 6b-1 更新：JD 侧的 uploadJD / uploadJDWithProgress 随 `/api/wf03` 前端路径一并退役
+ * （目标岗位工作区改走 `/api/target-jobs`，JD 以文本提交、不再走文件上传进度），
+ * 故此处删去 JD 进度上传与 job-upload 流程两条用例；退役本身由
+ * `tests/test_phase6b_contract.js` 的反向判据守住。
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -107,7 +112,9 @@ test('data-bridge 暴露带进度上传方法', () => {
     abort() {}
   });
   assert.equal(typeof env.bridge.uploadResumeWithProgress, 'function');
-  assert.equal(typeof env.bridge.uploadJDWithProgress, 'function');
+  // 退役的 JD 进度上传不得复活
+  assert.equal(env.bridge.uploadJDWithProgress, undefined);
+  assert.equal(env.bridge.uploadJD, undefined);
 });
 
 test('uploadResumeWithProgress：进度回调 + 成功缓存', async () => {
@@ -134,20 +141,6 @@ test('uploadResumeWithProgress：scanned_pdf 错误码透传', async () => {
   const result = await env.bridge.uploadResumeWithProgress({ name: 'scan.pdf', size: 2048 }, function () {});
   assert.equal(result.error, 'scanned_pdf');
   assert.equal(result.message.includes('扫描件'), true);
-});
-
-test('uploadJDWithProgress：进度 + 成功', async () => {
-  const XHR = xhrQueueFactory([
-    { progress: { loaded: 640, total: 1024 }, status: 200, json: { jdText: '岗位职责：负责后端开发。任职要求：熟悉 Python 与 MySQL。', trace_id: 't-3' } }
-  ]);
-  const env = loadBridge('', null, {}, 'https://api.example.test', XHR);
-  const progressEvents = [];
-  const result = await env.bridge.uploadJDWithProgress(
-    { name: 'jd.pdf', size: 1024 },
-    function (p) { progressEvents.push(p); }
-  );
-  assert.equal(result.jdText.includes('后端开发'), true);
-  assert.equal(progressEvents[0].percent, 63);
 });
 
 test('resume-upload 流程优先使用带进度上传，不破坏旧契约', async () => {
@@ -197,39 +190,6 @@ test('resume-upload 流程优先使用带进度上传，不破坏旧契约', asy
   assert.deepStrictEqual(plainCalls, ['r2.pdf']);
 });
 
-test('job-upload 流程优先使用 uploadJDWithProgress', async () => {
-  const source = fs.readFileSync(path.join(root, 'docs', 'js', 'job-upload.js'), 'utf8');
-  const context = {
-    window: {},
-    document: { addEventListener() {} },
-    console,
-    encodeURIComponent,
-    isFinite,
-    Promise
-  };
-  vm.createContext(context);
-  vm.runInContext(source, context, { filename: 'job-upload.js' });
-
-  const calls = [];
-  const flow = context.window.JobUpload.createSubmissionFlow({
-    bridge: {
-      uploadJDWithProgress(file, onProgress) {
-        calls.push(['progress', file.name]);
-        onProgress({ percent: 40 });
-        return Promise.resolve({ jdText: '岗位职责：负责后端开发。任职要求：熟悉 Python。' });
-      },
-      uploadJD(file) { calls.push(['plain', file.name]); return Promise.resolve({ jdText: 'x' }); },
-      async submitJD() { return { jobProfile: { requirements: [{ id: 'J1', type: 'hard', text: '熟悉 Python' }] } }; },
-      async matchJD() { return { score_M: 60, subscores: {}, requirements: [], gaps: [] }; }
-    },
-    getResumeText() { return '张三，三年后端开发经验，主导订单与支付系统建设，具备完整的项目交付与团队协作能力。'; },
-    isApiAvailable() { return true; }
-  });
-  const outcome = await flow.submitFile({ name: 'jd.pdf', size: 1024 });
-  assert.equal(outcome.ok, true);
-  assert.equal(calls[0][0], 'progress');
-});
-
 test('页面包含上传进度元素与错误映射', () => {
   const f1 = fs.readFileSync(path.join(root, 'docs', 'pages', 'f1-resume.html'), 'utf8');
   assert.equal(f1.includes('id="resumeUploadProgress"'), true);
@@ -238,6 +198,9 @@ test('页面包含上传进度元素与错误映射', () => {
 
   const resumeUpload = fs.readFileSync(path.join(root, 'docs', 'js', 'resume-upload.js'), 'utf8');
   assert.equal(resumeUpload.includes('uploadResumeWithProgress'), true);
-  const jobUpload = fs.readFileSync(path.join(root, 'docs', 'js', 'job-upload.js'), 'utf8');
-  assert.equal(jobUpload.includes('uploadJDWithProgress'), true);
+
+  // 目标岗位工作区以 JD 文本建岗，不再走文件上传，因此不得引用已退役的 JD 进度上传
+  const targetJob = fs.readFileSync(path.join(root, 'docs', 'js', 'target-job.js'), 'utf8');
+  assert.equal(targetJob.includes('uploadJD'), false);
+  assert.equal(targetJob.includes('createTargetJob'), true);
 });

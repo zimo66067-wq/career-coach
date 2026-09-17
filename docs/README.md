@@ -8,6 +8,8 @@
 |---|---|---|
 | 首页 | `index.html` | 主流程入口与快速演示 |
 | F1 简历诊断 | `pages/f1-resume.html` | 总分环 + 子分条 + 证据对照（点击理由高亮原文）+ 改写建议 |
+| 目标岗位 | `pages/target-job.html` | 粘贴 JD → 拆出可核对要求 → 对照简历 → 给出可解释的投递判断（可以投 / 够一够再投 / 先别投）+ 缺口铺成行动 |
+| 目标岗位 | `pages/target-job.html` | 粘贴 JD → 拆出可核对要求 → 对照简历 → 给出可解释的投递判断（可以投 / 够一够再投 / 先别投）+ 缺口铺成行动 |
 | F3 模拟面试 | `pages/f3-interview.html` | 对话气泡 + 每轮评估卡（引用块 / STAR 缺口 / 追问）+ 流式追问 |
 | F4 能力报告 | `pages/f4-report.html` | 六维雷达 + 分维明细（雷达失败自动降级为表格） |
 | F5 投递 | `pages/f5-apply.html` | 求职信生成与申请记录 |
@@ -15,7 +17,10 @@
 
 > **已下线**（勿再引用）：
 > - `pages/f2-match.html` —— 2026-09-13 随「专业→职业匹配」整块删除而下线。
->   目标岗位分析由后端 `/api/wf03/jd` + `/api/wf03/match` 提供，其界面将在目标岗位工作区重新挂载。
+> - `js/job-upload.js` —— 2026-09-17（Phase 6b-1）随 `f2-match.html` 的界面一并退役。
+>   它绑定的 `/api/wf03/{upload,jd,match}` 前端路径**只产出匹配分数，产不出 Decision 与 Gap**，
+>   无法支撑目标岗位工作区；替代实现是 `pages/target-job.html` + `js/target-job.js`
+>   （走 `/api/target-jobs` 与 `/api/actions`）。后端 `wf03` 路由仍保留，去留见 Phase 7 决议。
 > - `pages/kb.html` —— 2026-09-13 随「知识库不作为独立产品」下线，题库下沉为面试引擎的内部数据源。
 > - 目录索引里原先的 `voice-test-checklist.md` 一项已随语音链路删除一并清除。
 

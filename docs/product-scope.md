@@ -226,7 +226,30 @@ CareerProfile        TargetJob                InterviewSession        Action
 
 删除后主产品只剩**一套**匹配概念：Target Job Analysis（`wf03` 血脉，`services/match_service.py`）。DoD #6 达成。
 
-**刻意未删**：`js/job-upload.js`（`/api/wf03` JD 解析→确认→匹配的 UI）以及 `data-bridge.js` 的 `submitJD`/`matchJD`。它们属于要保留的 Target Job Analysis。注意 `job-upload.js` 当前**没有任何页面挂载**（实测：全部页面的 `<script>` 标签均未引用），需要在 Phase 3 的目标岗位工作区里重新挂载，而不是删除。
+**~~刻意未删~~ → 已于 Phase 6b-1（2026-09-17）退役**：`js/job-upload.js` 与 `data-bridge.js` 的
+`submitJD`/`matchJD`/`uploadJD*`。当时的理由是"它们属于要保留的 Target Job Analysis，只是缺宿主页面"。
+**该理由在 6b-1 侦察中被实测推翻**：`job-upload.js` 的通路是
+`uploadJD → submitJD → matchJD`，即 `/api/wf03/{upload,jd,match}`，产出的是 `jobProfile` 与
+`matchResult`（匹配分数 + gaps）——**产不出 Decision，也产不出落库的 Gap 与 Action**。
+换句话说，即使给它建了宿主页面，它也交不出 §7 要求的 Target Job Workspace
+（"分析这个岗位，能不能投" → APPLY/STRETCH/PASS + 依据），因为它的契约里没有这两个概念。
+且它跨 6 个状态依赖 **29 个 DOM id**（含已删的 `f2-match.html` 布局），复用它等于把已删页面的
+布局契约重新引回 canonical 树。
+
+**因此 6b-1 的处置是：新建控制器而非重新挂载**——
+
+- 删除 `public/js/job-upload.js` + `docs/js/job-upload.js` + `tests/test_job_upload.js`
+  （实测：全部页面的 `<script>` 均未引用它；`submitJD`/`matchJD` 在全前端**只有它一个调用方**，
+  所以它一走，`/api/wf03/*` 的前端消费方归零）。
+- 新建 `pages/target-job.html` + `js/target-job.js`，走 `/api/target-jobs` 与 `/api/actions`。
+- 退役 `data-bridge.js` 的 `uploadJD` / `uploadJDWithProgress` / `submitJD` / `matchJD` 及其端点映射；
+  新增目标岗位 5 个方法 + 行动闭环 9 个方法 + 证据档案 1 个方法，以及"当前目标岗位"这一跨页概念
+  （`setCurrentTargetJob` / `getCurrentTargetJob`），供 F5 投递与 F3 出题共用同一岗位口径。
+- 清理随之失效的 `.job-upload-layout` CSS（实测：两棵发布树中**无任何 HTML 引用它**）。
+
+**仍然刻意未动**：后端 `/api/wf03/upload|jd|match` 三条路由本身（`api/index.py` 仍服务、
+`tests/test_api.py` 与 `scripts/run-rehearsal.py` 仍覆盖）。前端消费方虽已归零，
+但路由的去留属独立决议 —— 见 Phase 7 待办，不在 6b-1 内顺手删。
 
 **遗留**：`public/README.md`、`public/redesign-v2-visual.md`、`public/p0-02-automation-alternatives.md` 与 `docs/design/*`、`docs/f2-iteration-1-plan-*.md`、`docs/test-report.md` 等历史文档仍提到 F2 页面。这些是**带日期的历史记录**，不在 Phase 1 改写；Phase 7 统一处理（同时解决 `public/*.md` 对外暴露问题）。
 
@@ -552,5 +575,77 @@ vercel 死路由 **0**（44 条重写 / 38 条 API 路由）、双方言 DDL 各
 **口径**：本阶段是结构与清理改动，**用户可见行为零变化**。唯一对外可见差异是
 `public/capability_matrix.md` 与 `README.md` 的内容修正。
 
-**下一步**：Phase 6b（IA 收敛到 4 个一级工作区 + 全量去 F 代号 + 目标岗位工作区挂 `job-upload.js`
-+ F5 接 `targetJobId` + Action Loop 消费 8 条路由 + D7 登录门禁）；D3 期限 **2026-10-13**。
+**下一步**：Phase 6b-1（见 §16）。
+
+---
+
+## 16. Phase 6b-1 完成记录（2026-09-17 · 目标岗位工作区 + 退役 wf03 前端路径）
+
+提交 **`<待回填>`**（25 文件，+1991 / −1652）；门禁 pytest **482**、node **40/40**、
+真实 HTTP 冒烟 **70/70**、vercel 死路由 **0**、双方言 DDL **15**、
+发布镜像 **28** 个非 md 文件逐字节一致。
+
+**为什么 6b 还要再拆（裁决）**：§15 把 6b 定为五件事，侦察后发现两条硬顺序约束：
+
+1. **一级工作区 ≤4 是产品门禁**：`tests/test_phase1_deletions.py` 把导航标签写死为
+   `["首页","F1 简历诊断","F3 模拟面试","F4 能力报告","F5 投递"]`，并注明"不得超过 DoD 的 4 项上限 + 首页"。
+   于是本轮**不能**顺手往导航塞第 6 项。
+2. **IA 收敛要等四个工作区都真的存在**：§7 的 Action Loop = "F4 重构为 Gap & Action Plan + Retest"，
+   `f4-report.html` 要**先**长出行动清单，才能改名叫「行动闭环」。
+
+**故 6b-1 = 把事情做出来，6b-2 = 把界面收敛。** 本轮结束时导航**一个字符都没改** ——
+这是遵守约束 1 的结果，不是遗漏。目标岗位页从 ① 首页功能卡 ② F5 投递页引导链接进入，
+二者都进了新判据（防"无人挂载"）。
+
+**做成了什么**
+
+1. **目标岗位工作区上线**：`pages/target-job.html` + `js/target-job.js`，
+   建岗 → 拆要求 → 对照简历 → **APPLY/STRETCH/PASS** + 可逐条回查依据 + 缺口清单。
+   `/api/target-jobs`（5 条）与 `/api/actions`（8 条）从**零前端消费**变为有消费方 ——
+   `docs/phase3-report.md` 遗留项 #1「闭环在界面上不可见」就此关闭。
+2. **引入「当前目标岗位」跨页口径**（缓存 `currentTargetJobId`）：此前"我分析的是哪个岗位"
+   在前端根本不存在，F3 只能靠 `matchResult.gaps` 出题；现在 F5 与 F3 共读同一岗位。
+3. **DoD #11 真正接通**：`startInterview()` 现在把 `targetJobId` 递给 `/api/wf04/start`。
+   后端本就支持（`api/index.py:1437` 起按该岗位未解决缺口 P0→P1→P2 排序出题并回传 `questionPlan`），
+   缺的只是前端把它传过去。
+4. **拒绝给结论的行为被原样呈现**：后端在可核对事实 < 3 条时返回 `insufficient_grounds(422)`，
+   页面显示该消息而不给分数；`insufficient_evidence` / `match_notice` 显式展示；
+   缺口为空时页面明确写"不等于能力已达标"。
+
+**决策反转：`job-upload.js` 退役而非重新挂载**
+
+§5 原写"刻意未删……需要在目标岗位工作区里重新挂载，而不是删除"。**该理由被侦察推翻**：
+它的通路 `uploadJD → submitJD → matchJD`（`/api/wf03/{upload,jd,match}`）只产出 `jobProfile`
+与匹配分数，**产不出 Decision，也产不出落库的 Gap 与 Action**。它的契约里没有这两个概念，
+所以即使建了宿主页面也交不出 §7 要求的 Target Job Workspace。且它跨 6 个状态依赖 **29 个 DOM id**
+（多个来自已删的 `f2-match.html`），复用它等于把已删页面的布局契约引回 canonical 树。
+
+四条证据：①无人挂载（全部页面 `<script>` 均未引用）②`submitJD`/`matchJD` 在全前端只有它一个调用方
+③契约已不成立 ④自身依赖已删页面的 DOM。处置见 §5 的修订段与 `CHANGELOG.md` 同日条目。
+**后端 `/api/wf03/*` 三条路由刻意保留**（`tests/test_api.py`、`scripts/run-rehearsal.py` 仍覆盖），
+去留记入 Phase 7。
+
+**顺带修掉的三处判据失效**（都是"判据自己不可靠"这一类）
+
+| 判据 | 失效方式 | 修法 |
+| --- | --- | --- |
+| `git diff --check`（门禁第 6 步） | 只查未暂存差异，而本流程先 `git add -A` 再跑门禁 → **恒为 0**。实测注入行尾空白后仍 exit 0（`git diff --check HEAD` 正确 exit 2） | 改为 `git diff --check HEAD` |
+| 新契约判据的 wf03 扫描 | 用全文正则，被自己写的说明性**注释**命中（误报） | 只解析 `ENDPOINTS` 映射的**值**，并断言取值数 ≥10 防假通过 |
+| `patch6b.py` 幂等性 | 判据写成"`new` 在且 `old` 不在"，对追加型补丁（`new = old + 新增行`）永远不成立 → 第二次运行把页面清单插了两遍 | 改为"`new` 已在即跳过" |
+
+第一条与 §15 修掉的 `cmd | tail -5; echo $?` 属同一类：**判据的观察面与实际改动面不重合**。
+
+**事故记录**：本轮中途发现 `public/`、`docs/`、`tests/` 三棵树被**外部进程**从工作区清空
+（`git status` 显示为第二列 ` D`，即工作区删除、索引未动 —— 与 6a 那次 `scripts/` 事件同签名）。
+已用 `git checkout -- public docs tests` 从索引完整还原，并逐文件用 `git hash-object` 与
+`git rev-parse HEAD:<path>` 比对确认逐字节一致。代价：未暂存的编辑会丢（本轮丢了 5 个文件的编辑）。
+对策：全部前端改动收进幂等可重跑的 `work/patch6b.py`；每完成一个可验证小段就 `git add -A`
+（索引在本环境中未被清空，暂存即持久化）。
+
+**口径**：本阶段是**能力新增**（此前界面上不存在目标岗位分析与行动闭环），
+不是"性能提升"或"体验优化"。发布说明应写"新增目标岗位工作区"，
+**不得**宣传为"能自动替你投递"。
+
+**下一步**：Phase 6b-2（IA 收敛到 4 个一级工作区【简历证据 / 目标岗位 / 模拟面试 / 行动闭环】
++ 全量去 F 代号 + Action Loop 落位到 `f4-report.html` 消费 `/api/actions` + F5 接当前目标岗位口径
++ F3 渲染 `questionPlan`）；6b-3（D7 进入即强制注册/登录）；D3 期限 **2026-10-13**。

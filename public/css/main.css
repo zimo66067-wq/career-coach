@@ -199,8 +199,6 @@ a.card:hover, .card.hoverable:hover {
 .data-consent input { flex: 0 0 auto; width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--zy-primary); }
 
 /* ---- F2 岗位描述输入：与 F1 采用同一文件接收规范，并补充术语解释 ---- */
-.job-upload-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 310px); gap: 18px; align-items: stretch; }
-.job-upload-layout .card { margin-bottom: 0; }
 .job-help-card { padding: 24px; background: linear-gradient(160deg, var(--zy-surface), var(--zy-bg-cool)); }
 .job-help-label { display: inline-flex; padding: 4px 9px; border-radius: var(--zy-r-pill); background: var(--zy-primary-soft); color: var(--zy-primary); font-size: 12px; font-weight: 700; }
 .job-help-card h3 { margin: 13px 0 8px; }
@@ -518,7 +516,6 @@ table.dim th { background: var(--zy-bg-cool); font-weight: 650; }
   .score-ring .inner { width: 90px; height: 90px; }
   .score-ring .num { font-size: 27px; }
   .resume-upload-card { padding: 30px 18px; }
-  .job-upload-layout { grid-template-columns: 1fr; }
   .resume-upload-actions .btn { flex: 1 1 160px; justify-content: center; }
   .demo-notice { top: 72px; max-width: calc(100vw - 28px); white-space: normal; text-align: center; }
   .journey-progress-head { align-items: flex-start; flex-direction: column; gap: 8px; }

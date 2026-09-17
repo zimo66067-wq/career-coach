@@ -37,7 +37,7 @@
 > | 审计条目 | 位置 | 现状 |
 > | --- | --- | --- |
 > | "`api/index.py` 既是路由又是业务" | §4.1 | 仍在，但 Phase 3 新增的业务全部落在 `services/`，路由块只做校验与转发；拆分属 Phase 5 |
-> | `js/job-upload.js` 无宿主页面 | §2 | **仍然无宿主**（Phase 6 建目标岗位工作区时重新挂载） |
+> | `js/job-upload.js` 无宿主页面 | §2 | ✅ **已解决（Phase 6b-1，2026-09-17）**：该脚本绑定的是 `/api/wf03/{upload,jd,match}`，只产匹配分数、产不出 Decision 与 Gap，无法支撑目标岗位工作区，故**退役**；替代实现是 `pages/target-job.html` + `js/target-job.js`（走 `/api/target-jobs` 与 `/api/actions`）。后端 `wf03` 路由保留，去留见 Phase 7 |
 > | 迁移 2 条 | §7 | 3 条（新增 `2026-09-14-phase3-gap-blocking`） |
 > | 表数量 30 张 | §7 | 30 张不变（只给 `gaps` 加了 `blocking` 列） |
 >

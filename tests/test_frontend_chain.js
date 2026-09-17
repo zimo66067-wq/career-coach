@@ -1,9 +1,13 @@
-/* test_frontend_chain.js · 前端数据链集成测试（F1 -> F2 全流程 + 降级 + 删除）
+/* test_frontend_chain.js · 前端数据链集成测试（F1 → 目标岗位 → 行动闭环 + 降级 + 删除）
  *
  * 读取 public/js/app.js 与 data-bridge.js，在 VM 中模拟浏览器环境：
- *  - 正常路径：同意 -> 上传简历 -> 诊断 -> 上传 JD -> 解析 -> 匹配
+ *  - 正常路径：同意 -> 上传简历 -> 诊断 -> 建岗 -> 分析（Decision/Gap/依据）-> 铺开行动
  *  - 降级路径：服务不可用时生产态明确报错、演示态才允许合成数据
  *  - 删除路径：清除本地会话缓存并标记删除
+ *
+ * Phase 6b-1 更新：链路从 `/api/wf03/{upload,jd,match}`（只产匹配分数）改为
+ * `/api/target-jobs` + `/api/actions`（产 Decision / Gap / Action），
+ * 与目标岗位工作区的实际接线保持一致。
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -35,7 +39,7 @@ function makeContext(search, fetchImpl, initialStorage, apiBase) {
     MOCK: {
       resumeText: '合成简历',
       resumeProfile: { score_R: 73 },
-      matchResult: { score_M: 60 }
+      jdText: '合成 JD'
     },
     Date: Date,
     JSON: JSON,
@@ -60,7 +64,8 @@ function loadBridge(search, fetchImpl, initialStorage, apiBase) {
   return { bridge: env.context.DataBridge, storage: env.storage, context: env.context };
 }
 
-function routeResponse(url) {
+function routeResponse(url, method) {
+  const verb = method || 'POST';
   if (url.endsWith('/api/wf01/consent')) {
     return { status: 'ACCEPTED', consent_token: 'tok-123', guest_token: 'guest-123', expires_in_seconds: 120 };
   }
@@ -70,14 +75,48 @@ function routeResponse(url) {
   if (url.endsWith('/api/wf02/diagnose')) {
     return { resumeProfile: { score_R: 75.5, subscores: {} }, score_R: 75.5, diagnosis_mode: 'model' };
   }
-  if (url.endsWith('/api/wf03/upload')) {
-    return { jdText: '岗位职责：负责后端开发。任职要求：熟悉 Python。' };
+  if (/\/api\/target-jobs$/.test(url)) {
+    return verb === 'GET'
+      ? { targetJobs: [{ id: 7, company: '示例公司', position: '后端开发工程师', status: 'open' }], total: 1 }
+      : {
+          targetJob: { id: 7, company: '示例公司', position: '后端开发工程师', status: 'open' },
+          requirements: [{ id: 1, req_key: 'req_01', req_type: 'hard', text: '熟悉 Python', ordinal: 0 }],
+          droppedNonRequirements: ['公司简介一行']
+        };
   }
-  if (url.endsWith('/api/wf03/jd')) {
-    return { jobProfile: { requirements: [{ id: 'J1', type: 'hard', text: '熟悉 Python' }], user_confirmed: false } };
+  if (/\/api\/target-jobs\/\d+\/analyse$/.test(url)) {
+    return {
+      target_job: { id: 7, company: '示例公司', position: '后端开发工程师' },
+      requirements: [{
+        id: 1, req_key: 'req_01', req_type: 'hard', text: '熟悉 Python', ordinal: 0,
+        status: 'weak', type_label: '硬性要求', evidence: '用 Python 做过订单系统'
+      }],
+      matches: [{ requirement_id: 1, evidence_id: 3, match_status: 'weak' }],
+      gaps: [{
+        id: 11, target_job_id: 7, requirement_id: 1, gap_type: 'weak', priority: 'P1',
+        reason: '只有弱证据', missing_evidence: '量化成果', action: '补一个量化数字',
+        expected_artifact: '一页含 3 个量化数字的项目说明', retest: '重新分析',
+        status: 'open', blocking: 0
+      }],
+      decision: {
+        id: 5, target_job_id: 7, decision: 'STRETCH',
+        rationale: { text: '关键要求强度不足。', citations: ['依据一', '依据二', '依据三'] }
+      },
+      citations: ['依据一', '依据二', '依据三'],
+      analysis: {
+        score_M: 60, match_mode: 'rule', match_notice: '规则匹配',
+        insufficient_evidence: false, new_candidate_evidence: 1
+      }
+    };
   }
-  if (url.endsWith('/api/wf03/match')) {
-    return { score_M: 60, subscores: {}, requirements: [], gaps: [], match_notice: '规则匹配' };
+  if (url.endsWith('/api/actions')) {
+    return verb === 'GET'
+      ? { actions: [{ id: 21, gap_id: 11, task: '补一个量化数字', status: 'todo', gap_priority: 'P1' }], total: 1 }
+      : {
+          targetJobId: 7,
+          created: [{ id: 21, gap_id: 11, status: 'todo' }],
+          existing: [], skipped: [], createdCount: 1, existingCount: 0
+        };
   }
   return { error: 'not_found' };
 }
@@ -88,11 +127,14 @@ test('生产态默认空态且演示数据被阻断', () => {
   assert.equal(loadApp('?demo=1&state=success').getState(), 'success');
 });
 
-test('F1->F2 全流程：同意令牌传递、调用顺序与缓存', async () => {
+test('F1 → 目标岗位 → 行动闭环 全流程：同意令牌传递、调用顺序与缓存', async () => {
   const calls = [];
   const fetchImpl = function (url, opts) {
     calls.push({ url: url, opts: opts });
-    return Promise.resolve({ ok: true, json: function () { return Promise.resolve(routeResponse(url)); } });
+    return Promise.resolve({
+      ok: true,
+      json: function () { return Promise.resolve(routeResponse(url, opts && opts.method)); }
+    });
   };
   const env = loadBridge('', fetchImpl, {}, 'https://api.example.test');
   const DB = env.bridge;
@@ -105,22 +147,39 @@ test('F1->F2 全流程：同意令牌传递、调用顺序与缓存', async () =
   const diagnosed = await DB.diagnoseResume(uploaded.resumeText);
   assert.equal(diagnosed.score_R, 75.5);
 
-  const jdUploaded = await DB.uploadJD({ name: 'jd.txt', size: 1024 });
-  assert.ok(!jdUploaded.error);
-  const parsed = await DB.submitJD(jdUploaded.jdText);
-  assert.equal(parsed.jobProfile.requirements.length, 1);
-  const confirmed = Object.assign({}, parsed.jobProfile, { user_confirmed: true });
-  const matched = await DB.matchJD(uploaded.resumeText, confirmed);
-  assert.equal(matched.matchResult.score_M, 60);
+  // 建岗：JD 以文本提交，拆出可核对的要求
+  const created = await DB.createTargetJob({
+    jdText: '岗位职责：负责后端开发。任职要求：熟悉 Python。',
+    company: '示例公司'
+  });
+  assert.equal(created.targetJob.id, 7);
+  assert.equal(created.requirements.length, 1);
+  assert.deepEqual(created.droppedNonRequirements, ['公司简介一行']);
+  assert.equal(DB.getCurrentTargetJob(), 7, '建岗后当前目标岗位必须被记住（F5/F3 共用这个口径）');
+
+  // 分析：产出 Decision / Gap / 可回查依据
+  const analysed = await DB.analyseTargetJob(7);
+  assert.equal(analysed.decision.decision, 'STRETCH');
+  assert.equal(analysed.gaps.length, 1);
+  assert.equal(analysed.gaps[0].expected_artifact.length > 0, true);
+  assert.equal(analysed.citations.length, 3, 'DoD #9：至少 3 条依据');
+  assert.equal(analysed.analysis.score_M, 60);
+
+  // 行动闭环：把未解决缺口铺成行动（幂等）
+  const listed = await DB.listActions();
+  assert.equal(listed.total, 1);
+  const planned = await DB.planActionsForTarget(7);
+  assert.equal(planned.createdCount, 1);
+  assert.equal(planned.existingCount, 0);
 
   assert.deepEqual(
     calls.map((call) => call.url.replace('https://api.example.test', '')),
     ['/api/wf01/consent', '/api/wf01/upload', '/api/wf02/diagnose',
-     '/api/wf03/upload', '/api/wf03/jd', '/api/wf03/match']
+     '/api/target-jobs', '/api/target-jobs/7/analyse', '/api/actions', '/api/actions']
   );
   assert.equal(JSON.parse(env.storage['cb_cache_resumeText']).data, '我的简历正文，长度满足诊断要求。');
-  assert.equal(env.storage['cb_cache_jobProfile'] !== undefined, true);
-  assert.equal(env.storage['cb_cache_matchResult'] !== undefined, true);
+  assert.equal(JSON.parse(env.storage['cb_cache_currentTargetJobId']).data, 7);
+  assert.equal(env.storage['cb_cache_targetJobAnalysis'] !== undefined, true);
   assert.equal(DB.getSessionContext().guestToken, 'guest-123');
   assert.ok(calls.slice(1).every((call) => call.opts.credentials === 'include'));
   assert.ok(calls.slice(1).every((call) => call.opts.headers['X-Guest-Token'] === 'guest-123'));
@@ -149,13 +208,13 @@ test('删除路径：服务端不可用时代理清除本地缓存并标记', as
   const env = loadBridge(
     '',
     fetchImpl,
-    { 'cb_cache_resumeText': 'x', 'cb_cache_matchResult': 'y', 'other_key': 'keep' },
+    { 'cb_cache_resumeText': 'x', 'cb_cache_targetJobAnalysis': 'y', 'other_key': 'keep' },
     'https://api.example.test'
   );
   const result = await env.bridge.deleteAllData('session');
   assert.equal(result.status, 'LOCAL_DELETED');
   assert.equal(env.storage['cb_cache_resumeText'], undefined);
-  assert.equal(env.storage['cb_cache_matchResult'], undefined);
+  assert.equal(env.storage['cb_cache_targetJobAnalysis'], undefined);
   assert.equal(env.storage['other_key'], 'keep');
   assert.equal(env.bridge.isSessionDeleted(), true);
 });

@@ -25,6 +25,7 @@ SHOTS.mkdir(parents=True, exist_ok=True)
 PAGES = [
     ("index", "index.html"),
     ("f1-resume", "pages/f1-resume.html"),
+    ("target-job", "pages/target-job.html"),
     ("f3-interview", "pages/f3-interview.html"),
     ("f4-report", "pages/f4-report.html"),
     ("f5-apply", "pages/f5-apply.html"),

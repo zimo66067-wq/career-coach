@@ -11,10 +11,14 @@
   var API_BASE = String(window.DUMATE_API_BASE || '').replace(/\/+$/, '');
   var ENDPOINTS = {
     uploadResume:    '/api/wf01/upload',
-    uploadJD:        '/api/wf03/upload',
     diagnoseResume:  '/api/wf02/diagnose',
-    submitJD:        '/api/wf03/jd',
-    matchJD:         '/api/wf03/match',
+    // Phase 6b：目标岗位工作区走 /api/target-jobs（产出 Decision / Gap），
+    // 行动闭环走 /api/actions，证据档案走 /api/profile。
+    // 旧的 /api/wf03/{upload,jd,match} 前端路径已退役：它只产出匹配分数，
+    // 产不出 Decision 与 Gap，无法支撑目标岗位工作区（后端路由仍保留，见 Phase 7 决议）。
+    profile:         '/api/profile',
+    targetJobs:      '/api/target-jobs',
+    actions:         '/api/actions',
     startInterview:  '/api/wf04/start',
     submitAnswer:    '/api/wf04/answer',
     endInterview:    '/api/wf04/end',
@@ -24,6 +28,10 @@
     coverLetter:     '/api/wf07/cover-letter',
     applications:    '/api/wf07/applications'
   };
+
+  // 当前目标岗位：F5 投递、F3 面试出题都要认同一个岗位，
+  // 否则"我投的是哪个岗位"和"我练的是哪个岗位的缺口"会对不上。
+  var CURRENT_TARGET_KEY = 'currentTargetJobId';
 
   // 后端会依次尝试主模型与备用模型（Vercel 函数上限为 60 秒）。
   // 30 秒会在后端完成可用的规则降级前提前中断请求。
@@ -325,27 +333,192 @@
   }
 
   // ============================================================
-  //  F2: JD 匹配
+  //  目标岗位工作区（Target Job）
+  //  "分析这个岗位，能不能投" —— 建岗 → 分析 → Decision / 要求 / 缺口 / 依据
   // ============================================================
 
-  // 上传 JD 文件 -> {jdText, trace_id}
-  async function uploadJD(file) {
-    var traceId = genTraceId();
-    var sessionId = getCache('sessionId') || traceId;
-    var formData = new FormData();
-    formData.append('file', file);
-    formData.append('session_id', sessionId);
-    var res = await request(ENDPOINTS.uploadJD, {
-      body: formData,
-      _traceId: traceId
-    });
+  // 当前目标岗位 ID：跨页面认同一个岗位（F5 投递、F3 出题都读它）
+  function setCurrentTargetJob(targetJobId) {
+    if (targetJobId === null || targetJobId === undefined || targetJobId === '') {
+      try { sessionStorage.removeItem(CACHE_PREFIX + CURRENT_TARGET_KEY); } catch (e) { /* ignore */ }
+      return null;
+    }
+    var id = parseInt(targetJobId, 10);
+    if (!isFinite(id)) return null;
+    setCache(CURRENT_TARGET_KEY, id);
+    return id;
+  }
 
-    // JD 与简历一样不能在当前文件上传失败时复用旧会话内容，
-    // 否则可能把上一份岗位要求错配给用户的新职位。
+  function getCurrentTargetJob() {
+    var id = getCache(CURRENT_TARGET_KEY);
+    return typeof id === 'number' ? id : null;
+  }
+
+  // 目标岗位列表 -> {targetJobs: [], total}
+  async function listTargetJobs() {
+    var res = await request(ENDPOINTS.targetJobs, { method: 'GET' });
     if (res.error) return res;
-    setCache('jobText', res.jdText);
-    setCache('sessionId', res.session_id || sessionId);
-    return { jdText: res.jdText, trace_id: res.trace_id || traceId, session_id: res.session_id || sessionId };
+    return {
+      targetJobs: res.targetJobs || [],
+      total: res.total !== undefined ? res.total : (res.targetJobs || []).length,
+      trace_id: res.trace_id
+    };
+  }
+
+  // 建岗 -> {targetJob, requirements[], droppedNonRequirements[]}
+  // 只接受 jdText 或已确认的 jobProfile，二者都缺时后端 422（不伪造空岗位）。
+  async function createTargetJob(payload) {
+    payload = payload || {};
+    var traceId = genTraceId();
+    var body = {
+      session_id: payload.session_id || getCache('sessionId') || undefined,
+      jdText: payload.jdText || undefined,
+      jobProfile: payload.jobProfile || undefined,
+      company: payload.company || undefined,
+      position: payload.position || undefined
+    };
+    var res = await request(ENDPOINTS.targetJobs, { method: 'POST', body: body, _traceId: traceId });
+    if (res.error) return res;
+    if (res.targetJob && res.targetJob.id !== undefined) setCurrentTargetJob(res.targetJob.id);
+    recordHistory(
+      'TargetJob',
+      '目标岗位 · ' + ((res.targetJob && (res.targetJob.position || res.targetJob.company)) || '未命名'),
+      getCache('sessionId') || traceId,
+      'done'
+    );
+    return {
+      targetJob: res.targetJob,
+      requirements: res.requirements || [],
+      droppedNonRequirements: res.droppedNonRequirements || [],
+      trace_id: res.trace_id || traceId
+    };
+  }
+
+  // 单个岗位（含要求 + 最近一次决策）-> {targetJob, requirements[], decision}
+  async function getTargetJob(targetJobId) {
+    var res = await request(ENDPOINTS.targetJobs + '/' + encodeURIComponent(String(targetJobId)), { method: 'GET' });
+    if (res.error) return res;
+    return {
+      targetJob: res.targetJob,
+      requirements: res.requirements || [],
+      decision: res.decision || null,
+      trace_id: res.trace_id
+    };
+  }
+
+  // 完整分析 -> {target_job, requirements[], matches[], gaps[], decision, citations[], analysis{}}
+  // 依据不足 3 条时后端返回 insufficient_grounds(422)，这里原样透传，不编造结论。
+  async function analyseTargetJob(targetJobId, resumeText) {
+    var traceId = genTraceId();
+    var body = {};
+    if (resumeText) body.resumeText = resumeText;
+    var res = await request(
+      ENDPOINTS.targetJobs + '/' + encodeURIComponent(String(targetJobId)) + '/analyse',
+      { method: 'POST', body: body, _traceId: traceId }
+    );
+    if (res.error) return res;
+    setCurrentTargetJob(targetJobId);
+    setCache('targetJobAnalysis', res);
+    recordHistory(
+      'TargetJob',
+      '岗位分析 · ' + ((res.decision && res.decision.decision) || ''),
+      getCache('sessionId') || traceId,
+      'done'
+    );
+    return res;
+  }
+
+  async function deleteTargetJob(targetJobId) {
+    var res = await request(ENDPOINTS.targetJobs + '/' + encodeURIComponent(String(targetJobId)), { method: 'DELETE' });
+    if (res.error) return res;
+    if (getCurrentTargetJob() === parseInt(targetJobId, 10)) setCurrentTargetJob(null);
+    return { deleted: res.deleted !== false, id: targetJobId, trace_id: res.trace_id };
+  }
+
+  // ============================================================
+  //  行动闭环（Gap Action Plan）
+  //  "补齐证据，然后复测" —— 缺口翻成可执行、可验证的行动
+  // ============================================================
+
+  // 行动清单（含所属缺口的优先级与岗位），P0 优先
+  async function listActions(status) {
+    var endpoint = ENDPOINTS.actions;
+    if (status) endpoint += '?status=' + encodeURIComponent(String(status));
+    var res = await request(endpoint, { method: 'GET' });
+    if (res.error) return res;
+    return {
+      actions: res.actions || [],
+      total: res.total !== undefined ? res.total : (res.actions || []).length,
+      trace_id: res.trace_id
+    };
+  }
+
+  // 按岗位未解决缺口整体铺开（幂等）-> {created[], existing[], skipped[]}
+  async function planActionsForTarget(targetJobId) {
+    var res = await request(ENDPOINTS.actions, {
+      method: 'POST',
+      body: { targetJobId: parseInt(targetJobId, 10) }
+    });
+    if (res.error) return res;
+    return {
+      targetJobId: res.targetJobId,
+      created: res.created || [],
+      existing: res.existing || [],
+      skipped: res.skipped || [],
+      createdCount: res.createdCount !== undefined ? res.createdCount : (res.created || []).length,
+      existingCount: res.existingCount !== undefined ? res.existingCount : (res.existing || []).length,
+      trace_id: res.trace_id
+    };
+  }
+
+  // 单条缺口开单 -> {action, opened}
+  async function openAction(gapId) {
+    var res = await request(ENDPOINTS.actions, {
+      method: 'POST',
+      body: { gapId: parseInt(gapId, 10) }
+    });
+    if (res.error) return res;
+    return { action: res.action, opened: res.opened === true, trace_id: res.trace_id };
+  }
+
+  async function getAction(actionId) {
+    var res = await request(ENDPOINTS.actions + '/' + encodeURIComponent(String(actionId)), { method: 'GET' });
+    if (res.error) return res;
+    return { action: res.action, trace_id: res.trace_id };
+  }
+
+  // 状态推进：start（todo→doing）/ complete（doing→done，可带成果物说明）
+  // / outcome（done 后记录"做完发生了什么"）/ drop（→dropped）
+  function advanceAction(actionId, verb, body) {
+    return request(ENDPOINTS.actions + '/' + encodeURIComponent(String(actionId)) + '/' + verb, {
+      method: 'POST',
+      body: body || {}
+    }).then(function (res) {
+      if (res.error) return res;
+      return { action: res.action, trace_id: res.trace_id };
+    });
+  }
+
+  function startAction(actionId) { return advanceAction(actionId, 'start'); }
+  function completeAction(actionId, artifact) { return advanceAction(actionId, 'complete', artifact ? { artifact: artifact } : {}); }
+  function recordActionOutcome(actionId, outcome) { return advanceAction(actionId, 'outcome', { outcome: outcome }); }
+  function dropAction(actionId) { return advanceAction(actionId, 'drop'); }
+
+  async function deleteAction(actionId) {
+    var res = await request(ENDPOINTS.actions + '/' + encodeURIComponent(String(actionId)), { method: 'DELETE' });
+    if (res.error) return res;
+    return { deleted: res.deleted !== false, id: actionId, trace_id: res.trace_id };
+  }
+
+  // ============================================================
+  //  职业证据档案（Career Evidence）
+  //  D8 方案 A：模型只产候选（pending），用户确认后才成为可信事实
+  // ============================================================
+
+  async function getProfile() {
+    var res = await request(ENDPOINTS.profile, { method: 'GET' });
+    if (res.error) return res;
+    return res;
   }
 
   // ── 带进度上传（XHR onprogress）─────────────────────────
@@ -403,9 +576,6 @@
         };
         var formData = new FormData();
         formData.append('file', file);
-        if (endpoint === ENDPOINTS.uploadJD) {
-          formData.append('session_id', getCache('sessionId') || traceId);
-        }
         xhr.send(formData);
       } catch (err) {
         resolve({ error: 'network', message: '上传失败：' + ((err && err.message) || '未知错误'), trace_id: traceId, degraded: true });
@@ -437,91 +607,47 @@
     };
   }
 
-  // 上传 JD（带进度）-> {jdText, trace_id}
-  async function uploadJDWithProgress(file, onProgress) {
-    var traceId = genTraceId();
-    var sessionId = getCache('sessionId') || traceId;
-    var res = await uploadWithXhr(ENDPOINTS.uploadJD, file, onProgress, traceId);
-    if (res.error) return res;
-    setCache('jobText', res.jdText);
-    setCache('sessionId', res.session_id || sessionId);
-    return { jdText: res.jdText, trace_id: res.trace_id || traceId, session_id: res.session_id || sessionId };
-  }
-  // 提交 JD -> {jobProfile, trace_id}
-  async function submitJD(jdText) {
-    var traceId = genTraceId();
-    var sessionId = getCache('sessionId') || traceId;
-    var res = await request(ENDPOINTS.submitJD, {
-      body: { jdText: jdText, session_id: sessionId },
-      _traceId: traceId
-    });
-
-    if (!res.error) {
-      setCache('jobProfile', res.jobProfile);
-      return { jobProfile: res.jobProfile, trace_id: res.trace_id || traceId };
-    }
-
-    // 岗位要求是本次输入的直接依据；失败时必须明确失败，不能使用旧 JD
-    // 或伪造空的本地解析结果继续匹配。
-    return res;
-  }
-
-  // 匹配 JD -> {matchResult, trace_id}
-  async function matchJD(resumeText, jobProfile) {
-    var traceId = genTraceId();
-    var sessionId = getCache('sessionId') || traceId;
-    var res = await request(ENDPOINTS.matchJD, {
-      body: { resumeText: resumeText, jobProfile: jobProfile, session_id: sessionId },
-      _traceId: traceId
-    });
-
-    if (!res.error) {
-      setCache('matchResult', res);
-      recordHistory(
-        'F2',
-        '岗位匹配 · M' + (res.score_M !== undefined ? res.score_M : ''),
-        res.session_id || getCache('sessionId') || traceId,
-        'done'
-      );
-      return { matchResult: res, trace_id: res.trace_id || traceId };
-    }
-
-    // 当前简历和 JD 的组合发生变化时，不允许复用旧匹配结果。
-    return res;
-  }
+  // ============================================================
+  //  F3: 面试
+  // ============================================================
   // ============================================================
   //  F3: 面试
   // ============================================================
 
-  // 开始面试 -> {session_id, firstQuestion, trace_id}
-  async function startInterview(jobProfile, resumeProfile, matchGaps) {
+  // 开始面试 -> {session_id, firstQuestion, targets, questionPlan, trace_id}
+  // 传 targetJobId 时出题顺序直接来自该岗位的未解决缺口（P0 → P1 → P2），
+  // 这是 DoD #11「按 Gap 定向出题」的接通点。未指定则回退到当前目标岗位。
+  async function startInterview(jobProfile, resumeProfile, matchGaps, targetJobId) {
     var traceId = genTraceId();
     var sessionId = getCache('sessionId') || traceId;
     jobProfile = jobProfile && Object.keys(jobProfile).length ? jobProfile : (getCache('jobProfile') || {});
     resumeProfile = resumeProfile && Object.keys(resumeProfile).length ? resumeProfile : (getCache('resumeProfile') || {});
-    if (!Array.isArray(matchGaps) || !matchGaps.length) {
-      var cachedMatch = getCache('matchResult') || {};
-      matchGaps = Array.isArray(cachedMatch.gaps)
-        ? cachedMatch.gaps
-        : ((cachedMatch.modeB && cachedMatch.modeB.gaps) || []);
-    }
+    var resolvedTarget = targetJobId !== undefined && targetJobId !== null
+      ? parseInt(targetJobId, 10)
+      : getCurrentTargetJob();
+    if (!isFinite(resolvedTarget)) resolvedTarget = null;
+    var body = {
+      session_id: sessionId,
+      jobProfile: jobProfile,
+      resumeProfile: resumeProfile,
+      matchGaps: Array.isArray(matchGaps) ? matchGaps : []
+    };
+    if (resolvedTarget !== null) body.targetJobId = resolvedTarget;
     var res = await request(ENDPOINTS.startInterview, {
-      body: {
-        session_id: sessionId,
-        jobProfile: jobProfile,
-        resumeProfile: resumeProfile,
-        matchGaps: matchGaps || []
-      },
+      body: body,
       _traceId: traceId
     });
 
     if (!res.error) {
       setCache('sessionId', res.session_id);
       setCache('firstQuestion', res.firstQuestion);
+      if (res.targetJobId !== undefined) setCurrentTargetJob(res.targetJobId);
       return {
         session_id: res.session_id,
         firstQuestion: res.firstQuestion,
         targets: res.targets || [],
+        questionPlan: res.questionPlan || null,
+        targetJobId: res.targetJobId !== undefined ? res.targetJobId : resolvedTarget,
         trace_id: res.trace_id || traceId
       };
     }
@@ -766,23 +892,51 @@
 
   // ── 暴露接口 ──────────────────────────────────────────
   window.DataBridge = {
+    // F1 简历
     uploadResume: uploadResume,
     uploadResumeWithProgress: uploadResumeWithProgress,
-    uploadJD: uploadJD,
-    uploadJDWithProgress: uploadJDWithProgress,
     diagnoseResume: diagnoseResume,
-    submitJD: submitJD,
-    matchJD: matchJD,
+
+    // 目标岗位工作区
+    listTargetJobs: listTargetJobs,
+    createTargetJob: createTargetJob,
+    getTargetJob: getTargetJob,
+    analyseTargetJob: analyseTargetJob,
+    deleteTargetJob: deleteTargetJob,
+    setCurrentTargetJob: setCurrentTargetJob,
+    getCurrentTargetJob: getCurrentTargetJob,
+
+    // 行动闭环
+    listActions: listActions,
+    planActionsForTarget: planActionsForTarget,
+    openAction: openAction,
+    getAction: getAction,
+    startAction: startAction,
+    completeAction: completeAction,
+    recordActionOutcome: recordActionOutcome,
+    dropAction: dropAction,
+    deleteAction: deleteAction,
+
+    // 职业证据档案
+    getProfile: getProfile,
+
+    // F3 面试
     startInterview: startInterview,
     submitAnswer: submitAnswer,
     endInterview: endInterview,
+
+    // F4 能力报告
     getAbility: getAbility,
+
+    // 隐私
     submitConsent: submitConsent,
     deleteAllData: deleteAllData,
-  generateCoverLetter: generateCoverLetter,
-  saveApplication: saveApplication,
-  listApplications: listApplications,
-  deleteApplication: deleteApplication,
+
+    // F5 投递
+    generateCoverLetter: generateCoverLetter,
+    saveApplication: saveApplication,
+    listApplications: listApplications,
+    deleteApplication: deleteApplication,
 
     // 降级检查
     isDegraded: function (result) {

@@ -4,6 +4,56 @@
 
 ## [Unreleased]
 
+### Added - 2026-09-17 目标岗位工作区（Phase 6b-1）
+
+`product-scope.md §7` 的 Target Job Workspace 首次到用户面前：「分析这个岗位，能不能投」——
+建岗 → 拆出可核对要求 → 对照简历 → 给出 APPLY/STRETCH/PASS 判定 + 可逐条回查的依据 + 缺口清单。
+
+- 新增 `public/pages/target-job.html`（宿主页，含 empty/processing/success/error/degraded 五状态）
+  与 `public/js/target-job.js`（控制器）
+- `data-bridge.js` 新增目标岗位 7 个方法（`listTargetJobs` / `createTargetJob` / `getTargetJob` /
+  `analyseTargetJob` / `deleteTargetJob` / `setCurrentTargetJob` / `getCurrentTargetJob`）、
+  行动闭环 9 个方法、证据档案 1 个方法（`getProfile`）
+- 引入「**当前目标岗位**」这一跨页口径（会话缓存 `currentTargetJobId`）：
+  此前「我分析的是哪个岗位」在前端不存在，F5 投递与 F3 出题无从对齐
+- `startInterview()` 现在把 `targetJobId` 真的递给 `/api/wf04/start`（后端本就支持，
+  `api/index.py:1437` 起按该岗位未解决缺口 P0→P1→P2 出题并回传 `questionPlan`）——DoD #11 接通
+- 后端 `/api/target-jobs`（5 条）与 `/api/actions`（8 条）从**零前端消费**变为有消费方
+- 新增 `tests/test_phase6b_contract.js`（5 条门禁）：坏引用、退役路径不得复活、接线正确、
+  页面可达性、判据自检
+
+**依据不足时不给结论**：后端在可核对事实 < 3 条时返回 `insufficient_grounds(422)`，
+页面原样显示该消息而不给分数 —— 这是 DoD #9 要求的行为，不是故障。
+
+### Removed - 2026-09-17 退役 `/api/wf03/*` 的前端路径与孤儿脚本 `js/job-upload.js`（Phase 6b-1）
+
+`product-scope.md §5` 原裁决是"刻意未删 `job-upload.js`，待目标岗位工作区重新挂载"。
+**该理由被侦察推翻**：它的通路 `uploadJD → submitJD → matchJD`（`/api/wf03/{upload,jd,match}`）
+只产出 `jobProfile` 与匹配分数，**产不出 Decision，也产不出落库的 Gap 与 Action** ——
+即使给它建了宿主页面，也交不出 §7 要求的 Target Job Workspace。且它跨 6 个状态依赖
+**29 个 DOM id**（含已删 `f2-match.html` 的布局），复用它等于把已删页面的布局契约引回 canonical 树。
+
+- 删除 `public/js/job-upload.js`、`docs/js/job-upload.js`、`tests/test_job_upload.js`
+- `data-bridge.js` 退役 `uploadJD` / `uploadJDWithProgress` / `submitJD` / `matchJD` 及其
+  `/api/wf03/*` 端点映射（实测：`submitJD`/`matchJD` 在全前端只有它一个调用方）
+- 清理随之失效的 `.job-upload-layout` CSS（实测：两棵发布树中无任何 HTML 引用）
+- **后端 `/api/wf03/upload|jd|match` 三条路由刻意保留**（`tests/test_api.py`、
+  `scripts/run-rehearsal.py` 仍覆盖）；前端消费方归零一事记入 Phase 7 待办
+- `tests/test_frontend_chain.js` 链路断言由 `/api/wf03/*` 改为 `/api/target-jobs` + `/api/actions`
+- `tests/test_upload_progress.js` 删去 JD 进度上传与 job-upload 两条用例
+
+### Fixed - 2026-09-17 门禁判据三处失效（Phase 6b-1）
+
+- **`git diff --check` 不看已暂存**：本流程先 `git add -A` 再跑门禁，该步恒为 0（空转）。
+  实证：注入行尾空白后 `git diff --check` 仍 exit 0，`git diff --check HEAD` 正确 exit 2。
+  门禁第 6 步已改为 `git diff --check HEAD` —— 与 6a 修掉的 `cmd | tail -5; echo $?`
+  属同一类错误：**判据的观察面与实际改动面不重合**
+- **新契约判据误报**：最初用 `/\/api\/wf03/` 扫 `data-bridge.js` 全文，被自己写的
+  说明性注释命中。改为只解析 `ENDPOINTS` 映射的**值**，并断言取值数 ≥10 防假通过
+- **补丁脚本不幂等**：`patch6b.py` 的幂等判据写成"`new` 在且 `old` 不在"，
+  对追加型补丁（`new = old + 新增行`）永远不成立，第二次运行把页面清单插了两遍。
+  改为"`new` 已在即跳过"，实测第二次运行 39 项全部 skipped
+
 ### Removed - 2026-09-17 删除第三棵前端树 ui/（Phase 6a）
 
 `ui/prototype/` 是 `public/` 的陈旧分叉：21 个文件名全部已存在于 `public/`（12 个逐字节相同，

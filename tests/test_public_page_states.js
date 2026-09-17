@@ -82,7 +82,8 @@ async function run() {
   const offlineResults = await Promise.all([
     bridge.uploadResume({}),
     bridge.diagnoseResume('candidate supplied text'),
-    bridge.matchJD({}, {}),
+    bridge.listTargetJobs(),
+    bridge.listActions(),
     bridge.startInterview({}, {}, []),
     bridge.submitAnswer('session', 'candidate supplied answer'),
     bridge.endInterview('session'),

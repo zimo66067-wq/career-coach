@@ -17,6 +17,7 @@ TREES = [ROOT / "public", ROOT / "docs"]
 PAGES = [
     "index.html",
     "pages/f1-resume.html",
+    "pages/target-job.html",
     "pages/f3-interview.html",
     "pages/f4-report.html",
     "pages/f5-apply.html",
