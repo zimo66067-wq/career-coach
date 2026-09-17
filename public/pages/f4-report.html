@@ -145,6 +145,25 @@
     .progress-connector { display: none; }
     .progress-step { width: 100%; }
   }
+  /* 行动闭环（消费 /api/actions） */
+  .al-msg { min-height: 18px; font-size: 13px; color: var(--zy-ink-3, #7a8699); margin: 10px 0 0; }
+  .al-msg.error { color: var(--zy-missing, #d32424); }
+  .al-target { font-size: 13px; color: var(--zy-ink-2, #4b5261); line-height: 1.75; margin: 6px 0 0; }
+  .al-summary { font-size: 12.5px; color: var(--zy-ink-3, #7a8699); margin: 10px 0 0; }
+  .al-ops-line { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .al-list { margin-top: 14px; }
+  .al-item { border: 1px solid var(--zy-line, rgba(22,30,52,.10)); border-radius: var(--zy-r-md, 12px); padding: 12px 14px; margin-bottom: 10px; background: #fff; }
+  .al-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .al-ctx { font-size: 12px; color: var(--zy-ink-3, #7a8699); }
+  .al-ops { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  .al-btn { border: 1px solid var(--zy-line-2, rgba(22,30,52,.16)); background: #fff; border-radius: 6px; padding: 4px 11px; font-size: 12.5px; cursor: pointer; color: var(--zy-ink-2, #4b5261); }
+  .al-btn.primary { border-color: var(--zy-primary, #2f5fe8); color: var(--zy-primary, #2f5fe8); }
+  .al-btn.danger { color: var(--zy-missing, #d32424); }
+  .al-task { font-size: 14px; color: var(--zy-ink, #1b1e26); line-height: 1.65; }
+  .al-line { font-size: 13px; color: var(--zy-ink-2, #4b5261); line-height: 1.75; margin-top: 5px; }
+  .al-line b { color: var(--zy-ink, #1b1e26); margin-right: 6px; font-weight: 600; }
+  .al-foot { font-size: 12px; color: var(--zy-ink-3, #7a8699); margin-top: 6px; }
+  .al-empty { color: var(--zy-ink-3, #7a8699); padding: 22px 0; text-align: center; font-size: 13.5px; line-height: 1.8; }
 </style>
 </head>
 <body data-page="f4">
@@ -274,6 +293,19 @@
       <h3>七天行动计划</h3>
       <div class="plan-grid" id="planGridDegraded"></div>
     </div>
+  <section class="card" id="actionLoopCard" aria-labelledby="actionLoopTitle">
+    <h2 id="actionLoopTitle" style="margin-bottom:8px">行动闭环 · 缺口 → 行动 → 复测</h2>
+    <p class="al-target" id="alTargetLine">正在读取当前目标岗位…</p>
+    <div class="al-ops-line">
+      <button class="btn primary" id="alPlanBtn" type="button">按未解决缺口生成行动清单</button>
+      <button class="btn ghost" id="alRefreshBtn" type="button">刷新清单</button>
+    </div>
+    <p class="al-msg" id="alMsg"></p>
+    <p class="al-summary" id="alSummary"></p>
+    <div class="al-list" id="alList"></div>
+    <p class="al-foot">行动「已完成」不等于缺口「已解决」：缺口只有在<b>重新分析</b>被新证据覆盖后
+      才会变成「已覆盖」。没有可验证成果物的缺口不会开单，也不会被静默丢掉。</p>
+  </section>
   </div>
 </div>
 
@@ -469,6 +501,7 @@ document.addEventListener("DOMContentLoaded", function () {
   </div>
 </div>
 
+<script src="../js/action-loop.js"></script>
 
 </body>
 </html>

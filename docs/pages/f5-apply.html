@@ -31,6 +31,10 @@
   .f5-boundary h2 { margin: 0 0 8px; color: var(--zy-ink, #1b1e26); font-size: 16px; }
   .f5-boundary ul { margin: 0; padding-left: 20px; line-height: 1.75; }
   .f5-boundary strong { color: #92400e; }
+  .f5-grounding { margin-top: 14px; padding: 16px; background: var(--zy-surface-2, #fafbfc); border: 1px solid var(--zy-line, rgba(22,30,52,.10)); border-radius: var(--zy-r-md, 12px); }
+  .f5-grounding h3 { margin: 0 0 10px; font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .f5-ground-item { font-size: 13px; color: var(--zy-ink-2, #4b5261); line-height: 1.75; margin: 0 0 6px; }
+  .f5-ground-item b { color: var(--zy-ink, #1b1e26); }
 </style>
 </head>
 <body data-page="f5">
@@ -64,8 +68,9 @@
     </ul>
   </section>
   <div class="f5-card">
-    <p class="f5-msg" id="f5ManualNotice">下方公司与职位由你手动填写，<strong>未经平台核验</strong>；请以单位官网、权威登记信息和招聘原页面为准。
+    <p class="f5-msg" id="f5ManualNotice">下方公司与职位由你填写，<strong>未经平台核验</strong>；请以单位官网、权威登记信息和招聘原页面为准。
       建议先在 <a href="target-job.html">目标岗位工作区</a> 对该岗位完成分析与投递判断，再回到本页生成求职信。</p>
+    <p class="f5-msg" id="f5TargetLine"></p>
     <div class="f5-row">
       <label>目标公司<input id="f5Company" type="text" placeholder="如：字节跳动"></label>
       <label>目标职位<input id="f5Position" type="text" placeholder="如：后端开发工程师"></label>
@@ -76,6 +81,11 @@
       <h3>求职信预览 <span class="badge weak">待确认</span></h3>
       <p class="f5-preview-body" id="f5PreviewBody"></p>
       <button class="btn primary" id="f5Confirm" type="button" disabled>确认保存</button>
+    </div>
+    <div class="f5-grounding zy-hidden" id="f5Grounding">
+      <h3>这封求职信引用了哪些依据 <span class="badge weak" id="f5BasisBadge">—</span></h3>
+      <div id="f5EvidenceList"></div>
+      <p class="f5-msg" id="f5Notice"></p>
     </div>
   </div>
   <h2 class="f5-section">申请跟踪</h2>

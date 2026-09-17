@@ -197,11 +197,22 @@
   }
 
   // ── F5: 投递闭环（求职信 + 申请跟踪） ───────────────────
-  function generateCoverLetter(sessionId, company, position) {
-    return request(ENDPOINTS.coverLetter, {
-      method: 'POST',
-      body: { session_id: sessionId, company: company, position: position }
-    });
+  // 传 targetJobId 时走 DoD #10 的接地路径：事实底座 = 岗位要求 + 已确认职业证据，
+  // 响应带回 evidence / requirements / gaps / basis / grounding / notice，
+  // 供页面显式呈现"这封信引用了哪些依据"。未显式传参时回退到当前目标岗位，
+  // 保证 F5 与 F3 出题、F4 行动清单认同一个岗位口径。
+  function generateCoverLetter(sessionId, company, position, targetJobId) {
+    var raw = targetJobId !== undefined && targetJobId !== null
+      ? targetJobId
+      : (typeof getCurrentTargetJob === 'function' ? getCurrentTargetJob() : null);
+    var resolved = null;
+    if (raw !== null && raw !== undefined && raw !== '') {
+      var parsed = parseInt(raw, 10);
+      if (isFinite(parsed)) resolved = parsed;
+    }
+    var body = { session_id: sessionId, company: company, position: position };
+    if (resolved !== null) body.targetJobId = resolved;
+    return request(ENDPOINTS.coverLetter, { method: 'POST', body: body });
   }
 
   function saveApplication(sessionId, company, position, coverLetter) {

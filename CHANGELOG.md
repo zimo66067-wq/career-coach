@@ -4,6 +4,46 @@
 
 ## [Unreleased]
 
+### Added - 2026-09-17 行动闭环落位到能力报告页（Phase 6b-2a）
+
+`product-scope.md §7` 的第 4 个一级工作区 Action Loop 首次到用户面前：
+「补齐证据，然后复测」—— 按目标岗位的未解决缺口铺开行动，并让状态流转与结果回流留在界面上。
+此前 `/api/actions` 的 8 条路由**零前端消费**（`phase6a-report.md §8` 明确记为待办）。
+
+- 新增 `public/js/action-loop.js`（控制器）：清单、按岗位铺开、`todo→doing→done` 流转、
+  结果回流、放弃、删除；五类状态徽标（待办/进行中/已完成/已放弃）+ 缺口优先级徽标
+- `public/pages/f4-report.html` 新增「行动闭环 · 缺口 → 行动 → 复测」面板。
+  面板位于**所有 state view 之外**，因此在 empty / error 态下依然可用（有判据锁死这一点）
+- 幂等铺开的结果**如实分账**：`新建 N 条 / 已有未关闭 M 条 / 跳过 K 条（缺口没有可验证的成果物说明）`
+  —— 被跳过的条数不静默丢弃，否则用户会误以为"我的缺口都开好单了"
+- 「记录结果」按钮**只在行动已完成且带成果物说明时出现**：域层本就要求 `done + artifact`
+  才允许 `outcome`，界面不制造必然 422 的操作
+- 新增 `tests/test_phase6b2_contract.js`（7 条门禁）：面板存在且不在 state view 内、
+  控制器只调用真实导出的 DataBridge 方法、行动状态取值集合与 `domain/action.py` 的
+  `ActionStatus` 一致、限定语不得被删、判据自检
+
+### Added - 2026-09-17 求职信接入目标岗位并显式呈现引用依据（Phase 6b-2a，DoD #10）
+
+`phase4b-report.md §7` 记的"前端 F5 页面尚未传 `targetJobId`"到此结清。
+
+- `data-bridge.js` 的 `generateCoverLetter()` 新增第 4 个参数 `targetJobId`；
+  **未显式传参时回退到「当前目标岗位」** —— 保证 F5 与 F3 出题、F4 行动清单认同一个岗位
+- `pages/f5-apply.html` 新增依据面板：`引用 N 条已确认证据 / 岗位要求底座（前 5 条）/ 未覆盖的缺口`
+  + 后端下发的 `basis`（AI 生成 / 规则模板）与 `grounding`（目标岗位+证据 / 仅岗位要求 / 简历诊断）
+- **没有任何已确认证据时明说**"正文没有引用任何个人经历"，而不是留白让人以为写了
+- 缺口只作提示、不写进正文，也不被声称具备 —— 该限定写在后端 `notice` 与前端渲染两处
+
+### Added - 2026-09-17 模拟面试显示按缺口定向的出题顺序（Phase 6b-2a，DoD #11）
+
+DoD #11 的后端在 Phase 3 就返回 `questionPlan`，但界面上一直看不见，因此"顺序即优先级"无法验证。
+
+- `pages/f3-interview.html` 新增出题计划面板：逐题显示题型（P0/P1 缺口定向题 / 关键证据验证题 /
+  行为问题 / 通用题库）+ 优先级，并注明"来自目标岗位的未解决缺口"
+- `js/f3-interview.js` 新增 `renderQuestionPlan()`；题型标签覆盖 `domain/interview.py::QUESTION_PRIORITY`
+  的全部 5 个取值（有判据跨语言比对，防后端加题型后前端静默漏显示）
+- 开始面试时显式读「当前目标岗位」并递给 `/api/wf04/start`；岗位无缺口时面板自动隐藏，
+  不显示空壳
+
 ### Added - 2026-09-17 目标岗位工作区（Phase 6b-1）
 
 `product-scope.md §7` 的 Target Job Workspace 首次到用户面前：「分析这个岗位，能不能投」——

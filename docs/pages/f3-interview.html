@@ -59,6 +59,12 @@
   }
   .report-actions { margin-top: 16px; text-align: center; }
   .interview-hint { font-size: 13px; color: var(--zy-ink-2, #4c5364); margin-bottom: 12px; }
+  /* 出题计划（questionPlan）：把"按缺口定向出题"显示出来，而不是只在后端生效 */
+  .f3-plan { margin: 0 0 16px; padding: 14px 16px; border: 1px solid var(--zy-line, rgba(22,30,52,.10)); border-radius: var(--zy-r-md, 12px); background: var(--zy-surface-2, #fafbfc); }
+  .f3-plan-head { font-size: 13px; font-weight: 600; color: var(--zy-ink, #1b1e26); margin-bottom: 10px; line-height: 1.7; }
+  .f3-plan-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .f3-plan-chip { font-size: 12.5px; color: var(--zy-primary, #2f5fe8); background: rgba(47,107,255,.08); border-radius: 999px; padding: 4px 11px; }
+  .f3-plan-note { font-size: 12px; color: var(--zy-ink-3, #7a8699); margin-top: 10px; line-height: 1.7; }
 </style>
 </head>
 <body data-page="f3">
@@ -104,6 +110,7 @@
         <span style="font-weight:600;color:var(--zy-ink)">面试官在线</span>
         <span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
       </div>
+      <div class="f3-plan" id="f3QuestionPlan" hidden></div>
       <div class="interview-hint">回答第 <span id="f3TurnNo">1</span>/5 题 · Ctrl+Enter 提交</div>
       <div id="turns"></div>
       <div id="f3StreamingBubble" style="display:none;margin-top:10px"></div>

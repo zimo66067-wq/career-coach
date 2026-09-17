@@ -242,7 +242,9 @@
       var jobProfile = DB._cache ? DB._cache.get("jobProfile") : null;
       var matchResult = DB._cache ? DB._cache.get("matchResult") : null;
       var gaps = matchResult && Array.isArray(matchResult.gaps) ? matchResult.gaps : [];
-      return DB.startInterview(jobProfile || {}, resumeProfile || {}, gaps);
+      // DoD #11：把当前目标岗位显式带过去，出题顺序才真的来自该岗位的未解决缺口。
+      var targetId = typeof DB.getCurrentTargetJob === "function" ? DB.getCurrentTargetJob() : null;
+      return DB.startInterview(jobProfile || {}, resumeProfile || {}, gaps, targetId);
     }).then(function (res) {
       if (!res || res.error || !res.firstQuestion) {
         setView("error");
@@ -263,6 +265,7 @@
       state.report = null;
       saveSnapshot();
       renderTurns();
+      renderQuestionPlan(res);
       hideStreamed();
       updateProgress();
       setView("success");
@@ -273,6 +276,39 @@
       var msg = $("f3ErrorMsg");
       if (msg) msg.textContent = "网络错误：" + (err && err.message ? err.message : "未知错误");
     });
+  }
+
+  // 出题计划：把后端算好的 questionPlan 显示出来，证明"顺序即优先级"。
+  var QUESTION_KIND_LABEL = {
+    p0_gap: "P0 缺口定向题",
+    p1_gap: "P1 缺口定向题",
+    evidence_verification: "关键证据验证题",
+    behavioural: "行为问题",
+    generic_bank: "通用题库"
+  };
+
+  function renderQuestionPlan(res) {
+    var box = $("f3QuestionPlan");
+    if (!box) return;
+    var plan = res && Array.isArray(res.questionPlan) ? res.questionPlan : null;
+    if (!plan || !plan.length) {
+      box.hidden = true;
+      box.innerHTML = "";
+      return;
+    }
+    var targetId = res && res.targetJobId ? res.targetJobId : null;
+    var chips = plan.map(function (item, index) {
+      var kind = (item && item.kind) || "generic_bank";
+      var priority = (item && item.priority) || "—";
+      return '<span class="f3-plan-chip">' + (index + 1) + ". " +
+        esc(QUESTION_KIND_LABEL[kind] || kind) + " · " + esc(priority) + "</span>";
+    }).join("");
+    box.innerHTML = '<div class="f3-plan-head">本次出题顺序：来自目标岗位的未解决缺口，P0 → P1' +
+      (targetId ? "（岗位 #" + esc(String(targetId)) + "，缺口按优先级排序）" : "") + "</div>" +
+      '<div class="f3-plan-chips">' + chips + "</div>" +
+      '<div class="f3-plan-note">顺序即优先级 —— 这就是「按缺口定向出题」，不是通用题库轮询。' +
+      "缺口全部解决后，题目会回落到证据验证与行为问题。</div>";
+    box.hidden = false;
   }
 
   function renderReport(res) {
@@ -368,6 +404,8 @@
     startInterview: startInterview,
     submitAnswer: submitAnswer,
     finishInterview: finishInterview,
+    updateProgress: updateProgress,
+    renderQuestionPlan: renderQuestionPlan,
     getState: function () { return state; }
   };
 })();
