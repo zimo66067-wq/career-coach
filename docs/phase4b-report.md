@@ -1,7 +1,7 @@
 # phase4b-report.md · Phase 4b（DoD #10 · 求职信接地）
 
 - 日期：2026-09-17
-- 提交：**`<待回填>`**（<待回填> 文件，<待回填>）
+- 提交：**`5cba7b4`**（10 文件，+1112 / −12）
 - 阶段目标：**DoD #10 —— 求职信必须接目标岗位（Target Job）与已确认职业证据（Career Evidence），
   且每项事实可映射 Evidence ID。**
 - 前置：Phase 4 收尾时留了一处口径冲突（`product-scope.md §13.4`），裁决为**方案 A**：
@@ -18,20 +18,23 @@
 ## 1. 修改摘要
 
 ```
-4 files changed, 296 insertions(+), 5 deletions(-)   (工作区；tests/ 新文件另计 <待回填>)
+10 files changed, 1112 insertions(+), 12 deletions(-)   (5cba7b4)
 ```
 
 | 改造 | 净增 | 要点 |
 | --- | --- | --- |
-| `services/apply_service.py` | +213 | DoD #10 区块：`_letter_context` / `_grounded_prompt` / `_grounded_template` / `_grounded_letter` / `_letter_notice`；`generate_cover_letter` 双路径分派 |
+| `services/apply_service.py` | +210 | DoD #10 区块：`_letter_context` / `_grounded_prompt` / `_grounded_template` / `_grounded_letter` / `_letter_notice`；`generate_cover_letter` 双路径分派 |
+| `scripts/phase4-http-smoke.py` | +53 | 真端口冒烟追加 13 项（接地路径 / 未确认证据不进正文 / 会话与岗位两道归属各测一次 / 旧路径未动） |
+| `prompts/apply/cover-letter.md` | +32 | 写明 A（接地）/ B（旧）两种输入结构与接地路径的三条硬约束 |
 | `api/index.py` | +12 | `wf07/cover-letter` 解析 `targetJobId`（int 校验，坏值 422）并透传 `owner_key` |
-| `scripts/phase4-http-smoke.py` | +43 | 真端口冒烟追加 13 项（接地路径 / 未确认证据不进正文 / 会话与岗位两道归属各测一次 / 旧路径未动） |
-| `prompts/apply/cover-letter.md` | +33 | 写明 A（接地）/ B（旧）两种输入结构与接地路径的三条硬约束 |
 
 | 新建 | 行数 | 作用 |
 | --- | --- | --- |
-| `tests/test_cover_letter_grounding.py` | <待回填> | **16 项**契约：只引用已确认证据 / 缺口不得声称 / 模型三道门 / 归属隔离 / 旧路径兼容 |
-| `scripts/vercel-dead-routes.py` | 106 | **实证**的死路由检查（见 §5.3，本阶段把 Phase 4 那次没留档的一次性命令固化下来） |
+| `tests/test_cover_letter_grounding.py` | 398 | **16 项**契约：只引用已确认证据 / 缺口不得声称 / 模型三道门 / 归属隔离 / 旧路径兼容 |
+| `scripts/vercel-dead-routes.py` | 85 | **实证**的死路由检查（见 §5.3，本阶段把 Phase 4 那次没留档的一次性命令固化下来） |
+
+文档：`docs/phase4b-report.md`（257 行，新建）、`docs/product-scope.md`（+25 / −6，DoD 表 #10 行重写 + §13.4 裁决落地 + §13.5 记录）、
+`docs/domain-model.md`（+2 / −1：接线进度表补求职信一行，并修掉一行过期的"待定 D9"）、`CHANGELOG.md`（+38，2 条）。
 
 ### 1.1 接口契约（唯一一处对外变化）
 
