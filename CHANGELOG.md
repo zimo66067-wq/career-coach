@@ -4,6 +4,37 @@
 
 ## [Unreleased]
 
+### Added - 2026-09-17 进入即强制注册/登录门禁（Phase 6b-3 · D7）
+
+产品负责人要求的"点进产品即强制注册/登录"落地为弹窗门禁。这是**门禁**，不是账号体系重构：
+服务端安全实现（HttpOnly Session、密码哈希、授权校验、归属隔离、删除链路、限流）一行未改，
+门禁只加在它前面。
+
+- 新增 `public/js/auth-gate.js`（**政策层**）：`decide()` / `plan()` 两个纯函数决定"谁被拦、
+  何时拦、能否关掉"，脱离 DOM 即可断言；`js/account.js` 保持**机制**角色（弹窗、表单、
+  `/api/auth/*` 调用）。分层是为了可判据化 —— 断网会不会放行、本地标记能不能绕过，
+  这类问题能在 VM 里跑出来，不需要浏览器
+- **登录态只认服务端**：政策层不读 `localStorage` / `sessionStorage` / `document.cookie`，
+  只认 `GET /api/auth/me` 的答复。判据用**存取陷阱**证明它一次都没碰过本地存储
+- **"不知道"不等于"是游客"，一律拦下**：拿不到服务端答复（断网 / 5xx）判为 `unavailable`
+  → 强制弹窗 + 「重新连接」出口。把两者混为一谈等于给服务器故障开后门
+- **强制态关不掉，三层兜底**：政策层隐藏关闭按钮 + `account.js` 在 `forced && !currentUser`
+  时拒绝 `closeAuth()` + CSS `[data-forced="true"] .zy-modal-close { display: none }`；
+  `Esc` 亦被原生 `cancel` 事件拦下
+- 弹窗改为**原生 `<dialog>`**：`showModal()` 自带焦点陷阱与 `::backdrop`；三态显式存在
+  （`empty` / `error` / `disabled`），状态区为 `role="status" aria-live="polite"`。
+  门禁只挡住交互，**页面本身始终可见**，不清空也不报错
+- 注册弹窗只有四项（手机号、邮箱、密码、账户名），满足 DoD #18「首次用户到第一个
+  Target Job Decision ≤3 分钟」对注册环节的约束
+- 豁免名单刻意只有一项：`public/pages/states.html`（内部 QA 状态墙 —— 不进导航、不含用户
+  数据，且用途就是预览包含 empty 在内的六种界面状态）。有判据锁成"恰好一项"
+- **修正一个接口隐患**：`check()` 过去返回 `plan()` 的结果，而 `plan()` 与 `decide()`
+  **同用一个 `gate` 键、语义还相反**（豁免页 `plan().gate === 'exempt'` 是真值，
+  `decide().gate === false` 意思是"别拦"）。现在 `check()` 返回**决策本体**，
+  两层键名错开为 `gate`（布尔）/ `mode`（字符串）
+- 新增 `tests/test_phase6b3_contract.js`（15 项）：含"只有服务端能放行"的行为判据、
+  跨 realm 比较与注释剥离两个工具的探针
+
 ### Changed - 2026-09-17 一级导航收敛到 4 个工作区（Phase 6b-2b）
 
 `product-scope.md §7` 定下的四个一级工作区（简历证据 / 目标岗位 / 模拟面试 / 行动闭环）

@@ -180,6 +180,7 @@
 <script src="../js/pages-api-config.js"></script>
 <script src="../js/data-bridge.js"></script>
 <script src="../js/account.js"></script>
+<script src="../js/auth-gate.js"></script>
 <script>
 function renderPlan(elId, plan) {
   document.getElementById(elId).innerHTML = plan.map(function (p) {
@@ -288,10 +289,11 @@ document.addEventListener("DOMContentLoaded", function () {
   </div>
 </aside>
 <div class="zy-sidebar-backdrop" id="zySidebarBackdrop"></div>
-<div class="zy-modal zy-hidden" id="zyAuthModal" role="dialog" aria-modal="true" aria-labelledby="zyAuthTitle">
+<dialog class="zy-modal" id="zyAuthModal" aria-labelledby="zyAuthTitle" aria-describedby="zyAuthWhy">
   <div class="zy-modal-box">
     <button class="zy-modal-close" id="zyAuthClose" type="button" aria-label="关闭">×</button>
     <h3 id="zyAuthTitle">登录 / 注册</h3>
+    <p class="zy-gate-why" id="zyAuthWhy">进入「职跃AI」需要先注册或登录：你的简历、目标岗位与面试记录按账号长期保存。注册只需手机号、邮箱、密码、账户名四项，约 30 秒。</p>
     <div class="zy-tabs">
       <button class="zy-tab active" data-tab="login" type="button">登录</button>
       <button class="zy-tab" data-tab="register" type="button">注册</button>
@@ -311,8 +313,10 @@ document.addEventListener("DOMContentLoaded", function () {
       <button class="zy-btn" type="submit">注 册</button>
     </form>
     <p class="zy-form-msg" id="zyAuthMsg"></p>
+    <p class="zy-gate-status" id="zyGateStatus" role="status" aria-live="polite"></p>
+    <button class="zy-gate-retry zy-hidden" id="zyGateRetry" type="button">重新连接</button>
   </div>
-</div>
+</dialog>
 
 <script src="../js/action-loop.js"></script>
 

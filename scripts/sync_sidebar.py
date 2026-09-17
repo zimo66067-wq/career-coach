@@ -45,10 +45,11 @@ ASIDE = """<aside class="zy-sidebar" id="zySidebar" aria-label="账号与历史�
   </div>
 </aside>
 <div class="zy-sidebar-backdrop" id="zySidebarBackdrop"></div>
-<div class="zy-modal zy-hidden" id="zyAuthModal" role="dialog" aria-modal="true" aria-labelledby="zyAuthTitle">
+<dialog class="zy-modal" id="zyAuthModal" aria-labelledby="zyAuthTitle" aria-describedby="zyAuthWhy">
   <div class="zy-modal-box">
     <button class="zy-modal-close" id="zyAuthClose" type="button" aria-label="关闭">×</button>
     <h3 id="zyAuthTitle">登录 / 注册</h3>
+    <p class="zy-gate-why" id="zyAuthWhy">进入「职跃AI」需要先注册或登录：你的简历、目标岗位与面试记录按账号长期保存。注册只需手机号、邮箱、密码、账户名四项，约 30 秒。</p>
     <div class="zy-tabs">
       <button class="zy-tab active" data-tab="login" type="button">登录</button>
       <button class="zy-tab" data-tab="register" type="button">注册</button>
@@ -68,8 +69,10 @@ ASIDE = """<aside class="zy-sidebar" id="zySidebar" aria-label="账号与历史�
       <button class="zy-btn" type="submit">注 册</button>
     </form>
     <p class="zy-form-msg" id="zyAuthMsg"></p>
+    <p class="zy-gate-status" id="zyGateStatus" role="status" aria-live="polite"></p>
+    <button class="zy-gate-retry zy-hidden" id="zyGateRetry" type="button">重新连接</button>
   </div>
-</div>
+</dialog>
 """
 
 
@@ -107,7 +110,13 @@ def inject(page_path):
             changed = True
 
     if 'id="zySidebar"' not in text:
-        text = text.replace("</body>", ASIDE + '\n<script src="%sjs/account.js"></script>\n</body>' % prefix, 1)
+        text = text.replace(
+            "</body>",
+            ASIDE
+            + '\n<script src="%sjs/account.js"></script>' % prefix
+            + '\n<script src="%sjs/auth-gate.js"></script>\n</body>' % prefix,
+            1,
+        )
         changed = True
     else:
         wrong = 'src="js/account.js"' if prefix else 'src="../js/account.js"'
@@ -116,7 +125,20 @@ def inject(page_path):
             text = text.replace(wrong, right, 1)
             changed = True
         elif right not in text:
-            text = text.replace("</body>", '\n<script src="%sjs/account.js"></script>\n</body>' % prefix, 1)
+            text = text.replace(
+                "</body>",
+                '\n<script src="%sjs/account.js"></script>' % prefix
+                + '\n<script src="%sjs/auth-gate.js"></script>\n</body>' % prefix,
+                1,
+            )
+            changed = True
+
+    # 政策层（auth-gate.js）必须在机制层（account.js）之后加载
+    gate_tag = '<script src="%sjs/auth-gate.js"></script>' % prefix
+    if gate_tag not in text:
+        account_tag = '<script src="%sjs/account.js"></script>' % prefix
+        if account_tag in text:
+            text = text.replace(account_tag, account_tag + "\n" + gate_tag, 1)
             changed = True
 
     if changed:

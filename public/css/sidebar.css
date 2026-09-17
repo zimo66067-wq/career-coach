@@ -105,11 +105,16 @@
 }
 .zy-sidebar-toggle:hover { background: rgba(22, 30, 52, .06); }
 
-/* 账号弹窗 */
+/* 账号弹窗：原生 <dialog>（D7 门禁的载体）。遮罩交给 ::backdrop，
+   dialog 自身只当容器，居中由 UA 的 margin:auto 完成。 */
 .zy-modal {
-  position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;
-  background: rgba(15, 20, 38, .46); padding: 20px;
+  border: 0; background: transparent; padding: 0; z-index: 80;
+  width: 380px; max-width: calc(100% - 40px); margin: auto;
 }
+.zy-modal::backdrop { background: rgba(15, 20, 38, .46); }
+/* 强制态（D7 门禁）下关闭按钮不可见。auth-gate.js 也会加 .zy-hidden，
+   这里再兜一层：JS 万一没跑到位，门禁也不能有个看得见的出口。 */
+.zy-modal[data-forced="true"] .zy-modal-close { display: none; }
 .zy-modal-box {
   width: 380px; max-width: 100%; background: #fff; border-radius: 16px;
   padding: 22px 22px 18px; box-shadow: 0 18px 60px rgba(15, 20, 38, .28); position: relative;
@@ -133,6 +138,16 @@
 .zy-btn:hover { filter: brightness(1.06); }
 .zy-form-msg { min-height: 16px; font-size: 12.5px; margin: 6px 0 0; }
 .zy-form-msg.ok { color: #1a9c5c; }
+
+/* D7 门禁：三态（empty / error / disabled）都需要看得见的载体 */
+.zy-gate-why { font-size: 12.5px; color: var(--zy-ink-2, #5b6272); margin: 0 0 12px; line-height: 1.55; }
+.zy-gate-status { min-height: 16px; font-size: 12.5px; color: var(--zy-ink-2, #5b6272); margin: 8px 0 0; line-height: 1.5; }
+.zy-gate-status.err { color: #c0432f; }
+.zy-gate-retry {
+  margin-top: 8px; border: 1px solid rgba(22, 30, 52, .16); background: #fff;
+  color: var(--zy-ink, #161e34); border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer;
+}
+.zy-btn[disabled], .zy-gate-retry[disabled] { opacity: .6; cursor: progress; }
 .zy-form-msg.err { color: #d33; }
 .zy-form .zy-hint { font-size: 11.5px; color: var(--zy-ink-3, #8b93a7); margin-top: -4px; }
 

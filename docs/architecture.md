@@ -48,10 +48,15 @@
 >
 > **现状口径**：主产品只剩一套匹配概念（`wf03` / `services/match_service.py`，DoD #6 达成）；
 > dependency inversion 已由 3 处降为 **0 处**（Phase 5 修完并加静态门禁 `tests/test_layering.py`）；
-> 一级导航 7 → 5 项（收敛到 ≤4 与去代号留 Phase 6b）；dead routes = 0。
+> 一级导航 7 → **4** 项（Phase 6b-2 完成：去掉「首页」项，改由品牌区回首页；去代号的范围含 URL）；dead routes = 0。
 > 仍有效的审计结论：`/api/admin/*`、`/api/f5/organizations/*` 无用户界面消费。
 > **Phase 6a（2026-09-17）**：`ui/prototype` 陈旧分叉已**整树删除**，前端只剩 `public/`（canonical）与 `docs/`（发布镜像），
 > 非 `.md` 文件由镜像门禁强制逐字节相同。
+> **Phase 6b-3（2026-09-17）**：D7「进入即强制注册/登录」落地为 `js/auth-gate.js` 政策层
+> （`decide()` / `plan()` 是纯函数，脱离 DOM 可断言）+ 原生 `<dialog>` 弹窗。登录态**只认服务端**
+> `GET /api/auth/me`；拿不到答复（断网 / 5xx）判为**拦下**而非放行；强制态三层兜底关不掉。
+> 豁免名单刻意只有 `public/pages/states.html`（内部 QA 状态墙）。服务端安全实现一行未改。
+> 参考 `docs/phase6b3-report.md`。
 
 ---
 
@@ -88,7 +93,7 @@
 | ~~`public/pages/kb.html`~~ | 105 | ~~面经知识库（BM25/向量）~~ | **已删除（Phase 6a 入口下线，题库下沉为面试引擎内部数据源）** |
 | `public/pages/states.html` | 116 | 空/加载/错误态样例 | ❌ |
 
-页面脚本装配（实测 `<script>` 标签）：`app.js`（壳/导航）+ `pages-api-config.js`（1 常量）+ `data-bridge.js`（唯一 API 客户端）+ `account.js` + 页面专属脚本。
+页面脚本装配（实测 `<script>` 标签）：`app.js`（壳/导航）+ `pages-api-config.js`（1 常量）+ `data-bridge.js`（唯一 API 客户端）+ `account.js`（账号机制）+ `auth-gate.js`（D7 门禁政策）+ 页面专属脚本。
 
 `public/js/voice.js`（318 行）**不被任何页面加载**；Phase 6b-2 时该文件已不在 `public/js/` 中（`ls public/js/` 无此项）。
 

@@ -5,6 +5,11 @@
  *   - 未登录游客：不展示任何历史记录；
  *   - 已登录用户：仅展示本人记录；
  *   - 演示数据：仅服务端在 role=admin 且 DEV_DEMO=1 时注入（不落库）。
+ *
+ * Phase 6b-3（D7）：本文件是**机制**层，政策层在 auth-gate.js（谁被拦、何时拦、
+ * 能不能关）。这里只提供 openAuth / closeAuth / refreshAuth 三个动作与真实登录态，
+ * 并把「拿不到服务端答复」与「确认是游客」分成**可区分**的返回值 —— 门禁要靠这个
+ * 区分决定拦还是放，混在一起就等于给断网开了后门。
  */
 (function () {
   'use strict';
@@ -81,11 +86,20 @@
   }
 
   /* ---------- 用户卡 ---------- */
-  function renderUser(user) {
+  function renderUser(user, status) {
     currentUser = user || null;
     var avatar = $('zyAvatar'), name = $('zyUserName'), sub = $('zyUserSub');
     var loginBtn = $('zyLoginBtn'), logoutBtn = $('zyLogoutBtn');
     if (!avatar || !name || !sub) return;
+    if (!user && status === 'unknown') {
+      // 「不知道」不能写成「未登录」：措辞不该骗人，而且门禁会据此决定拦不拦
+      avatar.textContent = '?';
+      name.textContent = '登录状态未知';
+      sub.textContent = '无法连接服务器，请稍后重试';
+      if (loginBtn) loginBtn.classList.remove('zy-hidden');
+      if (logoutBtn) logoutBtn.classList.add('zy-hidden');
+      return;
+    }
     if (user) {
       avatar.textContent = (user.name || '我').charAt(0);
       name.textContent = user.name;
@@ -162,29 +176,57 @@
     });
   }
 
+  /* 返回**可区分**的三种结果，而不是「user 或 null」：
+   *   { ok: true,  logged_in: true,  user }          已登录
+   *   { ok: true,  logged_in: false, user: null }    确认是游客
+   *   { ok: false, reason }                          拿不到服务端答复（网络 / 5xx）
+   * 后两者必须分得开：把断网当成游客，门禁就会在服务端不可用时放行。 */
   function refreshAuth() {
     return api('/auth/me').then(function (data) {
       var user = data.logged_in ? data.user : null;
       renderUser(user);
       if (user) loadHistory(); else renderHistory([]);
-      return user;
-    }).catch(function () {
-      renderUser(null);
+      return { ok: true, logged_in: !!data.logged_in, user: user };
+    }).catch(function (err) {
+      renderUser(null, 'unknown');
       renderHistory([]);
-      return null;
+      return { ok: false, logged_in: false, user: null,
+               reason: (err && err.message) || '服务端未响应' };
     });
   }
 
-  /* ---------- 账号弹窗 ---------- */
-  function openModal(tab) {
+  /* ---------- 账号弹窗（原生 <dialog>，D7 门禁的载体） ---------- */
+  var forced = false;
+
+  function openAuth(tab, options) {
     var modal = $('zyAuthModal');
     if (!modal) return;
-    modal.classList.remove('zy-hidden');
+    forced = !!(options && options.forced);
+    modal.setAttribute('data-forced', forced ? 'true' : 'false');
+    var closeBtn = $('zyAuthClose');
+    if (closeBtn) closeBtn.classList.toggle('zy-hidden', forced);
+    if (!modal.open) {
+      if (typeof modal.showModal === 'function') modal.showModal();  // 自带焦点陷阱 + Esc
+      else modal.setAttribute('open', '');                           // 老浏览器降级
+    }
     switchTab(tab || (currentUser ? 'login' : 'register'));
+    var visibleForm = $($('zyRegisterForm') &&
+      !$('zyRegisterForm').classList.contains('zy-hidden') ? 'zyRegisterForm' : 'zyLoginForm');
+    var input = visibleForm && visibleForm.querySelector('input');
+    if (input) input.focus();
   }
-  function closeModal() {
+
+  function closeAuth() {
     var modal = $('zyAuthModal');
-    if (modal) modal.classList.add('zy-hidden');
+    if (!modal) return;
+    if (forced && !currentUser) {
+      // 强制态下不接受「关掉算了」：能关掉的门禁等于没有门禁
+      toast('需要先注册或登录');
+      return;
+    }
+    if (typeof modal.close === 'function' && modal.open) modal.close();
+    else modal.removeAttribute('open');
+    forced = false;
     setMsg('', false);
   }
   function switchTab(tab) {
@@ -195,6 +237,23 @@
     if (loginForm) loginForm.classList.toggle('zy-hidden', tab !== 'login');
     if (regForm) regForm.classList.toggle('zy-hidden', tab !== 'register');
     setMsg('', false);
+  }
+
+  function notify(name, detail) {
+    if (typeof CustomEvent !== 'function') return;
+    document.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
+  }
+
+  /* Disabled 态：提交期间禁用按钮并广播，门禁据此切到 disabled。 */
+  function setBusy(form, busy) {
+    var button = form.querySelector('button[type="submit"]');
+    if (button) {
+      if (!button.getAttribute('data-label')) button.setAttribute('data-label', button.textContent);
+      button.disabled = busy;
+      button.setAttribute('aria-busy', busy ? 'true' : 'false');
+      button.textContent = busy ? '提交中…' : button.getAttribute('data-label');
+    }
+    notify('zy:auth-busy', { busy: !!busy });
   }
 
   function handleSubmit(ev) {
@@ -212,15 +271,20 @@
     } else {
       payload = { account: f.account.value.trim(), password: f.password.value };
     }
+    setBusy(f, true);
     api(isRegister ? '/auth/register' : '/auth/login', { method: 'POST', body: payload })
       .then(function (user) {
+        setBusy(f, false);
         setMsg('', false);
-        closeModal();
+        renderUser(user);   // 先落登录态：closeAuth 在强制态下要靠 currentUser 放行
+        closeAuth();
         refreshAuth();
+        notify('zy:auth', { user: user });
         toast(isRegister ? '注册成功，欢迎你，' + user.name + ' 🎉' : '已登录：' + user.name);
         f.reset();
       })
       .catch(function (err) {
+        setBusy(f, false);
         setMsg(err.message, false);
       });
   }
@@ -230,6 +294,7 @@
       .then(function () {
         renderUser(null);
         renderHistory([]);
+        notify('zy:auth', { user: null });   // 退出即重新上锁：门禁要重新拦
         toast('已退出登录');
       });
   }
@@ -295,13 +360,23 @@
     var backdrop = $('zySidebarBackdrop');
     if (backdrop) backdrop.addEventListener('click', function () { document.body.classList.remove('zy-drawer-open'); });
     var loginBtn = $('zyLoginBtn');
-    if (loginBtn) loginBtn.addEventListener('click', function () { openModal('login'); });
+    if (loginBtn) loginBtn.addEventListener('click', function () { openAuth('login', { forced: false }); });
     var logoutBtn = $('zyLogoutBtn');
     if (logoutBtn) logoutBtn.addEventListener('click', logout);
     var closeBtn = $('zyAuthClose');
-    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (closeBtn) closeBtn.addEventListener('click', function () { closeAuth(); });
     var modal = $('zyAuthModal');
-    if (modal) modal.addEventListener('click', function (ev) { if (ev.target === modal) closeModal(); });
+    if (modal) {
+      // 点遮罩关闭只在非强制态生效 —— 强制态下能关掉就等于没有门禁
+      modal.addEventListener('click', function (ev) {
+        if (ev.target === modal && !forced) closeAuth();
+      });
+      // 原生 <dialog> 的 Esc 走 cancel 事件。强制态下拦下 Esc：这是刻意的可访问性取舍 ——
+      // 门禁不可关，但页面始终可见、可读，且弹窗内全部可键盘操作（见 product-scope §10.3）。
+      modal.addEventListener('cancel', function (ev) {
+        if (forced && !currentUser) ev.preventDefault();
+      });
+    }
     document.querySelectorAll('.zy-tab').forEach(function (b) {
       b.addEventListener('click', function () { switchTab(b.getAttribute('data-tab')); });
     });
@@ -320,6 +395,9 @@
   window.ZY_ACCOUNT = {
     addHistory: addHistory,
     refreshAuth: refreshAuth,
-    currentUser: function () { return currentUser; }
+    currentUser: function () { return currentUser; },
+    openAuth: openAuth,
+    closeAuth: closeAuth,
+    isForced: function () { return forced; }
   };
 })();
