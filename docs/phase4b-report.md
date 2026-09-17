@@ -174,6 +174,11 @@ OPTIONS 白名单 + 前缀族。问题是 `history/$1` 这类**参数化重写**
 重写总数 44 / API 重写 38 / 死路由 0
 ```
 
+判据本身也验过一次（**判据错了，门禁全绿也说明不了任何事**）：拿一条肯定不存在的
+`_route=definitely/not/here` 确认兜底信号确实是 404 + "接口不存在。"；
+再用 `DELETE /api?_route=history/does-not-exist` 确认得到的是 401 `auth_required`
+（路由活着，只是要登录）——**信号能分开，判据才成立**。
+
 判据写进了 `scripts/vercel-dead-routes.py`（Phase 4 那条命令没留档，只留了个数字，
 这一轮为它付了一次返工 —— 所以这次固化下来）。
 
