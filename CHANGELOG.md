@@ -25,7 +25,7 @@ DoD #13「Service 不反向依赖 API」。两处倒置（`diagnosis_service` / 
   单一归属地且无人重新绑定、**判据自检**（喂故意越层的假源码证明它会红）
 - 6 个测试文件 + `scripts/run-rehearsal.py` 的打桩点统一改到 `tools.providers.model`
 
-提交：**`<待回填>`**（<待回填> 文件，<待回填>）。
+提交：**`a3541cc`**（18 文件，+725 / −48）。
 
 ### Changed - 2026-09-17 Phase 5 门禁口径
 

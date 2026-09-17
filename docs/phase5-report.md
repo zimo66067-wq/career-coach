@@ -1,7 +1,7 @@
 # phase5-report.md · Phase 5（依赖倒置）
 
 - 日期：2026-09-17
-- 提交：**`<待回填>`**（<待回填> 文件，<待回填>）
+- 提交：**`a3541cc`**（18 文件，+725 / −48）
 - 阶段目标：**DoD #13「Service 不反向依赖 API」** —— 修掉 `docs/dependency-map.md §3.1`
   从 Phase 0 就点出、被 Phase 2 明确推到本阶段的那两处倒置，并**加静态门禁防回潮**。
 - 依据：`dependency-map.md`「Phase 5 验收」4 条硬性约束里，本期落 1、2（并复核 3）。
@@ -19,7 +19,7 @@
 ## 1. 修改摘要
 
 ```
-<待回填>    ← 含新建的 tests/test_layering.py（327 行）
+18 files changed, 725 insertions(+), 48 deletions(-)    ← 含新建的 tests/test_layering.py（327 行）
 ```
 
 这次改动**总量很小、位置很集中**，这是依赖倒置修复的正常形态：真正的成本不在写代码，
