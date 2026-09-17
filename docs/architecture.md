@@ -37,7 +37,7 @@
 > | 审计条目 | 位置 | 现状 |
 > | --- | --- | --- |
 > | "`api/index.py` 既是路由又是业务" | §4.1 | 仍在，但 Phase 3 新增的业务全部落在 `services/`，路由块只做校验与转发；拆分属 Phase 5 |
-> | `js/job-upload.js` 无宿主页面 | §2 | ✅ **已解决（Phase 6b-1，2026-09-17）**：该脚本绑定的是 `/api/wf03/{upload,jd,match}`，只产匹配分数、产不出 Decision 与 Gap，无法支撑目标岗位工作区，故**退役**；替代实现是 `pages/target-job.html` + `js/target-job.js`（走 `/api/target-jobs` 与 `/api/actions`）。后端 `wf03` 路由保留，去留见 Phase 7 |
+> | `js/job-upload.js` 无宿主页面 | §2 | ✅ **已解决（Phase 6b-1，2026-09-17）**：该脚本绑定的是 `/api/wf03/{upload,jd,match}`，只产匹配分数、产不出 Decision 与 Gap，无法支撑目标岗位工作区，故**退役**；替代实现是 `pages/target-job.html` + `js/target-job.js`（走 `/api/target-jobs` 与 `/api/actions`）。后端 `wf03` 路由**保留**（Phase 7b 定案，见 §3） |
 > | 迁移 2 条 | §7 | 3 条（新增 `2026-09-14-phase3-gap-blocking`） |
 > | 表数量 30 张 | §7 | 30 张不变（只给 `gaps` 加了 `blocking` 列） |
 >
@@ -129,7 +129,7 @@
 | 账号 | `POST /api/auth/{register,login,logout}`、`GET /api/auth/me` | D7 门禁的登录态**唯一**来源 |
 | 历史 | `GET/POST/DELETE /api/history`、`/api/history/<id>` | |
 | 运维 | `GET /api/health`、`/api/admin/resumes`、`/api/admin/export` | admin 需 `X-Admin-Password` |
-| JD（遗留） | `POST /api/wf03/upload`、`/jd`、`/match` | 前端消费方已于 Phase 6b-1 归零（`js/job-upload.js` 退役）；后端路由仍在，去留是独立决议 |
+| JD（无界面消费） | `POST /api/wf03/upload`、`/jd`、`/match` | **保留（Phase 7b 决议，2026-09-17）**：浏览器消费方已于 Phase 6b-1 归零，但 `wf03` 是 DuMate 工作流编号 WF-01~WF-07 的 HTTP 面，见下 |
 
 **前端消费的端点不在这里另抄一份清单**。上一版这里写了一句手抄的端点计数并列了 15 个名字，
 实测那 15 个里 `uploadJD` / `submitJD` / `matchJD` / `majorMatch` / `tasks` 五个早已随
@@ -152,8 +152,21 @@
 唯一 API 客户端是 `public/js/data-bridge.js`（`ENDPOINTS` 映射 + `request()`）；账号与历史走
 `public/js/account.js` 的 `api()` 辅助函数。页面专属脚本不得各自拼 URL。
 
-→ 无用户界面消费的端点（`/api/admin/*`、`/api/health`、`/api/f5/organizations/*`）不在第一段链内
-—— 它们**不需要**前端引用，但仍在路由表里，且仍受第二段（重写源 ⊆ 处理分支）约束。
+→ 无用户界面消费的端点（`/api/admin/*`、`/api/health`、`/api/f5/organizations/*`、`/api/wf03/*`）
+不在第一段链内 —— 它们**不需要**前端引用，但仍在路由表里，且仍受第二段（重写源 ⊆ 处理分支）约束。
+
+> **Phase 7b 决议：`/api/wf03/*` 保留，它不是死接口。**
+> 6b-1 记的是「前端消费方归零」，而 Phase 7b 在决定删除之前先问了一句"消费者是谁" ——
+> 答案是 **DuMate 工作流层**：`wf01`~`wf07` 是产品自己的分类法（`GET /api/health` 的
+> `workflows` 段逐项报告可用性），`/api/wfNN/*` 就是它在 HTTP 上的体现。
+> 三条路由各自对应公开材料里的具体条目：`capability_matrix.md` 的 **N7**（BM25 四态匹配）
+> 与 **N9**（注入 JD 被置 flag）把 WF-03 标为**已验证**（证据编号 `[CAP-008]` /
+> `[CAP-010]`，N8 另指 `tests/*.json` 的召回实测），`dumate-workflow-sop.md` 有 WF-03 的
+> 搭建节，`scripts/run-rehearsal.py` 的彩排链中段
+> （consent → diagnose → **jd → match** → interview → ability → delete）也走它，
+> 路由本身在 `tests/test_api.py` 有多条直接用例。
+> **把"浏览器不调它"读成"没人调它"，正是 7a 那条教训的同一形状**：判据的观察面
+> （前端）比它要判的语义（有没有消费者）窄。判据见 `tests/test_phase7b_contract.js` 7b-1/7b-2。
 
 ---
 

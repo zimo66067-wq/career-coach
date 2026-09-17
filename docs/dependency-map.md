@@ -248,8 +248,24 @@ Vercel 静态根是 `public/`，**其中所有文件都对公网可读**。实�
 /remaining-items.md（列已知缺口）
 ```
 
-> **Phase 6a 更新**：原表还列了 `/voice-test-checklist.md`，该文件已不存在（Phase 1 拆语音链路时删除），
-> 两份 `index.md` 里对它的索引项也已一并清除。**哪些内部文档应当公开**属产品/隐私决策，本阶段未擅自增删，见 `phase6a-report.md`。
+**Phase 7b 更新（2026-09-17）—— 这个集合现在是显式的、有判据的。**
+实测 16 份 md 全部对公网可读（15 份在顶层 + `blind-test-results/blind-test-report.md`）。
+此前它是隐式的：没有清单、没有判据，6a 与 6b-1 两次把它记成「属产品/隐私决策」后挂起，
+而挂起没有触发条件，于是第三次出现。现在：
+
+| 物 | 角色 |
+| --- | --- |
+| `contracts/publish-scope.json` | 逐份记录：路径 + 用途分类 + **公开的理由**。改它 = 一次有记录的公开范围变更 |
+| `scripts/publish-scope-check.py` | 全向比对 `public/**/*.md` 与清单：增 / 删 / 改名未记录即 exit 1（含空判防线与 8 项自检探针） |
+| `tests/test_phase7b_contract.js` | 文本层不变量：清单结构与集合一致（独立复算，不调用上面的脚本） |
+
+**这些 md 是赛事提交物与过程证据**（iCAN 无代码开发挑战赛 · DuMate 方向），评委要通过
+分享 URL 读到它们，因此当前公开范围是**有意为之**而非疏漏。要把某一份撤出公网：删除
+`public/` 下该文件 + 改清单，一步即可 —— `docs/` 侧的 md 不在镜像不变量内
+（`scripts/sync_mirror.py` 排除 `.md`），所以不影响两棵发布树的非 md 一致性。
+
+> 前一轮记录：原表还列了 `/voice-test-checklist.md`，该文件已不存在（Phase 1 拆语音链路时删除），
+> 两份 `index.md` 里对它的索引项也已一并清除。
 >
 > 另：原记录「`/assets/*` 实测 404」已不成立 —— `vercel.json` 现已把 `/assets/:path*` 重写到 `/public/assets/:path*`，
 > 且 `assets/`（favicon / logo / vendor/echarts.min.js）已纳入两棵发布树并有镜像门禁守着。

@@ -1,0 +1,118 @@
+{
+  "$comment": [
+    "公开范围清单 —— Phase 7b 的决定记录，不是自动推导出来的。",
+    "",
+    "背景：Vercel 静态根是 public/（实测 200，见 docs/architecture.md §12），",
+    "所以 public/ 下**每个文件都对公网可读**，包括 md。也就是说「把一份文档放进 public/」",
+    "与「把这份文档发布出去」是同一个动作 —— 没有中间态，没有确认点。",
+    "这个集合此前是隐式的：没有清单、没有判据，6a 与 6b-1 两次把它记成",
+    "「属产品/隐私决策」后挂起，而挂起本身没有触发条件，于是它第三次出现。",
+    "",
+    "本文件把这件事变成一次**有记录的决定**：判据 scripts/publish-scope-check.py 全向比对",
+    "public/ 下实际存在的 md 与本清单，任何增 / 删 / 改名都必须同时改本文件。",
+    "改本文件 = 一次公开范围变更，会在 code review 里显示为一行 diff。",
+    "",
+    "清单记录的是**当前已发布的事实**，不是「应该发布哪些」的理想答案：这些 md 是",
+    "赛事（iCAN 无代码开发挑战赛 · DuMate 方向）的提交物与过程证据，评委要通过分享 URL",
+    "读到它们。要把某一份撤出公网，删除 public/ 下该文件并改本文件即可 ——",
+    "docs/ 侧的 md 不在镜像不变量内（scripts/sync_mirror.py 排除 .md），所以撤出公网",
+    "不会影响两棵发布树的非 md 一致性。"
+  ],
+  "reviewed_at": "2026-09-17",
+  "reviewed_in": "Phase 7b",
+  "public_root": "public",
+  "scope": "**/*.md",
+  "classes": [
+    "发布树自述",
+    "赛事能力证据",
+    "平台搭建手册",
+    "技术选型证据",
+    "工程规范",
+    "测试方法与模板",
+    "交付与改版记录",
+    "过程追踪",
+    "盲测证据"
+  ],
+  "entries": [
+    {
+      "path": "README.md",
+      "class": "发布树自述",
+      "reason": "发布树自述：页面清单、公开运行规则、发布结构与同步约定。Phase 6a 已重写（原版是死树自述，列着 Phase 1 已删的页面）。"
+    },
+    {
+      "path": "index.md",
+      "class": "发布树自述",
+      "reason": "发布树 doc 索引。与 docs/index.md 不同是设计如此（各树自己的索引），但标题与条目必须指自己这一棵树 —— Phase 7b 修掉了它错标成「docs 文档目录索引」并漏掉本树 4 份 md 的问题。"
+    },
+    {
+      "path": "capability_matrix.md",
+      "class": "赛事能力证据",
+      "reason": "DuMate 平台能力实测表（P0-06），N1~N18 逐项映射 WF-01~WF-06 与验证证据。是评审核对「声称的能力是否真的验过」的第一入口，必须公开。"
+    },
+    {
+      "path": "defense-evidence-index.md",
+      "class": "赛事能力证据",
+      "reason": "答辩证据索引（P2-06）：把评委可能提的 20+ 问题映射到具体证据文件，用于 30 秒内定位。答辩材料，必须公开。"
+    },
+    {
+      "path": "dumate-workflow-sop.md",
+      "class": "平台搭建手册",
+      "reason": "DuMate 六工作流平台搭建 SOP（P0-01）：WF-01~WF-06 的触发条件、工具调用链、状态转换、降级路径、验收命令。是「无代码方向」这条赛道的核心交付说明。"
+    },
+    {
+      "path": "embedding-model-comparison.md",
+      "class": "技术选型证据",
+      "reason": "Embedding 模型对比报告（千帆 / 智谱 / Jina）与召回实测数据，支撑 capability_matrix.md N8 的主路径选型。"
+    },
+    {
+      "path": "qianfan-embedding-test-report.md",
+      "class": "技术选型证据",
+      "reason": "千帆 Embedding API 连通性测试报告（2026-08-02）。记录该候选为何被降为第二候选，属于选型证据链。"
+    },
+    {
+      "path": "model-baking-log.md",
+      "class": "技术选型证据",
+      "reason": "模型选择与盲测记录（P2-02）：主模型/备用模型与参数冻结的决策依据。"
+    },
+    {
+      "path": "blind-test-results/blind-test-report.md",
+      "class": "盲测证据",
+      "reason": "模型盲测报告（P2-02）：10 组盲测数据、3 轮盲测结果。与同目录 blind-test-summary.json 一起作为 N 项的运行证据。"
+    },
+    {
+      "path": "observability.md",
+      "class": "工程规范",
+      "reason": "可观测性规范（P2-03）：trace_id 规范、耗时记录、错误分类、匿名摘要导出格式与**禁止记录清单**。禁止记录清单公开反而是加分项 —— 它把脱敏承诺写成了可核对的条目。"
+    },
+    {
+      "path": "mobile-accessibility-testing.md",
+      "class": "测试方法与模板",
+      "reason": "移动端与无障碍测试计划（P1-09）：8 设备矩阵与 23 项无障碍清单。属可核对的方法学，公开无风险。"
+    },
+    {
+      "path": "user-research-template.md",
+      "class": "测试方法与模板",
+      "reason": "G8 用户验证的数据收集模板。模板本身不含任何真实用户数据。"
+    },
+    {
+      "path": "redesign-v2-visual.md",
+      "class": "交付与改版记录",
+      "reason": "前端视觉改版（v2）交付记录。与发布树当前外观对应，属提交物说明。"
+    },
+    {
+      "path": "p0-02-automation-alternatives.md",
+      "class": "过程追踪",
+      "reason": "P0-02 自动化替代方案评估报告：记录「为什么不用平台自动化而走自建链路」。属决策依据。"
+    },
+    {
+      "path": "remaining-items.md",
+      "class": "过程追踪",
+      "reason": "仍需完成项记录（2026-08-02）。末尾带日期与逐项状态，是过程材料而不是「当前状态声明」，因此可以公开；但**不得**在它上面新增未标日期的现况断言（对照 HANDOFF.md 在 Phase 7a 的退役）。"
+    },
+    {
+      "path": "remaining-items-2026-08-02-fixed.md",
+      "class": "过程追踪",
+      "reason": "AI求职面试教练待完善与修复报告（2026-08-02）：G0–G9 符合性审计与逐条修复结论，文件名自带日期，属历史记录。"
+    }
+  ]
+}

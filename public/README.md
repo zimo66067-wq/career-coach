@@ -22,7 +22,11 @@
 > - `js/job-upload.js` —— 2026-09-17（Phase 6b-1）随 `f2-match.html` 的界面一并退役。
 >   它绑定的 `/api/wf03/{upload,jd,match}` 前端路径**只产出匹配分数，产不出 Decision 与 Gap**，
 >   无法支撑目标岗位工作区；替代实现是 `pages/target-job.html` + `js/target-job.js`
->   （走 `/api/target-jobs` 与 `/api/actions`）。后端 `wf03` 路由仍保留，去留见 Phase 7 决议。
+>   （走 `/api/target-jobs` 与 `/api/actions`）。
+>   **后端 `/api/wf03/*` 三条路由保留（Phase 7b 决议，2026-09-17）**：它们不是死接口 ——
+>   `wf03` 是 DuMate 工作流编号 WF-01~WF-07 在 HTTP 上的体现（与 `capability_matrix.md`
+>   的 N7/N9 两行、`dumate-workflow-sop.md` 的 WF-03 一一对应），**归零的是浏览器消费方，
+>   不是消费者**。判据把它锁住：`tests/test_phase7b_contract.js`。
 > - `pages/kb.html` —— 2026-09-13 随「知识库不作为独立产品」下线，题库下沉为面试引擎的内部数据源。
 > - 目录索引里原先的 `voice-test-checklist.md` 一项已随语音链路删除一并清除。
 
