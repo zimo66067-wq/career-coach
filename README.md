@@ -1,10 +1,11 @@
 # career-coach · AI求职面试教练
 
-> **项目状态：F1–F4 全接口已统一实现并回归通过（pytest 423 通过，Node 契约 36/36），六工作流自动化彩排 10/10 通过。**
+> **项目状态：F1–F4 全接口已统一实现并回归通过（pytest 482 通过，Node 契约 42/42），六工作流自动化彩排 10/10 通过。**
 >
-> 正在按「证据驱动的 AI 求职教练」做收敛式重构（Phase 1 已完成）：删除了专业→职业匹配、C7 预测区间、
-> 独立面经知识库页、整条语音链路与 4 条死路由。**详细删除清单见 `CHANGELOG.md` 2026-09-13 两条条目，
-> 分阶段报告见 `docs/phase1-report.md`。**
+> 正在按「证据驱动的 AI 求职教练」做收敛式重构（**Phase 6a 已完成**）：删除了专业→职业匹配、C7 预测区间、
+> 独立面经知识库页、整条语音链路与 4 条死路由；修掉最后 2 处依赖倒置并加静态分层门禁；
+> 删掉第三棵前端树 `ui/`，前端收敛为 `public/`（canonical）+ `docs/`（发布镜像）。
+> **详细删除清单见 `CHANGELOG.md`，分阶段报告见 `docs/phase1-report.md` ~ `docs/phase6a-report.md`。**
 >
 > - ✅ 数据合同冻结（4 Schema + scoring.md）
 > - ✅ 工具链已实现并测试通过
@@ -39,11 +40,11 @@ iCAN 无代码开发挑战赛（DuMate 方向）参赛项目。
 
 ```
 career-coach/
-├── docs/            # 设计/技术汇总、测试报告、发布镜像（Pages 源）
+├── public/          # 前端唯一 canonical（Vercel 生产静态根）
+├── docs/            # 设计/技术汇总、测试报告 + 发布镜像（Pages 源）
 ├── contracts/       # 4 个 JSON Schema + scoring.md 评分公式（冻结层，禁止擅改）
 ├── workflows/       # WF-01~06 工作流定义（DuMate 负责实现）
 ├── prompts/         # resume / match / interview / plan 提示词模块
-├── ui/              # prototype/ 静态高保真原型 + assets/
 ├── tools/           # WorkBuddy 交付的 8 个 Python 工具
 ├── tests/           # fixtures-synthetic 合成样本 + pytest 契约/故障注入测试
 ├── tasks/           # 任务看板规则
@@ -53,7 +54,11 @@ career-coach/
 
 ## 快速开始
 
-**看公开入口**：GitHub Pages 从 `docs/` 发布；本地可双击打开 `ui/prototype/index.html`。功能页默认均为等待用户材料的空态，普通 `?state=...` 参数不会展示诊断结果。
+**看公开入口**：Vercel 生产静态根是 `public/`（`vercel.json` 把 `/`、`/index.html` 与 `css`、`js`、`pages`、`assets` 四类路径重写到 `public/`）；GitHub Pages 从 `docs/` 发布同一前端。本地直接双击打开 `public/index.html` 即可。功能页默认均为等待用户材料的空态，普通 `?state=...` 参数不会展示诊断结果。
+
+> **同步约定**：`public/` 是唯一 canonical。两棵树下所有**非 `.md`** 文件必须集合相同且逐字节相同 ——
+> 由 `tests/test_publish_mirror.js` 门禁守住，用 `python scripts/sync_mirror.py` 修复漂移。
+> （2026-09-17 已删除第三棵树 `ui/prototype`：它是陈旧分叉 + `assets` 重复副本，未部署且含 7 处坏引用。）
 
 **内部 QA 演示**：仅限显式使用 `?demo=1&state=empty|processing|success|error|degraded`；该入口不在公开导航中，合成数据不得作为用户诊断结果使用。
 
@@ -124,7 +129,7 @@ set PY=C:\Users\Administrator\.workbuddy\binaries\python\envs\default\Scripts\py
 | 角色 | 拥有目录 | 说明 |
 |---|---|---|
 | Product Agent | docs/ + contracts/ | 已冻结，改动须走变更流程 |
-| Frontend Agent (WorkBuddy) | ui/ + prompts/ | 静态原型与提示词 |
+| Frontend Agent (WorkBuddy) | public/ + prompts/ | 前端发布树（唯一 canonical）与提示词 |
 | QA/Tool Agent (WorkBuddy) | tools/ + tests/ | 校验器、复算器、契约测试 |
 | Workflow Agent (DuMate) | workflows/ + deliverables/ | 六个工作流与提交包 |
 | Integration Agent | 合并 + 版本冻结 | 单一负责人 |

@@ -44,7 +44,7 @@ RETIRED_FILES = [
     "scripts/build_majors_data.py",
     "scripts/validate_f2_data.py",
 ]
-RETIRED_TREES = ["public", "docs", "ui/prototype"]
+RETIRED_TREES = ["public", "docs"]
 RETIRED_TREE_FILES = ["pages/f2-match.html", "css/f2-major.css", "js/f2-major.js"]
 
 
@@ -80,6 +80,16 @@ def test_retired_files_are_absent():
         for relative in RETIRED_TREE_FILES:
             assert not (ROOT / tree / relative).exists(), "%s/%s must be deleted" % (tree, relative)
     assert not (ROOT / "data" / "f2").exists(), "data/f2 directory must be deleted"
+
+
+def test_the_legacy_prototype_tree_is_gone():
+    """Phase 6a: `ui/` was a third front-end copy (stale fork + duplicate assets).
+
+    It had 7 broken references, was deployed nowhere, and nothing at runtime
+    referenced it. `public/` is the only canonical tree now, so the whole
+    directory must stay gone — not just the files retired in Phase 1.
+    """
+    assert not (ROOT / "ui").exists(), "ui/ must not be resurrected: public/ is the only front-end tree"
 
 
 def test_module_no_longer_imports_the_retired_capability():

@@ -4,6 +4,53 @@
 
 ## [Unreleased]
 
+### Removed - 2026-09-17 删除第三棵前端树 ui/（Phase 6a）
+
+`ui/prototype/` 是 `public/` 的陈旧分叉：21 个文件名全部已存在于 `public/`（12 个逐字节相同，
+9 个不同，其中 8 个更小 —— `css/main.css` 20336 vs 32008），
+含 **7 处坏引用**（6 处指向不存在的 JS + `radar.js` 在 prototype 下失效的 ECharts 相对路径），
+`vercel.json` 无 `ui/` 重写所以**从未部署**，且 `public/`、`docs/` 的 HTML/JS/CSS 中**零运行期引用**。
+`ui/assets/` 与 `public/assets/` **逐字节完全相同**。没有一件是 prototype 独有的。
+
+- 删除 `ui/` 整树（24 文件）+ 删除 `scripts/capture_ui.py`（目标树被删，且本就指向已删的 `f2-match.html`）
+- `tests/test_phase1_deletions.py`：`RETIRED_TREES` 去掉 `ui/prototype`，另加一项断言
+  `ui/` **整目录不得复活**（`public/` 是唯一前端树）
+- `scripts/capture_mobile_ui.py`：去掉已删的 `f2-match` 条目，补上缺的 `pages/f5-apply.html`
+
+### Changed - 2026-09-17 前端 canonical 口径：public 为源、docs 为镜像（Phase 6a）
+
+不变量从"约定"升级为门禁：两棵发布树下所有 **非 `.md`** 文件必须**集合相同且逐字节相同**。
+
+- 新增 `scripts/sync_mirror.py`：规则化（不硬编码清单）、幂等、`--check` 只校验并以退出码 1 报漂移；
+  不自动删除镜像侧孤儿文件（需人工确认）
+- 重写 `tests/test_publish_mirror.js`：**规则驱动 + 双向检查 + 判据自检**。
+  原测试是**硬编码 26 项清单**，漏掉了 `blind-test-results/blind-test-summary.json` ——
+  恰好当时两边相同，那处漂移永远不会被发现；且清单式规则的失效方式是"静默漏检"
+- 已实测门禁会红：注入 `docs/` 侧内容漂移 + 孤儿文件 → `--check` 退出码 1、node 测试 `not ok`
+- `scripts/sync_sidebar.py`：来源声明由 `ui/prototype` 改为 `public/`；`PAGES` 补上漏掉的
+  `pages/f5-apply.html`（6 页都有侧栏，脚本原来只管 5 页）；`TREES` 改为源在前
+
+### Fixed - 2026-09-17 Phase 6a 顺带修掉的四处真实偏差
+
+- `pages/f4-report.html`（两棵树）在同一个 `<head>` 里**重复引入 `css/sidebar.css`** → 去掉重复项
+- `public/capability_matrix.md` 比 `docs/` 那份旧：N8 行 08-05 vs 08-06，后者带
+  `tests/embedding_full_recall_zhipu-3.json` + `deliverables/p0-03-evidence/`（2026-08-06 实跑）→ 同步
+- `public/README.md` 与 `docs/README.md` **逐字节相同、整篇是 `ui/prototype` 的自述**，
+  还列着 Phase 1 已删的 `pages/kb.html`、C7 区间带、七天计划 → 两棵都重写为发布树说明
+  （页面清单、公开运行规则、发布结构与同步约定）
+- 两份 `index.md` 都还索引着**不存在**的 `voice-test-checklist.md`（Phase 1 删语音链路时遗留）→ 删除该行
+
+提交：**`<待回填>`**（<待回填> 文件，<待回填>）。
+
+### Changed - 2026-09-17 Phase 6a 门禁口径
+
+- pytest **481 → 482**（+1 项 `ui/` 整树已删断言）；node **36 → 42**（镜像测试 1→3 项、新增 6a 契约 4 项）
+- 八步门禁扩为**九步**：新增第 9 步「发布镜像不变量」（`scripts/sync_mirror.py --check`）。
+  该步第一版写成 `cmd | tail -5; echo $?` —— `$?` 取的是 `tail` 的退出码、**永远为 0**，
+  一个不可能报错的检查；已改为先接住输出与退出码再打印，并实测三种状态回读正确
+- 真实 HTTP 冒烟仍 **70/70**；vercel 重写仍 **44** 条 / 死路由 0；双方言 DDL 仍各 **29** 张表
+- 敏感扫描 253 → **236** 文件（删除 `ui/` 24 文件等），无发现
+
 ### Changed - 2026-09-17 依赖倒置：模型工厂收敛 + 分层门禁（Phase 5）
 
 DoD #13「Service 不反向依赖 API」。两处倒置（`diagnosis_service` / `interview_service` 里

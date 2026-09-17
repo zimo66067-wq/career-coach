@@ -17,7 +17,6 @@
 | mobile-accessibility-testing.md | 测试 | 移动端适配测试 |
 | dumate-workflow-sop.md | SOP | DuMate 工作流搭建指南 |
 | user-research-template.md | 用户研究 | G8 用户验证模板 |
-| voice-test-checklist.md | 测试清单 | 语音链路测试清单 |
 | p0-02-automation-alternatives.md | 方案 | P0-02 自动化方案分析 |
 | remaining-items.md | 项目管理 | 剩余未完成任务 |
 | remaining-items-2026-08-02-fixed.md | 项目管理 | 已修复问题清单 |

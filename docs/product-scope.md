@@ -206,7 +206,7 @@ CareerProfile        TargetJob                InterviewSession        Action
 | 12 Interview 新事实需用户确认 | ✅ **Phase 4 端到端打通**：D9=A 落地，`wf04/end` 一次性抽取；模型路径与降级路径都由 `candidate_evidence()` 收口，只产 pending（9 项测试锁死） | ✅ **已达成**（Phase 4） |
 | 13 Service 不反向依赖 API | ✅ **Phase 5 达成**：两处倒置已修（`diagnosis_service` / `interview_service` 不再 import api，模型工厂收敛为 `tools.providers.model` 唯一归属地）；新增静态门禁 `tests/test_layering.py`（8 项，进 pytest，含判据自检） | ✅ **已达成**（Phase 5）。`tools/` 归并进 domain+providers 属 Phase 7 |
 | 14 .env 无重复/废弃 | 4 个重复变量 + 2 个无消费者 | Phase 7 |
-| 15 前端只有一套 canonical | public / docs / ui 三份 | Phase 6（D1 已保证三份同步删除、public==docs 逐字节一致） |
+| 15 前端只有一套 canonical | ✅ **Phase 6a 达成**：`ui/prototype`（陈旧分叉）+ `ui/assets`（与 `public/assets` 逐字节重复）**整树已删**；`public/` 定为唯一 canonical，`docs/` 为发布镜像，非 `.md` 文件由 `tests/test_publish_mirror.js` 强制集合相同 + 逐字节相同（含判据自检） | ✅ **已达成**（Phase 6a）。`.md` 的公开范围属产品/隐私决策，未擅自增删 |
 | 16-18 Coverage 85/90/75 | Python 79%（Phase 0 基线）；JS 未测 | Phase 15（须在 CI 的 Python 3.11 上重测） |
 | 19 CI 全绿 | ✅ pytest **457** passed + node 36/36 | 已达成 |
 | 20 High/Critical 依赖漏洞 = 0 | ✅ pip-audit 无发现 | 已达成 |
@@ -214,7 +214,7 @@ CareerProfile        TargetJob                InterviewSession        Action
 | 22 删除链路自动化测试 | ✅ **`tests/test_phase1_deletions.py` 24 项**；Phase 3 加目标岗位删除级联；**Phase 4 修掉一处真实的孤儿行泄漏**（删岗位未清派生行动，见 `phase4-report §7` 缺陷 1） | ✅ **已达成** |
 | 23 README 与实际 IA 一致 | 已修正项目状态、页面数、F4 口径与已删变量 | 命名体系仍用 F1–F5（Phase 6/7 统一） |
 | 24 无 dead routes | ✅ **0 个**；Phase 4 新增 3 条重写（共 **44** 条）后仍为 0，并新增**正向**检查（新接口必须在生产入口有重写） | ✅ **已达成** |
-| 25 无明显 dead code | 已清除：专业匹配+任务框架、C7、KB 页、语音链路、陈旧测试产物 | 剩余：`ui/prototype` 陈旧分叉、4 个推送脚本、5 个未调用 prompt（Phase 6/7） |
+| 25 无明显 dead code | 已清除：专业匹配+任务框架、C7、KB 页、语音链路、陈旧测试产物；**Phase 6a 再清：`ui/` 整树（24 文件）、`scripts/capture_ui.py`（已坏）** | 剩余：4 个推送脚本、5 个未调用 prompt（Phase 7）。`ui/prototype` 一项已结清 |
 
 ---
 
@@ -504,3 +504,53 @@ vercel 死路由 **0**（44 条重写 / 38 条 API 路由）、双方言 DDL 各
 属 Phase 7；不塞进本期，是为了让"倒置已修"这个结论保持可验证。
 
 **口径**：本阶段是结构与测试改动，**对外能力零变化**。发布说明不得出现"性能提升/新增能力"。
+
+---
+
+## 15. Phase 6a 完成记录（2026-09-17 · 前端 canonical 唯一化与死树清理）
+
+提交 **`<待回填>`**（<待回填> 文件，<待回填>）；门禁 pytest **482**、node **42/42**、
+真实 HTTP 冒烟 **70/70**、vercel 死路由 **0**、双方言 DDL 各 **29** 张表、
+发布镜像 27 个非 md 文件逐字节一致。
+
+**为什么先做这一段（裁决）**：`product-scope.md §7` 与多条 Phase 报告把 Phase 6 写成"前端工作面"，
+但它实际包含四件规模不同的事：① canonical 唯一化 ② IA 收敛到 4 个一级工作区 + 去 F 代号
+③ 闭环接线（目标岗位工作区挂 `job-upload.js`、F5 接 `targetJobId`、Action Loop 消费 8 条路由）
+④ D7 登录门禁。一次做完必然注水，且 ①②是 ③④ 的前置（改名不能跨着一棵待删的树做）。
+**故拆为 6a（本轮，结构）与 6b（IA 收敛 + 闭环接线 + D7）**。
+
+**修了什么**
+
+1. **删掉第三棵前端树 `ui/`（24 文件）**：`ui/prototype/` 是 `public/` 的陈旧分叉 —— 21 个文件名
+   全部已存在于 `public/`（12 个逐字节相同、9 个不同且其中 8 个更小，如 `css/main.css` 20336 vs 32008；
+   `pages/f3-interview.html` 反而更大，但 prototype 侧**缺** `pages-api-config.js`、`job-upload.js`、
+   `resume-upload.js`）、含 **7 处坏引用**（6 处指向不存在的 JS + `radar.js` 里在 prototype 下失效的
+   ECharts 相对路径）、**未部署**（`vercel.json` 无 `ui/` 重写）、**无任何运行期引用**；
+   `ui/assets/` 与 `public/assets/` **逐字节完全相同**（3 文件，含 1MB echarts）。
+   没有一件是 prototype 独有的。
+2. **不变量从"约定"升级为"门禁"**：`public/` 定为唯一 canonical，`docs/` 定为发布镜像；
+   新增 `scripts/sync_mirror.py`（规则化 + `--check`）与重写的 `tests/test_publish_mirror.js`
+   （**规则驱动、双向、含判据自检**）。原测试是**硬编码 26 项清单**，漏掉了
+   `blind-test-results/blind-test-summary.json` —— 恰好当时两边相同，那处漂移永远不会被发现。
+3. **两棵发布树的自述文件是死树自述**：`public/README.md` 与 `docs/README.md` 逐字节相同，
+   且整篇在描述 `ui/prototype`（还列出 Phase 1 已删的 `pages/kb.html`、C7 区间带、七天计划）。
+   两棵都重写为发布树说明。
+4. **顺带修掉的真实缺陷**：`scripts/sync_sidebar.py` 的来源声明写着 `ui/prototype`（删树后成假话）、
+   `PAGES` 漏了 `pages/f5-apply.html`（6 页都有侧栏，脚本只管 5 页）；`pages/f4-report.html`
+   在同一个 `<head>` 里**重复引入 `sidebar.css`**；`public/capability_matrix.md` 比 `docs/` 那份旧
+   （08-05 vs 08-06，且后者带 `deliverables/p0-03-evidence/` 实跑证据）；两份 `index.md` 都还索引着
+   已不存在的 `voice-test-checklist.md`。删 `scripts/capture_ui.py`（目标树被删且本就指向已删的 `f2-match.html`）；
+   修 `scripts/capture_mobile_ui.py` 的同类坏条目。
+
+**未做（有意）**
+
+- `scripts/p0-06-user-mission.py` / `p0-07-freeze.py` 里的 `ui/prototype` 引用**不改**：它们是
+  2026-08-03 G9 证据链的**时点归档脚本**，引用是历史事实。但**不得重跑**（会产出错误证据）。
+- `.md` 的公开范围（`docs/` 45 份内部文档、`public/` 16 份）**未擅自增删** —— 这属产品/隐私决策。
+- IA 收敛（去 F 代号、导航 ≤4）与闭环接线未动，按上面的裁决留给 6b。
+
+**口径**：本阶段是结构与清理改动，**用户可见行为零变化**。唯一对外可见差异是
+`public/capability_matrix.md` 与 `README.md` 的内容修正。
+
+**下一步**：Phase 6b（IA 收敛到 4 个一级工作区 + 全量去 F 代号 + 目标岗位工作区挂 `job-upload.js`
++ F5 接 `targetJobId` + Action Loop 消费 8 条路由 + D7 登录门禁）；D3 期限 **2026-10-13**。

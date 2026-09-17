@@ -130,7 +130,7 @@ INTERVIEW_DONE -> AGGREGATING -> RESCORING -> DIMENSION_MAPPING -> PLAN_GENERATI
     --output /tmp/radar_option.json
   - 输出 ECharts option（6 indicator, max=100, 3 series）
   - series: C0基线 + 七天推演low + 七天推演high
-  - 直接被 ui/prototype/js/radar.js 消费
+  - 直接被 public/js/radar.js 消费
 ```
 
 ### 3.5 备用路径

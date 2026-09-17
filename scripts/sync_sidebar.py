@@ -1,20 +1,25 @@
 # -*- coding: utf-8 -*-
-"""Inject the account sidebar into docs/ and public/ publish trees (idempotent).
+"""Inject the account sidebar into the publish trees (idempotent).
 
-Source of truth: ui/prototype markup (sidebar.css, aside, auth modal).
-Run after adding/changing the sidebar so both publish mirrors stay in sync.
+Source of truth: `public/` — it is the only canonical front-end tree.
+`docs/` is the publish mirror and must stay byte-identical for every non-.md
+file (enforced by tests/test_publish_mirror.js and scripts/sync_mirror.py).
+
+Run this after adding/changing the sidebar markup, then run
+`python scripts/sync_mirror.py` to re-mirror docs/.
 """
 import io
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-TREES = [ROOT / "docs", ROOT / "public"]
+TREES = [ROOT / "public", ROOT / "docs"]
 PAGES = [
     "index.html",
     "pages/f1-resume.html",
     "pages/f3-interview.html",
     "pages/f4-report.html",
+    "pages/f5-apply.html",
     "pages/states.html",
 ]
 

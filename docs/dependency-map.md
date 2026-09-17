@@ -80,6 +80,10 @@
 
 后端 Python 合计 **10383 行**（`api` + `services` + `tools`）。
 
+> **本表是 Phase 0（2026-08-08 前后）的审计快照**，不是当前状态。已随 Phase 1~6a 失效的行：
+> `api/f2_major.py`（已删）、`services/task_service.py`（已删）、`tools/providers/asr.py`（已删）、
+> `ui/prototype/**`（**Phase 6a 整树已删**）。前端两树的当前文件数与不变量见 §4.4。
+
 ---
 
 ## 2. 实测依赖边
@@ -211,15 +215,26 @@ public/pages/*.html
 
 即：产品早已不走语音，但语音的代码、配置、脚本、文档、测试全部留着。
 
-### 4.4 三份前端副本，只有一份 canonical
+### 4.4 前端副本：Phase 6a 后只剩一份 canonical
+
+**Phase 6a 更新（2026-09-17）** —— 原表列的三份副本已收敛为两份，且不变量从"约定"变成"门禁"：
 
 | 树 | 文件 | 状态 |
 | --- | --- | --- |
-| `public/` | 47 | **canonical**，Vercel 实测静态根 |
-| `docs/` | 66 | GitHub Pages 镜像（45 个与 public 逐字节相同）+ 19 个只存在于 docs 的项目文档；**2 个漂移**：`capability_matrix.md`、`index.md` |
-| `ui/prototype/` | 27 | **未部署**。`/ui/prototype/index.html` 实测 404 |
+| `public/` | **43**（27 非 md + 16 md） | **唯一 canonical**，Vercel 实测静态根 |
+| `docs/` | **72**（27 非 md + 45 md） | GitHub Pages 镜像；27 个非 md 与 public **逐字节相同** |
+| ~~`ui/prototype/`~~ | ~~27~~ → **0（整树已删）** | 陈旧分叉 + `ui/assets` 与 `public/assets` 逐字节重复，未部署、无运行期引用、含 7 处坏引用 |
 
-`ui/prototype/` 是 `public/` 的陈旧分叉，逐文件行数已不同（如 `data-bridge.js` 829 vs 889、`main.css` 447 vs 621、`f2-major.js` 611 vs 719）。
+**新的不变量**（`tests/test_publish_mirror.js` 强制，含判据自检）：
+两棵树下所有 **非 `.md`** 文件必须**集合相同且逐字节相同**，双向检查（docs 侧不得长出孤儿）。
+修复用 `scripts/sync_mirror.py`（`--check` 只校验、退出码 1）。
+
+原判据是**硬编码 26 项清单**，漏掉了 `blind-test-results/blind-test-summary.json` —— 恰好当时两边相同，
+所以那处漂移永远不会被发现。规则化就是为了消灭这类覆盖洞。
+
+`.md` 不在自动镜像范围内：`docs/` 合法地多出 29 份内部文档。共有的 16 份 md 里，
+`capability_matrix.md` 已同步（`docs/` 那份是 2026-08-06 且带 `deliverables/p0-03-evidence/` 实证，
+`public/` 那份停在 08-05）；`index.md` 两树不同是**设计如此**（各树自己的目录索引）。
 
 ### 4.5 生产静态暴露面（实测）
 
@@ -229,10 +244,14 @@ Vercel 静态根是 `public/`，**其中所有文件都对公网可读**。实�
 /capability_matrix.md            /observability.md
 /dumate-workflow-sop.md          /defense-evidence-index.md
 /README.md                       /blind-test-results/blind-test-report.md
-/voice-test-checklist.md         /remaining-items.md（列已知缺口）
+/remaining-items.md（列已知缺口）
 ```
 
-同时 `/assets/favicon.svg`、`/assets/logo.svg`、`/assets/vendor/echarts.min.js` **实测 404**：`vercel.json` 把 `/assets/:path*` 重写到 `/ui/assets/:path*`，但 `ui/` 不在部署静态根内 → **所有页面的 favicon 在线上是坏的，雷达图的本地 ECharts 兜底也永远 404**（只剩 CDN 路径可用）。
+> **Phase 6a 更新**：原表还列了 `/voice-test-checklist.md`，该文件已不存在（Phase 1 拆语音链路时删除），
+> 两份 `index.md` 里对它的索引项也已一并清除。**哪些内部文档应当公开**属产品/隐私决策，本阶段未擅自增删，见 `phase6a-report.md`。
+>
+> 另：原记录「`/assets/*` 实测 404」已不成立 —— `vercel.json` 现已把 `/assets/:path*` 重写到 `/public/assets/:path*`，
+> 且 `assets/`（favicon / logo / vendor/echarts.min.js）已纳入两棵发布树并有镜像门禁守着。
 
 ### 4.6 一次性运维脚本（约 1079 行）
 

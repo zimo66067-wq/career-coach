@@ -47,8 +47,11 @@
 > 新增参考：`docs/phase3-report.md`。
 >
 > **现状口径**：主产品只剩一套匹配概念（`wf03` / `services/match_service.py`，DoD #6 达成）；
-> dependency inversion 由 3 处降为 2 处；一级导航 7 → 5 项；dead routes = 0。
-> 仍有效的审计结论：`/api/admin/*`、`/api/f5/organizations/*` 无用户界面消费；`ui/prototype` 是陈旧分叉（Phase 6/7）。
+> dependency inversion 已由 3 处降为 **0 处**（Phase 5 修完并加静态门禁 `tests/test_layering.py`）；
+> 一级导航 7 → 5 项（收敛到 ≤4 与去代号留 Phase 6b）；dead routes = 0。
+> 仍有效的审计结论：`/api/admin/*`、`/api/f5/organizations/*` 无用户界面消费。
+> **Phase 6a（2026-09-17）**：`ui/prototype` 陈旧分叉已**整树删除**，前端只剩 `public/`（canonical）与 `docs/`（发布镜像），
+> 非 `.md` 文件由镜像门禁强制逐字节相同。
 
 ---
 
@@ -400,16 +403,17 @@ git diff --check                       通过
 
 | # | 文档说法 | 代码/线上事实 |
 | --- | --- | --- |
-| 1 | `README.md:3`「pytest 220 通过 / 4 跳过，Node 契约 7/7」 | 实测 **436 passed / 52 node** |
+| 1 | `README.md:3`「pytest 220 通过 / 4 跳过，Node 契约 7/7」 | 早已更新为 **482 passed / 42 node**（2026-09-17）；本行滞后于 README 本身 |
 | 2 | `README.md:26-29` 把 F1–F5 作为产品功能表 | 与「取消用户可见 F1-F5」的目标直接冲突 |
 | 3 | `README.md:32`「F4 七天结果称『情景推演』不得称『预测』」 | 预测能力本身仍在（`C7_low/high` + 0.3/0.7 参数） |
 | 4 | `README.md:74` 列出 `ASR_API_URL / TTS_API_URL / BAIDU_SPEECH_TOKEN` | 语音链路已死 |
-| 5 | `docs/design/architecture.md`（62 行）描述四层架构 | 实际无 domain/repositories 层，且存在 3 处依赖倒置 |
-| 6 | `vercel.json` 把 `/assets/*` 重写到 `ui/assets/*` | `ui/` 未部署，线上 404 |
-| 7 | `scripts/sync_sidebar.py` 说 `ui/prototype` 是 sidebar 的 source of truth | 但 `ui/prototype` 整体未部署，且与 `public/` 已分叉 |
+| 5 | `docs/design/architecture.md`（62 行）描述四层架构 | 实际无 domain/repositories 层；3 处依赖倒置**已由 Phase 5 降为 0 处**并加静态门禁 |
+| 6 | `vercel.json` 把 `/assets/*` 重写到 `ui/assets/*` | ✅ **已修**：改重写到 `/public/assets/:path*`，`assets/` 已纳入两棵发布树并有镜像门禁 */
+| 7 | `scripts/sync_sidebar.py` 说 `ui/prototype` 是 sidebar 的 source of truth | ✅ **已修（Phase 6a）**：改为 `public/` 为唯一源；`ui/` 整树已删；脚本的 `PAGES` 还漏了 `pages/f5-apply.html`，一并补上 |
 | 8 | `docs/design/privacy.md` 与 `SECURITY.md` 描述日志脱敏 | 需在 Phase 7 逐条复核（本次未验证） |
 | 9 | `contracts/*.schema.json` 共 4 个 | 只有 2 个被运行时加载，另 2 个仅 CI 使用 |
 | 10 | `CHANGELOG.md` 多条仍写「commit hash 待回填」 | 历史提交已完成 |
+| 11 | `public/README.md` 与 `docs/README.md` 整篇是 `ui/prototype` 的自述 | ✅ **已修（Phase 6a）**：两棵树的自述重写为发布树说明；原文还列着 Phase 1 已删的 `pages/kb.html`、C7 区间带、七天计划 |
 
 ---
 

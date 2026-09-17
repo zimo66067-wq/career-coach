@@ -130,7 +130,7 @@
 | 删除残留 | 删除后无缓存/会话残留 | 检查 /tmp/ 文件已清除 |
 | 日志安全 | 日志扫描无 PII（姓名/电话/邮箱/身份证/音频/完整简历） | log_sanitize.py 扫描 |
 | 日志脱敏 | 手机号/邮箱/JWT/AK-SK 全部脱除 | log_sanitize.py 测试 |
-| 降级界面 | 降级态参照 ui/prototype/pages/states.html | 检查界面状态 |
+| 降级界面 | 降级态参照 public/pages/states.html | 检查界面状态 |
 
 ## 8. 验收命令
 
