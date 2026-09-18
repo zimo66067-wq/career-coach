@@ -32,7 +32,7 @@ from domain.target_job import (
 from domain.target_job import decide as domain_decide
 from repositories import action as action_repo
 from repositories import target_job as repo
-from tools import database
+from repositories import database
 
 MATCH_ENGINE = "rule_bm25"
 

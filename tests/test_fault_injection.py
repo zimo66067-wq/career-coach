@@ -16,7 +16,7 @@ ENV = dict(os.environ, PYTHONIOENCODING="utf-8")
 
 def run_validator(schema, instance_path):
     return subprocess.run(
-        [PY, os.path.join(ROOT, "tools", "validate_schema.py"),
+        [PY, os.path.join(ROOT, "domain", "validate_schema.py"),
          "--schema", os.path.join(ROOT, "contracts", schema),
          "--instance", str(instance_path)],
         capture_output=True, text=True, encoding="utf-8", env=ENV)
@@ -24,7 +24,7 @@ def run_validator(schema, instance_path):
 
 def run_redflag(out_path, against):
     return subprocess.run(
-        [PY, os.path.join(ROOT, "tools", "redflag.py"),
+        [PY, os.path.join(ROOT, "domain", "redflag.py"),
          "--output", str(out_path)] + ["--against"] + list(against),
         capture_output=True, text=True, encoding="utf-8", env=ENV)
 

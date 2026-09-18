@@ -2,7 +2,7 @@
 """extract_text.py · 从 PDF/DOCX/TXT 提取纯文本（WF-01 主路径）
 
 用法:
-  python tools/extract_text.py --input <file> --output <out.txt>
+  python domain/internal/extract_text.py --input <file> --output <out.txt>
 
 规则:
   - DOCX: 优先 python-docx；失败降级 zipfile + 正则解析 word/document.xml

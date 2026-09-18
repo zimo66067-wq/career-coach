@@ -8,8 +8,8 @@ MODEL_PROVIDER 环境变量选择 provider：
 """
 import os
 
-from tools.api_errors import ApiError
-from tools.model_router import ZhipuModelRouter
+from domain.internal.api_errors import ApiError
+from providers.model_router import ZhipuModelRouter
 
 
 class BaseModelProvider:

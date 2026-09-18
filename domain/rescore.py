@@ -2,7 +2,7 @@
 """rescore.py · 分数复算器（contracts/scoring.md 的唯一执行口径）
 
 用法:
-  python tools/rescore.py --input <score-input.json> [--expect C0=68.27] [--tolerance 0.5]
+  python domain/rescore.py --input <score-input.json> [--expect C0=68.27] [--tolerance 0.5]
 
 输入格式（见 tests/fixtures-synthetic/abilities/score-input-01.json）:
   R: 五个子分 0-100

@@ -12,14 +12,14 @@ from domain.target_job import OPEN_GAP_STATUSES, REQUIREMENT_TYPES, priority_for
 from repositories import target_job as target_job_repo
 from services import career_evidence_service as evidence_service
 from services import target_job_service
-from tools.api_errors import ApiError
-from tools.database import (
+from domain.internal.api_errors import ApiError
+from repositories.database import (
     delete_application as _delete_row,
     get_resume_detail,
     list_applications as _list_rows,
     save_application as _save_row,
 )
-from tools.providers import model as model_provider
+from providers import model as model_provider
 
 
 def _profile_from_detail(detail):
@@ -382,7 +382,7 @@ def record_outcome_feedback(application_id, owner_key, outcome, note=None):
     from domain.errors import DomainError
     from repositories import application as application_repo
     from services import career_evidence_service as evidence_service
-    from tools import database
+    from repositories import database
 
     application = application_repo.get_for_owner(application_id, owner_key)
     if application is None:

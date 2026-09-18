@@ -3,6 +3,12 @@
 
 覆盖：智谱/千帆 HTTP 错误、非法响应、输出解析变体、模型优先级、
 提示词加载、未知任务、主->备->规则降级链、日志内容脱敏。
+
+Phase 7d：`model_router` 从仓库根的裸模块（靠 `sys.path` 挂上）变成 `providers.model_router`，
+所以 `patch()` 的目标串也必须是**全限定**的 `"providers.model_router.urlopen"`。
+裸串 `"model_router.urlopen"` 在 7d 之后会以 `ModuleNotFoundError` 的形式炸 ——
+而且只在 patch 执行的那一行炸，收集期看不出来（见 tests/test_phase7d_contract.py
+对"mock 目标必须可解析"的静态判据）。
 """
 import json
 from unittest.mock import patch
@@ -10,7 +16,7 @@ from urllib.error import HTTPError, URLError
 
 import pytest
 
-from model_router import (
+from providers.model_router import (
     ModelRouter,
     QianfanModelRouter,
     ZhipuModelRouter,
@@ -55,7 +61,7 @@ PARAMS = {"temperature": 0.1, "max_tokens": 100, "timeout": 5}
 
 def test_zhipu_success_parses_json(zhipu):
     body = {"choices": [{"message": {"content": '{"ok": true}'}}]}
-    with patch("model_router.urlopen", return_value=fake_response(body)):
+    with patch("providers.model_router.urlopen", return_value=fake_response(body)):
         result = zhipu.call("resume_diagnosis", "简历正文")
     assert result["status"] == "success"
     assert result["output"] == {"ok": True}
@@ -63,7 +69,7 @@ def test_zhipu_success_parses_json(zhipu):
 
 def test_zhipu_http_error_maps_to_runtime_error(zhipu):
     with patch(
-        "model_router.urlopen",
+        "providers.model_router.urlopen",
         side_effect=HTTPError("https://x", 401, "Unauthorized", {}, None),
     ):
         with pytest.raises(RuntimeError, match="zhipu_http_401"):
@@ -71,13 +77,13 @@ def test_zhipu_http_error_maps_to_runtime_error(zhipu):
 
 
 def test_zhipu_network_error_maps(zhipu):
-    with patch("model_router.urlopen", side_effect=URLError("offline")):
+    with patch("providers.model_router.urlopen", side_effect=URLError("offline")):
         with pytest.raises(RuntimeError, match="zhipu_network_error"):
             zhipu._try_call("glm-test", "p", "u", PARAMS, None)
 
 
 def test_zhipu_invalid_response_shape(zhipu):
-    with patch("model_router.urlopen", return_value=fake_response({"choices": []})):
+    with patch("providers.model_router.urlopen", return_value=fake_response({"choices": []})):
         with pytest.raises(ValueError, match="zhipu_invalid_response"):
             zhipu._try_call("glm-test", "p", "u", PARAMS, None)
 
@@ -95,7 +101,7 @@ def test_zhipu_parse_output_variants():
 
 def test_qianfan_success_parses_json(qianfan):
     body = {"choices": [{"message": {"content": '{"ok": true}'}}]}
-    with patch("model_router.urlopen", return_value=fake_response(body)):
+    with patch("providers.model_router.urlopen", return_value=fake_response(body)):
         result = qianfan.call("resume_diagnosis", "简历正文")
     assert result["status"] == "success"
     assert result["output"] == {"ok": True}
@@ -103,7 +109,7 @@ def test_qianfan_success_parses_json(qianfan):
 
 def test_qianfan_http_error_maps(qianfan):
     with patch(
-        "model_router.urlopen",
+        "providers.model_router.urlopen",
         side_effect=HTTPError("https://x", 429, "Too Many", {}, None),
     ):
         with pytest.raises(RuntimeError, match="qianfan_http_429"):
@@ -111,13 +117,13 @@ def test_qianfan_http_error_maps(qianfan):
 
 
 def test_qianfan_network_error_maps(qianfan):
-    with patch("model_router.urlopen", side_effect=URLError("offline")):
+    with patch("providers.model_router.urlopen", side_effect=URLError("offline")):
         with pytest.raises(RuntimeError, match="qianfan_network_error"):
             qianfan._try_call("qwen-test", "p", "u", PARAMS, None)
 
 
 def test_qianfan_invalid_response_shape(qianfan):
-    with patch("model_router.urlopen", return_value=fake_response({"foo": "bar"})):
+    with patch("providers.model_router.urlopen", return_value=fake_response({"foo": "bar"})):
         with pytest.raises(ValueError, match="qianfan_invalid_response"):
             qianfan._try_call("qwen-test", "p", "u", PARAMS, None)
 

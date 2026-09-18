@@ -15,7 +15,7 @@ Phase 7c：本文件只剩「入口」这一件事 —— 建 app、装中间件
 
 三个必须留在这里的东西（不是懒得搬，是搬了会坏）：
 
-1. **`REPOSITORY_ROOT` 与 `sys.path` 插入** —— 线上入口就是本文件，`tools/` / `services/`
+1. **`REPOSITORY_ROOT` 与 `sys.path` 插入** —— 线上入口就是本文件，`domain/` / `providers/` / `repositories/` / `services/`
    能被 import 全靠这三行。移到别处等于赌"Vercel 一定先 import 了包"。
 2. **`app` 对象** —— `vercel.json` 的 `functions` 指向 `api/index.py`，文件名与
    `app` 这个变量名都是部署契约的一部分（`scripts/vercel-dead-routes.py` 也是
@@ -44,8 +44,8 @@ from api.startup import bootstrap  # noqa: E402
 # 断言它们在这里都能取到；反向也断言（入口不许 import 既不用、也没人取的符号）。
 from services.diagnosis_service import build_rule_based_resume_profile  # noqa: E402,F401
 from services.match_service import build_job_profile, match_job_profile  # noqa: E402,F401
-from tools.api_errors import ApiError  # noqa: E402,F401
-from tools.database import load_session  # noqa: E402,F401
+from domain.internal.api_errors import ApiError  # noqa: E402,F401
+from repositories.database import load_session  # noqa: E402,F401
 
 # 冷启动引导：显式调用，不再靠"import 本模块就顺带跑一次"的隐式副作用。
 # 迁移幂等；失败不抛、由 /api/health 照实上报（见 api/startup.py）。

@@ -7,7 +7,7 @@ import os
 import pytest
 from jsonschema import Draft202012Validator
 
-import validate_schema
+from domain import validate_schema
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures-synthetic")
 CONTRACTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "contracts")

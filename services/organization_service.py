@@ -7,15 +7,15 @@
 规划见 `docs/f5-organization-job-search-plan-2026-09-11.md`；阶段 1 的验收
 要求是「无外部 API 时不伪造数据；归属隔离、删除闭环和失败降级通过」。
 """
-from tools.api_errors import ApiError
-from tools.database import (
+from domain.internal.api_errors import ApiError
+from repositories.database import (
     find_organizations_by_name,
     get_organization as _get_organization_row,
     index_counts,
     list_job_postings,
     upsert_organization,
 )
-from tools.providers.organization import (
+from providers.organization import (
     build_organization_provider,
     eligible_results,
 )

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """repositories.migrations · 版本化数据迁移
 
-项目的 schema 由 ``tools.database.init_db()`` 以 ``CREATE TABLE IF NOT EXISTS`` 维护，
+项目的 schema 由 ``repositories.database.init_db()`` 以 ``CREATE TABLE IF NOT EXISTS`` 维护，
 因此**建表是加法**；但"已有数据要变成新模型"必须显式迁移，否则老库会留下语义不一致的行。
 本模块提供最小可用的迁移框架：
 
@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 
 from domain.application import LEGACY_FALLBACK_STATUS, LEGACY_STATUS_MAP, ApplicationStatus
 from repositories.base import cursor, insert, many, one
-from tools import database
+from repositories import database
 
 VERSION_APPLICATION_STATUS = "2026-09-13-phase2-application-status"
 VERSION_CAREER_PROFILES = "2026-09-13-phase2-career-profiles"

@@ -5,7 +5,7 @@
 配置 EMBEDDING_API_KEY 后可升级为向量召回（当前提供接口占位）。
 
 用法:
-  from tools.knowledge import search_questions, list_categories, list_questions
+  from domain.knowledge import search_questions, list_categories, list_questions
   search_questions("项目难点", category=None, limit=5)
 """
 import math

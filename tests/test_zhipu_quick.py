@@ -8,9 +8,8 @@ import time
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 
-import match_requirements as mr
+from domain import match_requirements as mr
 
 API_KEY = os.environ.get("ZHIPU_API_KEY", "")
 FIX = os.path.join(os.path.dirname(__file__), "fixtures-synthetic")

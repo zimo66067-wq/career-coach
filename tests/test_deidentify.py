@@ -3,7 +3,7 @@
 import re
 import time
 
-import deidentify
+from domain import deidentify
 
 RE_PHONE = re.compile(r"1[3-9]\d{9}")
 RE_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")

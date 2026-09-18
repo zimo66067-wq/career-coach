@@ -6,7 +6,7 @@
 敏感阻断: 20条敏感词 -> 立即替换题目
 
 用法:
-  from tools.interview_engine import InterviewEngine
+  from domain.interview_engine import InterviewEngine
   engine = InterviewEngine(model_router=router)
   session = engine.start(job_profile, resume_profile, match_gaps)
   q = engine.next_question(session)
@@ -579,9 +579,9 @@ class InterviewEngine:
     def _deidentify_answer(value):
         text = str(value or "")
         try:
-            from tools.deidentify import deidentify
+            from domain.deidentify import deidentify
         except ImportError:
-            from deidentify import deidentify
+            from domain.deidentify import deidentify
         cleaned, _mapping = deidentify(text)
         return cleaned
 
@@ -1017,12 +1017,14 @@ class InterviewEngine:
             float: I 分（0-100），或 None（证据不足）
         """
         try:
-            from tools.rescore import calc_I
+            from domain.rescore import calc_I
         except ImportError:
             try:
                 import sys
-                sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-                from rescore import calc_I
+                # Phase 7d：模块从 tools/ 移到 domain/，这条兜底要挂的是**仓库根**
+                # （原来是 tools/，`from rescore import ...` 才找得到），不是模块自己那一层。
+                sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                from domain.rescore import calc_I
             except ImportError:
                 # 最终降级: 本地加权计算
                 return self._calc_I_local(i_input)

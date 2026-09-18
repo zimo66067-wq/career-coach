@@ -2,7 +2,7 @@
 """radar_adapter.py · AbilityProfile -> ECharts radar option（WF-05 输出给前端）
 
 用法:
-  python tools/radar_adapter.py --input ability.json --output option.json
+  python domain/internal/radar_adapter.py --input ability.json --output option.json
 
 输出可直接被 js/radar.js 消费（indicator 六维 max=100，series 只有一条
 「当前证据快照」）。历史上的「七天推演 low/high」两条曲线依赖固定 0.30/0.70

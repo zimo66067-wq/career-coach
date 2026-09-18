@@ -2,11 +2,11 @@
 """F2 JD 解析与匹配服务（阶段5：自 api/index.py 机械搬迁，行为不变）。"""
 import re
 
-from tools.api_errors import ApiError
-from tools.contracts import JOB_PROFILE_VALIDATOR
-from tools.deidentify import deidentify
-from tools.redflag import RE_NUMBER
-from tools.match_requirements import (
+from domain.internal.api_errors import ApiError
+from domain.internal.contracts import JOB_PROFILE_VALIDATOR
+from domain.deidentify import deidentify
+from domain.redflag import RE_NUMBER
+from domain.match_requirements import (
     Bm25Matcher,
     judge,
     split_sentences,

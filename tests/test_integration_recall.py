@@ -66,7 +66,7 @@ def get_expected_labels(expected_path):
 def run_match(resume_path, job_path, backend, model=None, output_path=None):
     """调用 match_requirements.py CLI。"""
     cmd = [
-        sys.executable, "tools/match_requirements.py",
+        sys.executable, "domain/match_requirements.py",
         "--resume", resume_path,
         "--job", job_path,
         "--backend", backend,

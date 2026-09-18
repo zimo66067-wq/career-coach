@@ -1,19 +1,25 @@
 # -*- coding: utf-8 -*-
 """F1 简历诊断服务（阶段5：自 api/index.py 机械搬迁，行为不变）。
 
-依赖模型路由（tools.providers.model）与契约校验（tools.contracts）；
+依赖模型路由（providers.model）与契约校验（domain.internal.contracts）；
 无 key 时以规则降级（rule_fallback_diagnosis）交付。
+
+Phase 7d：补上漏掉的 `import re`。`normalize_score()`（第 105 行）用 `re.fullmatch`
+接住"provider 把分数写成数字字符串"这种输出（LLM 很常见），但模块级从来没有绑过 `re` ——
+于是这条分支一旦走到就是 `NameError`。它躲过了 7c 的门禁第 14 步，因为那一步当时
+只扫 `api/`；7d 把观察面扩到 5 层后**当场**报了出来（见 docs/phase7d-report.md §4）。
 """
 import json
+import re
 
-from tools.api_errors import ApiError
-from tools.contracts import RESUME_PROFILE_VALIDATOR, SUBSCORE_DEFAULTS
-from tools.deidentify import deidentify
-from tools.providers import model as model_provider
-from tools.redflag import JSON_NOISE, RE_NUMBER, RE_PLACEHOLDER
-from tools.rescore import calc_R, round2
-from tools.trace import new_trace_id
-from tools.validate_schema import business_rules
+from domain.internal.api_errors import ApiError
+from domain.internal.contracts import RESUME_PROFILE_VALIDATOR, SUBSCORE_DEFAULTS
+from domain.deidentify import deidentify
+from providers import model as model_provider
+from domain.redflag import JSON_NOISE, RE_NUMBER, RE_PLACEHOLDER
+from domain.rescore import calc_R, round2
+from domain.internal.trace import new_trace_id
+from domain.validate_schema import business_rules
 
 
 def profile_validation_errors(profile, resume_text):
@@ -323,9 +329,9 @@ def diagnose_resume(resume_text, trace=None):
     """诊断一份简历。**不依赖 web 层**：调用方（路由）可以把 trace id 传进来。
 
     Phase 5 之前这里 `from api.index import build_model_router`，顺带还用
-    `tools.trace.trace_id()` 兜底 —— 后者要 Flask 请求上下文，于是服务的单测必须
+    `api.trace.trace_id()` 兜底 —— 后者要 Flask 请求上下文，于是服务的单测必须
     `with app.test_request_context()` 才能跑（`test_phase5.py` 里那个 workaround 就是它）。
-    现在两层依赖都掉头了：工厂只从 `tools.providers.model` 取，trace 由调用方注入。
+    现在两层依赖都掉头了：工厂只从 `providers.model` 取，trace 由调用方注入。
     """
     cleaned_text, _mapping = deidentify(resume_text)
     try:

@@ -1,8 +1,8 @@
 
 import sys, json
 from pathlib import Path
-sys.path.insert(0, "tools")
-from interview_engine import InterviewEngine
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from domain.interview_engine import InterviewEngine
 
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures-synthetic"
 

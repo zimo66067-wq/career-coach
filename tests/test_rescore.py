@@ -2,7 +2,7 @@
 """test_rescore.py · rescore 对拍 scoring.md 手算示例 + 边界"""
 import pytest
 
-import rescore
+from domain import rescore
 
 
 def test_handcalc_example(score_input):

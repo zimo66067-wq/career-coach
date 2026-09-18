@@ -2,8 +2,8 @@
 """log_sanitize.py · 日志脱敏管道（WF 日志落盘前必经，见 docs/privacy.md 第4节）
 
 用法:
-  type app.log | python tools/log_sanitize.py > app.clean.log
-  python tools/log_sanitize.py --input app.log --output app.clean.log
+  type app.log | python domain/internal/log_sanitize.py > app.clean.log
+  python domain/internal/log_sanitize.py --input app.log --output app.clean.log
 
 规则:
   - 复用 deidentify 的 PII 规则（姓名/手机号/邮箱/身份证）
@@ -15,7 +15,7 @@ import re
 import sys
 
 RE_PHONE = re.compile(r"1[3-9]\d{9}")
-# 与 tools/deidentify.py 保持同一写法：前瞻 + 长度上限，否则在长日志行上是二次复杂度。
+# 与 domain/deidentify.py 保持同一写法：前瞻 + 长度上限，否则在长日志行上是二次复杂度。
 RE_EMAIL = re.compile(
     r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,24}"
 )

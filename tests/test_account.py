@@ -5,8 +5,8 @@ import os
 import pytest
 
 import api.index as api_module
-from tools import account as account_module
-from tools.database import get_resume_detail, save_resume
+from services import account_service as account_module
+from repositories.database import get_resume_detail, save_resume
 
 
 @pytest.fixture(autouse=True)
@@ -14,7 +14,7 @@ def _fresh_account_db(tmp_path, monkeypatch):
     """每个账号测试使用独立的临时数据库，避免会话级 DB 残留数据。"""
     db_file = tmp_path / "account_test.db"
     monkeypatch.setenv("RESUME_DB_PATH", str(db_file))
-    from tools import database
+    from repositories import database
     database.init_db()
     account_module._RATE_BUCKETS.clear()
     yield
@@ -171,7 +171,7 @@ def test_admin_demo_only_with_dev_demo_flag(monkeypatch):
     # 普通用户不注入演示数据
     assert client.get("/api/history").json["total"] == 0
 
-    from tools.database import create_user
+    from repositories.database import create_user
     create_user("13900000001", "admin@example.com",
                 account_module.hash_password("admin1234"), "管理员", role="admin")
     login = client.post(

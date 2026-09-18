@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tools.database import export_all  # noqa: E402
+from repositories.database import export_all  # noqa: E402
 
 
 def main():

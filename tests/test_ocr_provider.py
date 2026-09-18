@@ -10,7 +10,7 @@ import pytest
 
 import api.index as api_module
 import api.validation as api_validation
-import tools.ocr_provider as ocr
+import providers.ocr_provider as ocr
 
 # Phase 7c：`ocr_pdf` 的**调用点**从 `api/index.py` 搬到了 `api/validation.py`
 # （`read_uploaded_document` 的 SystemExit 分支）。所以下面的打桩必须打在

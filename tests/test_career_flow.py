@@ -72,7 +72,7 @@ def client(tmp_path, monkeypatch):
 
     import api.index as api_module
     from repositories import migrations
-    from tools import database
+    from repositories import database
 
     database.reset_init_cache()
     migrations.reset_cache()
@@ -366,7 +366,7 @@ def test_decision_must_agree_with_the_gap_distribution(client):
 
 def test_reanalysis_preserves_gap_progress_and_does_not_duplicate(client):
     from repositories import target_job as repo
-    from tools import database
+    from repositories import database
 
     job = _make_target_job(client)
     target_id = job["targetJob"]["id"]

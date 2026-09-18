@@ -30,9 +30,9 @@ if ZHIPU_API_KEY:
 if QIANFAN_API_KEY:
     os.environ["QIANFAN_API_KEY"] = QIANFAN_API_KEY
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from model_router import ZhipuChatRouter, QianfanModelRouter
+from providers.model_router import ZhipuChatRouter, QianfanModelRouter
 
 # ============================================================================
 # 配置

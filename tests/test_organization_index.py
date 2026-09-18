@@ -13,8 +13,8 @@ from pathlib import Path
 
 import api.index as api_module
 from services import organization_service as org_service
-from tools import database
-from tools.providers import organization as org_provider
+from repositories import database
+from providers import organization as org_provider
 
 FIXTURE_ORG = {
     "source_provider": "fixture-licensed-source",

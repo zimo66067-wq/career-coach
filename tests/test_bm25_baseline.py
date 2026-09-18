@@ -9,9 +9,7 @@ import json
 import os
 import sys
 
-# 把 tools 加入路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
-import match_requirements as mr
+from domain import match_requirements as mr
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures-synthetic")
 

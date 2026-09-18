@@ -4,7 +4,7 @@ import io
 import json
 import os
 
-import match_requirements as mr
+from domain import match_requirements as mr
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures-synthetic")
 

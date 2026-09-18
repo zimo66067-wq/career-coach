@@ -13,7 +13,7 @@ import os
 
 import pytest
 
-from radar_adapter import build_option
+from domain.internal.radar_adapter import build_option
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures-synthetic")
 

@@ -2,7 +2,7 @@
 """validate_schema.py · 合同校验器（Schema 层 + 业务规则层）
 
 用法:
-  python tools/validate_schema.py --schema <schema.json> --instance <data.json>
+  python domain/validate_schema.py --schema <schema.json> --instance <data.json>
 
 业务规则（contracts/README.md 冻结）:
   - 所有 score ∈ [0,100]（Schema 已含，双保险）
@@ -85,7 +85,7 @@ def main():
     try:
         from jsonschema import Draft202012Validator
     except ImportError:
-        print("INVALID: 缺少 jsonschema 依赖，请先 pip install -r tools/requirements.txt")
+        print("INVALID: 缺少 jsonschema 依赖，请先 pip install -r requirements.txt")
         sys.exit(2)
 
     validator = Draft202012Validator(schema)

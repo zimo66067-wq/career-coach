@@ -85,7 +85,7 @@ def client(tmp_path, monkeypatch):
 
     import api.index as api_module
     from repositories import migrations
-    from tools import database
+    from repositories import database
 
     database.reset_init_cache()
     migrations.reset_cache()
@@ -493,7 +493,7 @@ def test_actions_are_listed_by_gap_priority(client):
 def test_a_gap_without_a_verifiable_artifact_is_reported_not_silently_skipped(client):
     """开不出闭环的缺口要如实报出来，不能让用户以为"都开好单了"。"""
     from repositories import target_job as target_repo
-    from tools import database
+    from repositories import database
 
     target_id = _gap_ready(client)
     stamp = database.utc_iso()

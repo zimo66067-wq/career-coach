@@ -49,7 +49,7 @@ def run_match(resume_path, job_path, backend, model=None):
     """调用 match_requirements.py CLI，返回解析后的 JSON。"""
     out_path = "/tmp/match_result.json"
     cmd = [
-        sys.executable, "tools/match_requirements.py",
+        sys.executable, "domain/match_requirements.py",
         "--resume", resume_path,
         "--job", job_path,
         "--backend", backend,

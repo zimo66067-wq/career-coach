@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """repositories.application · 投递记录（7 态）+ 结果
 
-与既有 ``tools/database.save_application`` 并存：本模块是 Phase 2 之后的正式入口
+与既有 ``repositories.database.save_application`` 并存：本模块是 Phase 2 之后的正式入口
 （带状态机校验与 ``target_job_id``），旧函数保留给尚未迁移的 F5 接口，Phase 3 收敛。
 """
 from repositories.base import insert, many, one, update

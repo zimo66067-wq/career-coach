@@ -38,7 +38,7 @@
 ⇒ 「重写到得了分派」由 `scripts/vercel-dead-routes.py` 实证（38 条重写逐方法探），
    「族不重叠」由本节说的那条判据管，两件事各归各。
 """
-from tools.api_errors import ApiError
+from domain.internal.api_errors import ApiError
 
 from api.sentinel import UNHANDLED
 

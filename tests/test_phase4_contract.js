@@ -6,7 +6,7 @@
  * All scripts are also smoke-loaded in a stub DOM context to catch load-time crashes.
  *
  * 2026-09-13：kb.html / kb.js 的独立「面经知识库」产品页已下线（Phase 1），
- * 相应契约一并移除；题库数据保留为 Interview Engine 的内部数据源（tools/knowledge.py）。
+ * 相应契约一并移除；题库数据保留为 Interview Engine 的内部数据源（domain/knowledge.py）。
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

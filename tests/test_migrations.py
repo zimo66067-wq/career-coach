@@ -20,7 +20,7 @@ import api.index as api_module
 import api.startup as api_startup
 from domain.application import LEGACY_FALLBACK_STATUS, ApplicationStatus
 from repositories import migrations
-from tools import database
+from repositories import database
 
 # Phase 7c：`_MIGRATION_ERROR` / `migration_status` 从 `api/index.py` 搬到了 `api/startup.py`。
 # `api.index` **不再**再导出 `migration_status` —— 7c 的契约判据要求入口的再导出面**双向干净**

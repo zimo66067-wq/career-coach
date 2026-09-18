@@ -30,10 +30,10 @@ from pathlib import Path
 
 from flask import request
 
-from tools.api_errors import ApiError
-from tools.extract_text import extract_docx, extract_pdf, extract_txt
-from tools.ocr_provider import ocr_pdf
-from tools.upload_security import UploadSecurityError, validate_upload
+from domain.internal.api_errors import ApiError
+from domain.internal.extract_text import extract_docx, extract_pdf, extract_txt
+from providers.ocr_provider import ocr_pdf
+from domain.upload_security import UploadSecurityError, validate_upload
 
 from api.constants import (
     ALLOWED_EXTENSIONS,

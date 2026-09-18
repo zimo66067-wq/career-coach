@@ -31,13 +31,11 @@ jobs:
           cache: 'pip'
           cache-dependency-path: |
             requirements.txt
-            tools/requirements.txt
 
       # --- 步骤3: 安装依赖 ---
       - name: Install dependencies
         run: |
           python -m pip install -r requirements.txt
-          python -m pip install -r tools/requirements.txt
 
       # --- 步骤4: 运行 pytest 测试套件 ---
       - name: Run pytest
@@ -62,21 +60,21 @@ jobs:
           # ResumeProfile fixtures
           for f in tests/fixtures-synthetic/resumes/*.expected.json; do
             echo "Validating: $f"
-            python tools/validate_schema.py \
+            python domain/validate_schema.py \
               --schema contracts/resume-profile.schema.json \
               --instance "$f"
           done
           # JobProfile fixtures
           for f in tests/fixtures-synthetic/jobs/*.expected.json; do
             echo "Validating: $f"
-            python tools/validate_schema.py \
+            python domain/validate_schema.py \
               --schema contracts/job-profile.schema.json \
               --instance "$f"
           done
           # Interview fixtures
           for f in tests/fixtures-synthetic/interviews/*.json; do
             echo "Validating: $f"
-            python tools/validate_schema.py \
+            python domain/validate_schema.py \
               --schema contracts/interview-turn.schema.json \
               --instance "$f"
           done
@@ -87,7 +85,7 @@ jobs:
               *score-input*) echo "Skipping score-input fixture: $f"; continue ;;
             esac
             echo "Validating: $f"
-            python tools/validate_schema.py \
+            python domain/validate_schema.py \
               --schema contracts/ability-profile.schema.json \
               --instance "$f"
           done
@@ -145,5 +143,4 @@ jobs:
           python -m pip install pip-audit
           echo "=== Scanning dependencies for known vulnerabilities ==="
           pip-audit -r requirements.txt
-          pip-audit -r tools/requirements.txt
           echo "=== pip-audit complete ==="

@@ -27,8 +27,8 @@ sys.path.insert(0, str(ROOT))
 os.environ.setdefault("DUMATE_CONSENT_SECRET", "rehearsal-consent-secret")
 
 import api.index as api_module  # noqa: E402
-from tools.database import delete_session_data  # noqa: E402
-from tools.providers import model as model_provider  # noqa: E402
+from repositories.database import delete_session_data  # noqa: E402
+from providers import model as model_provider  # noqa: E402
 
 
 RESUME = "项目经历：负责接口开发并完成上线验证，持续跟进问题闭环，响应时间从 800ms 降至 220ms。"
@@ -141,7 +141,7 @@ def main():
     ap.add_argument("--rounds", type=int, default=10)
     args = ap.parse_args()
 
-    # Phase 5：模型工厂只有一个归属地（tools.providers.model），api 与服务层都从它取
+    # Phase 5：模型工厂只有一个归属地（providers.model），api 与服务层都从它取
     model_provider.build_model_router = lambda: FakeRouter()
     api_module.app.config.update(TESTING=True)
     client = api_module.app.test_client()

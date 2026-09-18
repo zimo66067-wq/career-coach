@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from tools.providers import model as model_provider
+from providers import model as model_provider
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures-synthetic"
@@ -75,7 +75,7 @@ def client(tmp_path, monkeypatch):
 
     import api.index as api_module
     from repositories import migrations
-    from tools import database
+    from repositories import database
 
     database.reset_init_cache()
     migrations.reset_cache()

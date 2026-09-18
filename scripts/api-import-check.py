@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""api-import-check.py · `api/` 层「名字解析」门禁（Phase 7c）
+"""api-import-check.py · 「名字解析」门禁（Phase 7c 建，7d 把观察面扩到 5 层）
 
 ## 为什么需要它
 
@@ -35,17 +35,37 @@
 
 看：
 
-  A. `api/**/*.py`（跳过 `__pycache__`）；
+  A. `--roots` 指定的各层下的 `**/*.py`（跳过 `__pycache__`）；默认 `api`，
+     Phase 7d 起门禁传 `api,domain,providers,repositories,services,scripts`
+     （5 个生产层 + 重写脚本本身）；
   B. 每个作用域里 **Name 在作用域链上能否解析**。
 
 不看：
 
   C. 属性是否存在（`x.foo` 里的 `foo`）、调用参数个数、类型正确性；
-  D. `services/` / `tools/` / `domain/` / `repositories/` 的形状；
+  D. 各层的**形状**（层间依赖、谁不许 import 谁 —— 那是 `tests/test_layering.py` 的事）；
   E. 循环 import —— 那是运行期的事，由 pytest 覆盖。
 
-⇒ 它只能证明「api/ 里没有解析不到的名字」，**不能**证明「api/ 是对的」。
-   后者归 pytest（482）+ 死路由实证（38 条重写逐方法探）+ HTTP 冒烟（70 条）管。
+⇒ 它只能证明「观察面里没有解析不到的名字」，**不能**证明「这些模块是对的」。
+   后者归 pytest（全量）+ 死路由实证（38 条重写逐方法探）+ HTTP 冒烟（70 条）管。
+
+### 为什么 7d 把观察面从 `api/` 扩到 5 层 + `scripts/`
+
+原来 `from tools import …` 那一层的模块，被分到 `domain` / `providers` / `repositories` /
+`services` 四个包下（208 处点号 import + 41 处扁平 import 被改写）。重写脚本的失效模式
+恰好就是这一格的失效模式：
+**漏改一处 ⇒ 那个名字解析不到 ⇒ 只在没被覆盖的分支上 `NameError`**。
+7d 实测撞到的是它的近亲 —— `domain/internal/contracts.py` 用 `parents[1]` 推仓库根，
+搬家后深了一层，于是 13 个测试模块在**收集期**就 FileNotFoundError（这次运气好，看得见）。
+
+扩面本身立刻抓到一条**跟 7d 无关的老 bug**：`services/diagnosis_service.py::normalize_score`
+用 `re.fullmatch` 接住"分数是数字字符串"的分支，而模块从未 `import re` ——
+只要 provider 把 `"85"` 当分数返回，这条分支就是 `NameError`。
+它此前不可见，纯粹因为观察面只有 `api/`。**这说明"观察面 = 语义"不是口号：
+判据的覆盖面决定了它能看见什么，而不是它写得多仔细。**
+
+`scripts/` 也纳入观察面：7d 的改写有一大块落在 `scripts/`（`sys.path` 插入、扁平 import），
+只扫生产层会把"改写脚本自己坏了"漏掉。
 
 ## 两类失败必须分清楚
 
@@ -61,6 +81,7 @@ symtable 也就答不出"这个名字到底存不存在"—— 判据会静默�
 用法（仓库根目录）：
 
     .venv-audit/Scripts/python.exe scripts/api-import-check.py [--verbose] [--selfcheck]
+    .venv-audit/Scripts/python.exe scripts/api-import-check.py --roots api,domain,providers,repositories,services
 """
 import argparse
 import ast
@@ -70,7 +91,9 @@ import symtable
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-API_DIR = ROOT / "api"
+#: `--roots` 的默认值。7d 起门禁显式传 5 层，这里保留 `api` 是为了让单独手跑时的
+#: 默认行为跟 7c 一致（不因为门禁扩面而改变手工调用的语义）。
+DEFAULT_ROOTS = "api"
 
 #: 解释器注入的名字（不是内建函数，但模块里可以直接用）。
 INTERPRETER_NAMES = {
@@ -149,16 +172,25 @@ def check_source(source, filename, extra_module_bound=()):
     return sorted(problems)
 
 
-def target_files():
-    if not API_DIR.is_dir():
-        return []
-    return sorted(p for p in API_DIR.rglob("*.py") if "__pycache__" not in p.parts)
+def target_files(roots):
+    """观察面 = 各 root 下的全部 `*.py`（跳过 `__pycache__`）。
+
+    故意**不**在 root 不存在时静默跳过：那会让「观察面为空」变成空判。
+    这里返回空列表，由 `run()` 用退出码 2 报出来。
+    """
+    files = []
+    for root in roots:
+        base = ROOT / root
+        if not base.is_dir():
+            continue
+        files.extend(p for p in base.rglob("*.py") if "__pycache__" not in p.parts)
+    return sorted(set(files))
 
 
-def run(verbose=False):
-    files = target_files()
+def run(roots, verbose=False):
+    files = target_files(roots)
     if not files:
-        print("观察面为空：%s 下没有 .py 文件 —— 判据在空跑，必须响。" % API_DIR)
+        print("观察面为空：%s 下没有 .py 文件 —— 判据在空跑，必须响。" % ",".join(roots))
         return 2
 
     total_problems = 0
@@ -173,7 +205,8 @@ def run(verbose=False):
         elif verbose:
             print("OK   %s" % rel)
 
-    print("已解析 %d 个 api/ 模块、%d 处解析失败" % (len(files), total_problems))
+    print("已解析 %d 个模块（观察面 %s）、%d 处解析失败"
+          % (len(files), ",".join(roots), total_problems))
     return 1 if total_problems else 0
 
 
@@ -232,10 +265,16 @@ def selfcheck():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="api/ 层名字解析门禁")
+    parser = argparse.ArgumentParser(description="模块「名字解析」门禁（默认观察面 api/）")
     parser.add_argument("--verbose", action="store_true", help="逐文件打印 OK 行")
     parser.add_argument("--selfcheck", action="store_true", help="只跑判据自检")
+    parser.add_argument("--roots", default=DEFAULT_ROOTS,
+                        help="逗号分隔的观察面（默认 %s）。Phase 7d 起门禁传 " % DEFAULT_ROOTS +
+                             "api,domain,providers,repositories,services,scripts —— "
+                             "归并后的模块换了 import 写法，"
+                             "「少 import 一个名字」这个失效模式跟着搬家了。")
     args = parser.parse_args()
+    roots = [r.strip() for r in args.roots.split(",") if r.strip()]
 
     if args.selfcheck:
         return selfcheck()
@@ -243,7 +282,7 @@ def main():
     code = selfcheck()
     if code:
         return code
-    return run(verbose=args.verbose)
+    return run(roots, verbose=args.verbose)
 
 
 if __name__ == "__main__":

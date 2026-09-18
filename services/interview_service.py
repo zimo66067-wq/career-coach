@@ -3,9 +3,9 @@
 import json
 import uuid
 
-from tools.api_errors import ApiError
-from tools.contracts import SUBSCORE_DEFAULTS
-from tools.database import (
+from domain.internal.api_errors import ApiError
+from domain.internal.contracts import SUBSCORE_DEFAULTS
+from repositories.database import (
     get_resume_detail,
     load_match,
     load_session,
@@ -13,9 +13,9 @@ from tools.database import (
     save_session,
     update_session,
 )
-from tools.interview_engine import InterviewEngine
-from tools.providers import model as model_provider
-from tools.rescore import calc_R, compute as rescore_compute, round2
+from domain.interview_engine import InterviewEngine
+from providers import model as model_provider
+from domain.rescore import calc_R, compute as rescore_compute, round2
 
 from services.match_service import MATCH_WEIGHTS
 
@@ -48,9 +48,9 @@ def build_turn_evaluation(result):
 def build_interview_router():
     """Return a router when configured; None otherwise (question-bank fallback).
 
-    Phase 5：工厂只从 `tools.providers.model` 取（之前是 `from api.index import ...`，
+    Phase 5：工厂只从 `providers.model` 取（之前是 `from api.index import ...`，
     服务反向依赖 API 层）。模块属性查找而不是一次性绑定，测试打桩只认
-    `tools.providers.model.build_model_router` 这一个点。
+    `providers.model.build_model_router` 这一个点。
     """
     try:
         return model_provider.build_model_router()

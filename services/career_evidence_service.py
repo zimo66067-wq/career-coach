@@ -31,8 +31,8 @@ from domain.errors import DomainError
 from domain.evidence import EvidenceType, new_evidence
 from repositories import career_evidence as evidence_repo
 from repositories import career_profile as profile_repo
-from tools import database
-from tools.deidentify import deidentify
+from repositories import database
+from domain.deidentify import deidentify
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-import extract_text
+from domain.internal import extract_text
 
 
 def _make_docx(path, text):

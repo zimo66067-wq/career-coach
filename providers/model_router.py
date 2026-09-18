@@ -2,7 +2,7 @@
 """model_router.py · 统一模型调用路由层（P0-03）
 
 用法:
-  from tools.model_router import ModelRouter
+  from providers.model_router import ModelRouter
   router = DuMateModelRouter()  # 子类实现 _try_call
   result = router.call("resume_diagnosis", user_input=clean_text)
   # result = {status, output, trace_id, model, latency_ms, error_type, degraded}
@@ -104,7 +104,7 @@ DEGRADED_OUTPUTS = {
         "candidate": "",
     },
     "jd_extract": {
-        "note": "model_unavailable_degraded: use tools/match_requirements.py text parsing",
+        "note": "model_unavailable_degraded: use domain/match_requirements.py text parsing",
         "requirements": [],
     },
     "jd_match_explain": {

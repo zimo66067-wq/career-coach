@@ -2,7 +2,7 @@
 """redflag.py · 事实锁机器校验（事实锁第1/2条，见 docs/PRD.md 第3节）
 
 用法:
-  python tools/redflag.py --output <model_output.json> --against <source1.txt> [source2.txt ...]
+  python domain/redflag.py --output <model_output.json> --against <source1.txt> [source2.txt ...]
 
 规则:
   1. 抽取模型输出 JSON 中的所有数字与「疑似专有名词」（连续大写/驼峰/含版本号词、

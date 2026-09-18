@@ -2,7 +2,7 @@
 """match_requirements.py · JD 要求级匹配（WF-03）
 
 用法:
-  python tools/match_requirements.py --resume <clean.txt> --job <job.txt 或 job.expected.json> \
+  python domain/match_requirements.py --resume <clean.txt> --job <job.txt 或 job.expected.json> \
       --backend bm25|embedding [--output match.json]
 
 后端:
@@ -212,7 +212,7 @@ class ZhipuEmbedder(EmbedderBase):
     """智谱AI Embedding-2/3 封装（推荐 embedding-3，召回率 91%，免费2000万Token）
 
     用法:
-      from tools.match_requirements import ZhipuEmbedder
+      from domain.match_requirements import ZhipuEmbedder
       embedder = ZhipuEmbedder(api_key=os.environ.get("ZHIPU_API_KEY"))
       vecs = embedder.embed(["文本1", "文本2"])
     """

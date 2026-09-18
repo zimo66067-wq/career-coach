@@ -18,7 +18,7 @@ from itsdangerous import BadSignature, SignatureExpired
 import api.index as api_module
 import api.security as api_security
 import api.validation as api_validation
-from tools.providers import model as model_provider
+from providers import model as model_provider
 
 # Phase 7c：本文件要打桩的两个点搬了家 ——
 #
@@ -346,7 +346,7 @@ def test_cors_attacker_origin_rejected(monkeypatch):
 
 
 def test_trace_id_passthrough_when_valid(client, monkeypatch):
-    # Phase 5：模型工厂的唯一归属地是 tools.providers.model（api 与服务层都从它取）
+    # Phase 5：模型工厂的唯一归属地是 providers.model（api 与服务层都从它取）
     monkeypatch.setattr(model_provider, "build_model_router", lambda: FakeRouter(valid_profile()))
     response = client.post(
         "/api/wf02/diagnose",
@@ -358,7 +358,7 @@ def test_trace_id_passthrough_when_valid(client, monkeypatch):
 
 
 def test_trace_id_generated_when_invalid(client, monkeypatch):
-    # Phase 5：模型工厂的唯一归属地是 tools.providers.model（api 与服务层都从它取）
+    # Phase 5：模型工厂的唯一归属地是 providers.model（api 与服务层都从它取）
     monkeypatch.setattr(model_provider, "build_model_router", lambda: FakeRouter(valid_profile()))
     response = client.post(
         "/api/wf02/diagnose",

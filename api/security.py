@@ -28,9 +28,9 @@ import uuid
 from flask import request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
-from tools.account import session_user
-from tools.api_errors import ApiError
-from tools.database import (
+from services.account_service import session_user
+from domain.internal.api_errors import ApiError
+from repositories.database import (
     bind_session_owner,
     consume_usage,
     get_session_owner,

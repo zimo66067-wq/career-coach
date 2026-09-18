@@ -2,8 +2,9 @@
 import json
 
 from services import apply_service
-from tools import database, optimizer
-from tools.providers import model as model_provider
+from repositories import database
+from domain import optimizer
+from providers import model as model_provider
 
 
 QUOTE = "负责订单接口开发并将平均响应从八百毫秒降低到两百毫秒"

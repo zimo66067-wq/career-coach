@@ -8,7 +8,7 @@ Phase 7c：本文件从 `api/index.py` 拆出。**分支体是按行号逐字搬
 为什么末尾要 `return UNHANDLED` 而不是 `return None`：None 是合法返回值（虽然现在没人返回
 它），用哨兵才能让"没接住"和"故意返回 None"区分开。哨兵见 `api/dispatch.py`。
 
-打桩点：本模块只用 `from tools.providers import model as model_provider` 后做属性查找，
+打桩点：本模块只用 `from providers import model as model_provider` 后做属性查找，
 不绑定 `build_model_router`（见 `tests/test_layering.py` 规则 5）。
 """
 
@@ -28,10 +28,10 @@ from services.interview_service import (
     end_interview,
     start_interview,
 )
-from tools.api_errors import ApiError
-from tools.database import load_session, update_session
-from tools.interview_engine import InterviewEngine
-from tools.providers import model as model_provider
+from domain.internal.api_errors import ApiError
+from repositories.database import load_session, update_session
+from domain.interview_engine import InterviewEngine
+from providers import model as model_provider
 
 from api.http_layer import api_response, require_json_object
 from api.security import _task_owner_key, enforce_usage, ensure_session_access, require_consent

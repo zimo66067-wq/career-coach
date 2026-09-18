@@ -126,7 +126,7 @@ def test_vercel_rewrites_do_not_reference_retired_routes():
 
 
 def test_retired_table_is_dropped_from_schema():
-    source = (ROOT / "tools" / "database.py").read_text(encoding="utf-8")
+    source = (ROOT / "repositories" / "database.py").read_text(encoding="utf-8")
     assert '("tasks",)' in source, "tasks must be listed as a retired table"
     assert "CREATE TABLE IF NOT EXISTS tasks" not in source
     # And it must not be reachable through the owner-transfer path either.
@@ -134,7 +134,7 @@ def test_retired_table_is_dropped_from_schema():
 
 
 def test_retired_table_is_absent_after_init(client):
-    from tools import database
+    from repositories import database
 
     database.init_db()
     conn = database._get_conn()
@@ -249,7 +249,7 @@ def test_retired_endpoints_for_phase1b_return_404(client):
 
 def test_c7_predictive_output_is_gone(client):
     """C7 预测区间不得以任何形式回流：复算器、响应、合同、前端。"""
-    import rescore
+    from domain import rescore
 
     fixture = json.loads(
         (ROOT / "tests" / "fixtures-synthetic" / "abilities" / "score-input-01.json")
@@ -272,7 +272,7 @@ def test_c7_predictive_output_is_gone(client):
 
 
 def test_radar_option_has_no_predictive_series():
-    from radar_adapter import build_option
+    from domain.internal.radar_adapter import build_option
 
     ability = json.loads(
         (ROOT / "tests" / "fixtures-synthetic" / "abilities" / "ability-01.json")

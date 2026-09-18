@@ -30,8 +30,8 @@ from werkzeug.exceptions import HTTPException
 
 from domain.errors import DomainError
 from services.target_job_service import TargetJobError
-from tools.api_errors import ApiError
-from tools.trace import trace_id
+from domain.internal.api_errors import ApiError
+from api.trace import trace_id
 
 from api.app import app
 from api.constants import PUBLIC_PAGES_ORIGIN

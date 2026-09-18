@@ -2,7 +2,7 @@
 """deidentify.py · 去标识化（WF-01 必经环节，见 docs/privacy.md）
 
 用法:
-  python tools/deidentify.py --input <in.txt> --output <out.txt> [--map map.json]
+  python domain/deidentify.py --input <in.txt> --output <out.txt> [--map map.json]
 
 规则:
   - 脱除：手机号 / 邮箱 / 身份证18位 / 姓名（常见姓氏+称谓启发式、以及「姓名：X」显式字段）

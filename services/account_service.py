@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from tools.database import (
+from repositories.database import (
     add_history_event,
     count_history_events,
     create_session_row,

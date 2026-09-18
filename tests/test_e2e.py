@@ -19,14 +19,14 @@ import time
 
 import pytest
 
-# conftest 已把 tools 加入 sys.path
-import extract_text
-import deidentify
-import match_requirements as mr
-import rescore
-from interview_engine import InterviewEngine
-from model_router import ModelRouter, DEGRADED_OUTPUTS, MODEL_PARAMS, TASK_PROMPTS
-from privacy_lifecycle import ConsentManager, DataLifecycle, PIIScanner
+# conftest 已把仓库根加入 sys.path
+from domain.internal import extract_text
+from domain import deidentify
+from domain import match_requirements as mr
+from domain import rescore
+from domain.interview_engine import InterviewEngine
+from providers.model_router import ModelRouter, DEGRADED_OUTPUTS, MODEL_PARAMS, TASK_PROMPTS
+from domain.privacy_lifecycle import ConsentManager, DataLifecycle, PIIScanner
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures-synthetic")
 

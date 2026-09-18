@@ -30,10 +30,9 @@ import time
 from collections import Counter
 from typing import List, Tuple, Dict
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 
-import match_requirements as mr
-import deidentify
+from domain import match_requirements as mr
+from domain import deidentify
 
 # ---------- 后端抽象 ----------
 

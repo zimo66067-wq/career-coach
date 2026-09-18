@@ -9,7 +9,11 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+# Phase 7d：本模块从 tools/ 搬到 domain/internal/，**深了一层**，所以 parents[1] → parents[2]。
+# 读错这一格不会当场报错，只会让下游去 `domain/contracts/` 找 schema ——
+# 实测 13 个测试模块在**收集期**就 FileNotFoundError。判据见
+# tests/test_phase7d_contract.py::test_repo_root_derivations_match_the_real_depth。
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 MIN_TEXT_CHARS = 20
 MAX_TEXT_CHARS = 200_000

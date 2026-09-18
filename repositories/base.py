@@ -3,7 +3,7 @@
 
 本层是唯一直接拼 SQL 的地方。约定：
 
-* 只依赖 ``tools.database`` 的公共门面（``connection`` / ``render`` / ``insert_id`` /
+* 只依赖 ``repositories.database`` 的公共门面（``connection`` / ``render`` / ``insert_id`` /
   ``utc_iso`` / ``has_column`` / ``table_names``），不 import 私有 helper。
 * 每条语句都走 ``database.render()``，因此 SQLite 的 ``?`` 在 PostgreSQL 下自动变成 ``%s``。
   **SQL 里不要出现字面量 ``%``**（psycopg 会把它当占位符）。
@@ -13,7 +13,7 @@
 """
 from contextlib import contextmanager
 
-from tools import database
+from repositories import database
 
 
 @contextmanager

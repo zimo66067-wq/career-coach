@@ -13,9 +13,9 @@ import sys
 
 import pytest
 
-from log_sanitize import sanitize, RE_PHONE, RE_EMAIL, RE_ID, RE_BEARER, RE_APIKEY, RE_JWT
+from domain.internal.log_sanitize import sanitize, RE_PHONE, RE_EMAIL, RE_ID, RE_BEARER, RE_APIKEY, RE_JWT
 
-TOOLS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools")
+DOMAIN_INTERNAL_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "domain", "internal")
 
 
 class TestPIISanitize:
@@ -122,7 +122,7 @@ class TestPipelineMode:
     def test_stdin_stdout_pipe(self):
         """管道模式: stdin -> stdout"""
         proc = subprocess.run(
-            [sys.executable, os.path.join(TOOLS_DIR, "log_sanitize.py")],
+            [sys.executable, os.path.join(DOMAIN_INTERNAL_DIR, "log_sanitize.py")],
             input="phone 13800138000".encode("utf-8"),
             capture_output=True,
             timeout=10,
@@ -139,7 +139,7 @@ class TestPipelineMode:
         in_file.write_text("电话 13912345678 邮箱 a@b.com", encoding="utf-8")
 
         proc = subprocess.run(
-            [sys.executable, os.path.join(TOOLS_DIR, "log_sanitize.py"),
+            [sys.executable, os.path.join(DOMAIN_INTERNAL_DIR, "log_sanitize.py"),
              "--input", str(in_file), "--output", str(out_file)],
             capture_output=True,
             timeout=10,

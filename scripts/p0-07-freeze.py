@@ -20,7 +20,8 @@ print("="*60)
 # 1. 文件清单
 manifest = {}
 for category, patterns in [
-    ("code", ["tools/*.py", "scripts/*.py"]),
+    ("code", ["domain/**/*.py", "providers/*.py", "repositories/*.py",
+               "services/*.py", "scripts/*.py"]),
     ("contracts", ["contracts/*.json", "contracts/*.md"]),
     ("docs", ["docs/*.md", "README.md"]),
     ("tests", ["tests/*.py", "tests/fixtures-synthetic/**/*"]),

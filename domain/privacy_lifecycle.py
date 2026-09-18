@@ -8,7 +8,7 @@
   - 删除后调用检查: DELETED 状态下禁止再调用模型，违则抛 PermissionError
 
 用法:
-  from privacy_lifecycle import ConsentManager, DataLifecycle, PIIScanner
+  from domain.privacy_lifecycle import ConsentManager, DataLifecycle, PIIScanner
 
   consent = ConsentManager()
   if not consent.check_consent(user_id):
@@ -28,10 +28,12 @@ import os
 import sys
 import time
 
-# 复用 deidentify 的残留扫描能力
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 复用 deidentify 的残留扫描能力。
+# Phase 7d：模块从 tools/ 移到 domain/，这里要挂的是**仓库根**
+# （原来是 tools/，`from deidentify import ...` 才找得到）。
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
-    from deidentify import scan_residue
+    from domain.deidentify import scan_residue
 except ImportError:
     scan_residue = None
 

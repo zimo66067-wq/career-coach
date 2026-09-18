@@ -8,9 +8,9 @@ import uuid
 from pathlib import Path
 
 import api.index as api_module
-import tools.database as database
-import tools.knowledge as knowledge
-import tools.optimizer as optimizer
+import repositories.database as database
+import domain.knowledge as knowledge
+import domain.optimizer as optimizer
 
 RESUME = (
     "项目经历：负责后端接口开发并完成上线验证，持续跟进问题闭环。"
@@ -107,7 +107,7 @@ def test_knowledge_service_empty_query_returns_notice():
 # Knowledge API —— 2026-09-13 已下线
 # ---------------------------------------------------------------- #
 # 「面经知识库」不再是独立产品：导航、页面与 /api/knowledge/* 均已删除。
-# 题库数据保留在 tools/knowledge.py，作为 Interview Engine 的内部数据源
+# 题库数据保留在 domain/knowledge.py，作为 Interview Engine 的内部数据源
 # （模块级行为仍由上面的 knowledge 测试覆盖）。这里固化 API 已下线。
 
 def test_knowledge_api_is_retired(monkeypatch):

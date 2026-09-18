@@ -74,9 +74,9 @@ print("WF-01: 材料接收与解析")
 print("="*60)
 wf01 = []
 wf01.append(log_step("wf01-extract",
-    f'python tools/extract_text.py --input {FIXTURES}/resumes/resume-01-swe.txt --output /tmp/wf01_raw.txt'))
+    f'python domain/internal/extract_text.py --input {FIXTURES}/resumes/resume-01-swe.txt --output /tmp/wf01_raw.txt'))
 wf01.append(log_step("wf01-deidentify",
-    f'python tools/deidentify.py --input /tmp/wf01_raw.txt --output /tmp/wf01_clean.txt'))
+    f'python domain/deidentify.py --input /tmp/wf01_raw.txt --output /tmp/wf01_clean.txt'))
 wf01.append(log_step("wf01-verify-pii",
     f'grep -c "pii_removed:true" /tmp/wf01_clean.txt'))
 wf01.append(log_step("wf01-scan-residue",
@@ -93,11 +93,11 @@ print("WF-02: 简历诊断（Schema验证 + 事实锁 + 评分）")
 print("="*60)
 wf02 = []
 wf02.append(log_step("wf02-validate-schema",
-    f'python tools/validate_schema.py --schema contracts/resume-profile.schema.json --instance {FIXTURES}/resumes/resume-01-swe.expected.json'))
+    f'python domain/validate_schema.py --schema contracts/resume-profile.schema.json --instance {FIXTURES}/resumes/resume-01-swe.expected.json'))
 wf02.append(log_step("wf02-redflag",
-    f'python tools/redflag.py --output {FIXTURES}/resumes/resume-01-swe.expected.json --against {FIXTURES}/resumes/resume-01-swe.txt'))
+    f'python domain/redflag.py --output {FIXTURES}/resumes/resume-01-swe.expected.json --against {FIXTURES}/resumes/resume-01-swe.txt'))
 wf02.append(log_step("wf02-rescore",
-    f'python tools/rescore.py --input {FIXTURES}/abilities/score-input-01.json > /tmp/wf02_score.json 2>&1'))
+    f'python domain/rescore.py --input {FIXTURES}/abilities/score-input-01.json > /tmp/wf02_score.json 2>&1'))
 
 # ─────────────────────────────────────────
 # WF-03: JD 要求级匹配
@@ -107,11 +107,11 @@ print("WF-03: JD 要求级匹配")
 print("="*60)
 wf03 = []
 wf03.append(log_step("wf03-validate-job-schema",
-    f'python tools/validate_schema.py --schema contracts/job-profile.schema.json --instance {FIXTURES}/jobs/job-01-swe.expected.json'))
+    f'python domain/validate_schema.py --schema contracts/job-profile.schema.json --instance {FIXTURES}/jobs/job-01-swe.expected.json'))
 wf03.append(log_step("wf03-match",
-    f'python tools/match_requirements.py --resume /tmp/wf01_clean.txt --job {FIXTURES}/jobs/job-01-swe.txt --backend bm25 --output /tmp/wf03_match.json'))
+    f'python domain/match_requirements.py --resume /tmp/wf01_clean.txt --job {FIXTURES}/jobs/job-01-swe.txt --backend bm25 --output /tmp/wf03_match.json'))
 wf03.append(log_step("wf03-match-json",
-    f'python tools/match_requirements.py --resume /tmp/wf01_clean.txt --job {FIXTURES}/jobs/job-01-swe.expected.json --backend bm25 --output /tmp/wf03_match2.json'))
+    f'python domain/match_requirements.py --resume /tmp/wf01_clean.txt --job {FIXTURES}/jobs/job-01-swe.expected.json --backend bm25 --output /tmp/wf03_match2.json'))
 
 for f in ["/tmp/wf03_match.json", "/tmp/wf03_match2.json"]:
     if os.path.exists(f):
@@ -129,8 +129,8 @@ wf04 = []
 fixtures_posix = str(FIXTURES).replace("\\", "/")
 wf04_script = f'''
 import sys, json
-sys.path.insert(0, "tools")
-from interview_engine import InterviewEngine
+sys.path.insert(0, ".")
+from domain.interview_engine import InterviewEngine
 
 # 加载 fixture 数据
 with open("{fixtures_posix}/jobs/job-01-swe.expected.json", encoding="utf-8") as f:
@@ -194,11 +194,11 @@ print("WF-05: 能力聚合与雷达")
 print("="*60)
 wf05 = []
 wf05.append(log_step("wf05-validate-ability",
-    f'python tools/validate_schema.py --schema contracts/ability-profile.schema.json --instance {FIXTURES}/abilities/ability-01.json'))
+    f'python domain/validate_schema.py --schema contracts/ability-profile.schema.json --instance {FIXTURES}/abilities/ability-01.json'))
 wf05.append(log_step("wf05-rescore",
-    f'python tools/rescore.py --input {FIXTURES}/abilities/score-input-01.json > /tmp/wf05_rescore.json 2>&1'))
+    f'python domain/rescore.py --input {FIXTURES}/abilities/score-input-01.json > /tmp/wf05_rescore.json 2>&1'))
 wf05.append(log_step("wf05-radar",
-    f'python tools/radar_adapter.py --input {FIXTURES}/abilities/ability-01.json --output /tmp/wf05_radar.json'))
+    f'python domain/internal/radar_adapter.py --input {FIXTURES}/abilities/ability-01.json --output /tmp/wf05_radar.json'))
 
 for f in ["/tmp/wf05_rescore.json", "/tmp/wf05_radar.json"]:
     if os.path.exists(f):
@@ -220,9 +220,9 @@ with open("/tmp/wf06_test.log", 'w') as f:
     f.write(test_log)
 
 wf06.append(log_step("wf06-log-sanitize",
-    f'cat /tmp/wf06_test.log | python tools/log_sanitize.py'))
+    f'cat /tmp/wf06_test.log | python domain/internal/log_sanitize.py'))
 wf06.append(log_step("wf06-deidentify-scan",
-    f'python tools/deidentify.py --input {FIXTURES}/resumes/resume-04-pm.txt --output /tmp/wf06_deidentified.txt'))
+    f'python domain/deidentify.py --input {FIXTURES}/resumes/resume-04-pm.txt --output /tmp/wf06_deidentified.txt'))
 
 # ─────────────────────────────────────────
 # 全量 pytest 验证

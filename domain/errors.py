@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """domain.errors · 领域层错误类型
 
-与 ``tools.api_errors.ApiError`` 分开：ApiError 关心 HTTP 状态码，DomainError 只关心
+与 ``domain.internal.api_errors.ApiError`` 分开：ApiError 关心 HTTP 状态码，DomainError 只关心
 "违反了哪条业务规则"。Service 层负责把 DomainError 翻译成 ApiError（Phase 3 接线）。
 """
 

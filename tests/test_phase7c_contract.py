@@ -177,11 +177,11 @@ def test_sentinel_is_a_leaf_shared_by_dispatch_and_handlers():
     repo_imports = []
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] in {
-                "api", "tools", "services", "domain", "repositories"}:
+                "api", "providers", "services", "domain", "repositories"}:
             repo_imports.append(node.module)
         if isinstance(node, ast.Import):
             repo_imports.extend(a.name for a in node.names if a.name.split(".")[0] in {
-                "api", "tools", "services", "domain", "repositories"})
+                "api", "providers", "services", "domain", "repositories"})
     assert repo_imports == [], "sentinel.py 必须是叶子，却 import 了：%s" % repo_imports
 
     assert dispatch.UNHANDLED is sentinel.UNHANDLED, "分派表用的不是唯一的那个哨兵"

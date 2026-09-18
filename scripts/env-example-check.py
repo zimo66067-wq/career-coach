@@ -20,7 +20,7 @@
   3. 模板里的每个变量都必须在代码里被读到（否则是废弃变量）；
   4. 代码里读到的每个变量都必须在模板里（例外见 NOT_DOCUMENTED，且**每条都要写理由**）。
 
-观察面：`api/`、`services/`、`domain/`、`tools/`、`repositories/`、`scripts/` 下的
+观察面：`api/`、`services/`、`domain/`、`repositories/`、`providers/`、`scripts/` 下的
 `.py` / `.js`，只认 `os.environ.get("X")` / `os.environ["X"]` / `getenv("X")` 这三种读法。
 `tests/` 不在观察面内 —— 测试用 `monkeypatch.setenv` 造变量是测试夹具，不是部署清单。
 
@@ -35,7 +35,7 @@ import re
 import sys
 
 ENV_FILE = ".env.example"
-CODE_DIRS = ["api", "services", "domain", "tools", "repositories", "scripts"]
+CODE_DIRS = ["api", "services", "domain", "repositories", "providers", "scripts"]
 CODE_EXT = (".py", ".js")
 SKIP_PREFIX = (".venv", "node_modules", "__pycache__")
 # 本脚本自身要排除：它的自检探针与文档字符串里必然写出 `os.environ.get("A_ONE")` 这类

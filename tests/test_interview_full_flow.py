@@ -8,7 +8,7 @@ end_session 评分与报告、answer_quote 子串校验。
 import pytest
 import json
 
-from interview_engine import (
+from domain.interview_engine import (
     InterviewEngine,
     GENERIC_QUESTIONS,
     MAX_MAIN_QUESTIONS,

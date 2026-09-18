@@ -11,7 +11,7 @@
 口径与既有实现对齐，不新造词：
 
 * 要求类型 = ``hard | responsibility | preferred | terminology``（同 ``match_service``）
-* 匹配四态 = ``covered | weak | missing | unknown``（同 ``tools.match_requirements.judge``）
+* 匹配四态 = ``covered | weak | missing | unknown``（同 ``domain.match_requirements.judge``）
 * 缺口优先级 = ``P0 | P1 | P2``（hard→P0，responsibility→P1，其余→P2）
 
 Decision 规则（**必须透明**，因此写成可读谓词而不是权重求和）：

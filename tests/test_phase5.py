@@ -12,7 +12,7 @@ import services.apply_service as apply_service
 import services.diagnosis_service as diagnosis_service
 import services.interview_service as interview_service
 import services.match_service as match_service
-from tools.providers import model as model_provider
+from providers import model as model_provider
 
 RESUME = (
     "项目经历：负责后端接口开发并完成上线验证，持续跟进问题闭环。"
@@ -117,8 +117,8 @@ def test_services_layer_exposes_expected_entry_points():
 def test_services_diagnose_matches_previous_rule_fallback(monkeypatch):
     """**不加任何请求上下文**直接调服务 —— Phase 5 之前这里必须
     `with api_module.app.test_request_context("/")`，因为服务里兜底 trace 用的是
-    `tools.trace.trace_id()`（要 Flask 请求上下文）。现在 trace 由调用方注入、
-    工厂只依赖 tools.providers.model，服务可以脱离 web 层被测试。"""
+    `api.trace.trace_id()`（要 Flask 请求上下文）。现在 trace 由调用方注入、
+    工厂只依赖 providers.model，服务可以脱离 web 层被测试。"""
     monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
     profile, score, _trace, mode, notice = diagnosis_service.diagnose_resume(RESUME)
     assert mode == "rule_fallback"
@@ -126,6 +126,28 @@ def test_services_diagnose_matches_previous_rule_fallback(monkeypatch):
     assert profile["version"] == "1.0"
     assert profile["suggestions"]
     assert notice
+
+
+def test_normalize_score_accepts_numeric_strings():
+    """Phase 7d 补的回归：`normalize_score` 的数字字符串分支以前是**必炸**的。
+
+    provider（尤其是 LLM）把子分写成 `"85"` 而不是 `85` 是常见输出，`normalize_score`
+    为此专门留了一条 `re.fullmatch` 分支。但那个模块从来没 import 过 `re`，
+    所以这条分支走到就是 `NameError: name 're' is not defined`。
+
+    它躲过了 Phase 7c 的门禁第 14 步（观察面只有 `api/`），7d 扩到
+    `api,domain,providers,repositories,services(,scripts)` 后当场报出来。
+    测试只钉**分支真的能跑通**，不钉具体分值口径（那是 contracts/scoring.md 的事）。
+    """
+    assert diagnosis_service.normalize_score("85") == 85
+    assert diagnosis_service.normalize_score(" 85 ") == 85
+    assert diagnosis_service.normalize_score("72.5") == 72.5
+    assert diagnosis_service.normalize_score({"score": "60"}) == 60
+    # 非数字字符串不能抛异常，按约定回落到中位 50。
+    assert diagnosis_service.normalize_score("未知") == 50
+    # 越界与 NaN 一类的输入同样只做夹取/回落，不抛。
+    assert diagnosis_service.normalize_score(120) == 100
+    assert diagnosis_service.normalize_score(-5) == 0
 
 
 # ---------------------------------------------------------------- #

@@ -31,8 +31,8 @@ from domain.target_job import OPEN_GAP_STATUSES
 from repositories import action as action_repo
 from repositories import target_job as target_job_repo
 from services import target_job_service
-from tools import database
-from tools.api_errors import ApiError
+from repositories import database
+from domain.internal.api_errors import ApiError
 
 logger = logging.getLogger(__name__)
 

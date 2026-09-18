@@ -9,8 +9,8 @@ from pypdf import PdfWriter
 import pytest
 
 import api.index as api_module
-from tools import database
-from tools.upload_security import UploadSecurityError, validate_upload
+from repositories import database
+from domain.upload_security import UploadSecurityError, validate_upload
 
 
 RESUME = "项目经历：负责接口开发、测试、部署与故障复盘，最终将平均响应时间降低百分之六十。"

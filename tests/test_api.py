@@ -8,8 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import api.index as api_module
-from tools.model_router import ZhipuModelRouter
-from tools.providers import model as model_provider
+from providers.model_router import ZhipuModelRouter
+from providers import model as model_provider
 
 
 RESUME = "项目经历：负责接口开发并完成上线验证，持续跟进问题闭环。"
@@ -69,7 +69,7 @@ class FakeRouter:
 
 def raw_client(monkeypatch, router=None):
     if router is not None:
-        # Phase 5：模型工厂只有一个归属地（tools.providers.model），api / services 都从这里取，
+        # Phase 5：模型工厂只有一个归属地（providers.model），api / services 都从这里取，
         # 所以打桩也只需要打这一个点 —— 打错了会直接 AttributeError，不会静默失效。
         monkeypatch.setattr(model_provider, "build_model_router", lambda: router)
     monkeypatch.setenv("DUMATE_CONSENT_SECRET", "test-consent-secret")
@@ -347,7 +347,7 @@ def test_zhipu_router_calls_chat_completions_and_parses_json(monkeypatch):
         def __exit__(self, exc_type, exc, traceback):
             return False
 
-    with patch("tools.model_router.urlopen", return_value=FakeResponse()) as mocked_open:
+    with patch("providers.model_router.urlopen", return_value=FakeResponse()) as mocked_open:
         result = router.call("resume_diagnosis", "分析简历", "简历正文")
 
     request = mocked_open.call_args.args[0]

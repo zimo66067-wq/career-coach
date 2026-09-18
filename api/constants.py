@@ -9,7 +9,7 @@
 
 原 `api/index.py` 顶部先写了
 
-    from tools.contracts import MAX_TEXT_CHARS, MIN_TEXT_CHARS
+    from domain.internal.contracts import MAX_TEXT_CHARS, MIN_TEXT_CHARS
 
 然后在 10 行之后**又赋值了一遍**：
 
@@ -17,12 +17,12 @@
     MIN_TEXT_CHARS = 20
 
 也就是说那次 import 拿到的名字**立刻被同名常量覆盖**，是个哑绑定（两者的值恰好一致：
-`tools/contracts.py:14-15` 也是 20 / 200_000）。拆到这里时只保留**生效的那一份**，
+`domain/internal/contracts.py:14-15` 也是 20 / 200_000）。拆到这里时只保留**生效的那一份**，
 值一字不改；那个 import 不再需要，因为 API 层用的一直是这里的常量。
 
 ## `TRACE_ID_PATTERN` 是死的（记录，不在本轮删）
 
-`api/index.py` 里定义了它但**没有任何引用**；真正在用的同名模式在 `tools/trace.py:15`。
+`api/index.py` 里定义了它但**没有任何引用**；真正在用的同名模式在 `domain/internal/trace.py:15`。
 7c 的 DoD 是"拆分"，不是"删代码"，所以这里照搬保留，并把证据记在
 `docs/phase7c-report.md`，留给后续阶段决定 —— 混进这一轮会让"对外行为零变化"这句话变浑。
 """

@@ -21,7 +21,7 @@ OPTIONS 把一个不存在的端点探测成"存在"。所以这里维护的是*
 """
 from flask import request
 
-from tools.api_errors import ApiError
+from domain.internal.api_errors import ApiError
 
 #: 精确匹配的预检白名单。
 OPTIONS_ROUTES = frozenset({

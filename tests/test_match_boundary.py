@@ -10,9 +10,9 @@ import json
 
 import pytest
 
-import match_requirements as mr
+from domain import match_requirements as mr
 import api.index as api_module
-from tools.rescore import calc_M
+from domain.rescore import calc_M
 
 
 # ---------------------------------------------------------------- #
