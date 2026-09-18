@@ -115,4 +115,4 @@ C0 = 0.25×73.00 + 0.35×60.00 + 0.40×72.55 = 18.25 + 21 + 29.02 = 68.27
 
 - M 某类全部 unknown → 该类 `insufficient_evidence`，权重归一；全部类别均 unknown → M 整体 `insufficient_evidence`，C0 不计算并报错。
 - R/I 输入缺失 → 对应项按 unknown 处理，不得按 0 分硬算。
-- 分数输出前必须过 `tools/redflag.py`：输出中出现输入对象之外的专有名词或数字 → 标红并阻断发布。
+- 分数输出前必须过 `domain/redflag.py`：输出中出现输入对象之外的专有名词或数字 → 标红并阻断发布。

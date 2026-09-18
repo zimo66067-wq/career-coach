@@ -4,6 +4,77 @@
 
 ## [Unreleased]
 
+### Changed - 2026-09-17 归并 `tools/`（Phase 7d）
+
+> 提交：待回填（分两笔：结构重构 / 文档记录）。
+> 门禁：`work/gate7d.sh` **16 步（0~15）全部 PASS，退出码 0**；变异注入 **17/17 全部被抓到**。
+
+Phase 7 的**最后一个**子阶段。**纯结构重构，对外行为零变化** —— 可证：把每个被搬走的模块
+相对 HEAD 的每处改动做一次"引用归一化"，旧行与新行必须逐字相同；实测 **7 个逐字节相同 /
+12 个只改引用 / 4 个已声明**（3 处散文 + `trace` 拆分），合计改动仅 `-29 / +59` 行。
+脚本 `work/verify7d-moves.py`，任何时候都能重跑。
+
+- **`tools/` 整层消失**：23 个模块 / 6440 行 → **22 个 `git mv` + 1 个拆分**。
+  `domain/` 10、`domain/internal/` 6、`providers/` 5、`repositories/` 1（`database.py`）、
+  `services/` 1（`account.py` → `account_service.py`，唯一改名的，为了跟同层的 `*_service.py` 命名一致）。
+  删除 `tools/requirements.txt`（逐行是根清单的子集）。**空目录都不留** ——
+  那会让 `tools` 变成可 import 的命名空间包、`import tools` 静默成功
+- **全仓 249 处引用改写**（点号 import 208 + 扁平 import 41）。字符串形态的引用
+  （`sys.path.insert(0, "tools")`、`monkeypatch("tools.model_router.urlopen")`、
+  `ROOT/"tools"/"database.py"`、CI 里的 `python tools/validate_schema.py`）单独一轮处理，
+  **每一处都声明期望的替换次数，对不上就拒绝写盘**
+- **新增 `domain/internal/`**：`dependency-map.md` §5 第 4 条的"或降级为 `domain` 的内部工具"
+  被读成一个具体的包 —— 放进 6 个"**是机制、不是领域规则**"的模块
+  （`api_errors` / `contracts` / `extract_text` / `log_sanitize` / `radar_adapter` / `trace`），
+  并附带一条硬约束：**成员必须是叶子**（仓库内零依赖）
+- **新增分层规则 6**：`providers → domain` 是唯一允许的反向边，且**只允许指向叶子模块**。
+  由 `providers/model.py` 要抛 `ApiError` 逼出来；反向边指向叶子就没有传递性。
+  判据同时要求那条边**真的存在且目标真是叶子**（否则"providers 压根不碰 domain"时也是绿的）
+- **`tools/trace.py` 拆成两半**：`domain/internal/trace.py`（纯的 `new_trace_id` /
+  `TRACE_ID_PATTERN`）+ 新文件 `api/trace.py`（要 Flask 请求上下文的 `trace_id()`）。
+  **触发拆分的是判据不是审美**：并进 `domain/` 后，`tests/test_layering.py` 规则 2
+  （domain 不得 import flask，**函数体内的也算**）立刻把那个函数内延迟 `import flask` 报了出来。
+  拆分依据是消费者清点：`trace_id()` 的 4 个消费者全在 `api/`
+- **新增门禁第 15 步「`tools/` 零残留」**：shell 分支（目录不存在 + `import tools` 抛错）
+  与契约测试（23 条映射逐条命中、AST 无 `tools.*` import、字符串常量残留白名单、
+  `__file__` 深度、mock 目标可解析）**两路**，因为它们会以不同方式失效
+- **门禁第 14 步的观察面从 `api/` 扩到 5 个生产层 + `scripts/`**（24 → 96 个模块）。
+  **扩面当天就抓到一条与本阶段无关的老 bug**：`services/diagnosis_service.py::normalize_score`
+  用 `re.fullmatch` 接住"provider 把分数写成数字字符串"的分支，但该模块从未 `import re` ——
+  模型返回 `"85"` 时 `diagnose_resume()` 就是 `NameError`。已补 `import re` +
+  `tests/test_phase5.py` 回归用例（6 种输入）
+- **修掉三处"藏在引用里"的缺陷**（既不是 import、也不含 `tools` 字样）：
+  `domain/internal/contracts.py` 的 `parents[1]` 在深一层后指错目录（**13 个测试模块在收集期
+  FileNotFoundError**）；`test_model_router_providers.py` 的 8 处 `patch("model_router.urlopen")`
+  裸模块名（只在 `patch` 执行那一行炸，报错像环境问题）；`domain` 里的函数级 `import flask`
+- **修掉 4 处写死老路径的活文档**：`HANDOFF.md`（代码分层表 + 门禁命令）、
+  `contracts/README.md`、`contracts/scoring.md`。
+  **`CHANGELOG.md` 与 `deliverables/` 里的历史记录一字未改** —— 改掉就是伪造历史
+- **判据的观察面补一种形态：仓库内路径（`<层>/…/<文件>.py|md|json`）。**
+  原先 `scripts/live-doc-path-check.py` 只认 `pages/*.html` 与 `js/*.js`，
+  `tools/validate_schema.py` 这种写法**根本抽不出来** —— `contracts/*.md` 里那两处死链
+  是**没有任何判据在看着**的情况下人工扫出来的。现在活文档 5 → **8 份**、
+  引用 121 → **436 处**（310 存在 / 126 历史语境 / 0 死链）。
+  第一版扩面报 68 处、只有 40 处为真，于是加两条收窄（**每一条都在代码里写了理由**）：
+  ① 首段必须是仓库顶层目录名 ∪「已消失的层」清单（挡住仓库外的 `work/…` 与部署 URL 路径，
+  同时**继续认 `tools`**）；② 词表加「基线」「旧路径」，章节标题沿父子链遗传但不含 H1
+  （`architecture.md` 的 H1 里就有"审计"，让 H1 生效等于整份文件一次豁免）。
+  「快照」**仍然不豁免** —— 6b-2b 那条教训不回退
+- **`docs/` 三份审计文档按"现况断言改对、基线测量不改"分开处理**：§1 技术栈 / §5 / §6 / §7 / §8
+  里的路径逐条改成归并后的真实路径（顺手把 `tools/contracts.py:25` 这类**行号**换成符号引用，
+  行号会自己漂移）；§11 覆盖率基线**一个字不改**（那是 2026-09-13 的实测值，
+  改路径等于伪造测量），靠标题里的「基线」声明豁免
+- **新增判据**：`tests/test_phase7d_contract.py`（13 项，含映射表可复算、残留白名单必须写理由、
+  `__file__` 深度、mock 目标可解析、以及"改坏一条映射必须报"的自检；
+  `test_live_doc_judge_covers_the_path_form` **把活文档判据脚本加载起来跑**而不是 grep 源码）；
+  `tests/test_layering.py` 新增规则 6 与 `test_the_providers_rule_can_fail`；
+  `scripts/api-import-check.py` 新增 `--roots`；`scripts/live-doc-path-check.py` 新增 `path` 形态
+- **变异脚本自己踩到一条门禁早就记过的坑**：pytest 在这个环境里**退出码不可信**
+  （atexit 的临时目录清理被 safe-delete 垫片拦下抛 `SystemExit`），首次真跑 17 条里
+  3 条 MISS 全由它造成，而测试其实已经红了。改成与 `gate7d.sh` 第 1 步同口径（只认摘要行）
+- **规模口径的一处修正**：§21.6 原先估 `tools/` 是"6252 行 / 20+ 模块"，
+  实测 **6440 行 / 23 个模块**（多 188 行、多 3 个模块）
+
 ### Added - 2026-09-17 拆 `api/index.py`（Phase 7c）
 
 > 提交：`bf738fd`（拆分 32 文件）+ `82688d4`（文档记录 4 文件）。

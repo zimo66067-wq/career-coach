@@ -67,9 +67,9 @@
 
 ---
 
-## 3. F4 的预测属性：必须删除 —— ✅ 已于 2026-09-13 执行
+## 3. F4 的预测属性：必须删除 —— ✅ 已于 2026-09-13 整条删除（本节是删除前的基线）
 
-`tools/rescore.py` 计算并对外返回：
+`tools/rescore.py`（旧路径，Phase 7d 后为 `domain/rescore.py`）计算并对外返回：
 
 - `C7_low` / `C7_high` —— 基于固定 **0.30 / 0.70** 假设参数
 - 前端 `f4-report.html` 与 `radar.js` 展示「七天情景推演区间 low ~ high」
@@ -302,7 +302,7 @@ CareerProfile        TargetJob                InterviewSession        Action
 | 期满条件 | 需同时具备：数据授权、Provider、数据 SLA、数据预算、更新策略 |
 
 **到期若五项仍未具备，则整块删除**：`organization` search UI、`/api/f5/organizations/*` 路由、
-`services/organization_service.py`、`tools/providers/organization.py`、7 张索引表、
+`services/organization_service.py`、`providers/organization.py`、7 张索引表、
 对应 tests 与 docs。
 
 **当前必须守住的口径**：任何材料都不得声称已有单位库或实时职位覆盖。索引恒空是设计状态，不是缺陷。
@@ -1056,3 +1056,99 @@ Phase 7 的第三个子阶段。**纯结构重构，对外行为零变化** —�
 （原入口 import 了 `MAX_TEXT_CHARS` 又在 10 行后赋值覆盖，两者值恰好一致）。
 
 **下一步**：Phase 7d。`D3`（单位/职位检索）期限 **2026-10-13** 不变。
+
+---
+
+## 22. Phase 7d 完成记录（2026-09-17 · `tools/` 归并）
+
+**Phase 7 到此收口**（7a 门禁扩面 / 7b wf03 与公开范围 / 7c 拆 `api/index.py` / 7d 归并 `tools/`）。
+
+### 22.1 结果
+
+| 量 | 值 |
+| --- | --- |
+| `tools/` 整层 | **23 个模块 / 6440 行**（§21.6 原先估的是"6252 行 / 20+ 模块"——**实测多了 188 行、多了 3 个模块**） |
+| 处理方式 | **22 个 `git mv` + 1 个拆分**（`trace` 拆成 `domain/internal/trace.py` + `api/trace.py`） |
+| 落位 | `domain/` 10、`domain/internal/` 6、`providers/` 5、`repositories/` 1、`services/` 1 |
+| 全仓引用改写 | **249 处**（点号 import 208 + 扁平 import 41） |
+| 删除 | `tools/requirements.txt`（逐行是根清单的子集，现由判据钉住） |
+| `import tools` | 抛 `ModuleNotFoundError`（空目录都不留 —— 那会让它变成命名空间包而静默成功） |
+
+规模数字的来源：`work/recon7d.py` 的实测清单，不是文档里的估计值。
+
+### 22.2 一个设计决定：`domain/internal/`
+
+`dependency-map.md` §5 第 4 条给的选项是"并入 `domain/` + `providers/`，**或**降级为 `domain`
+的内部工具"。这一轮**两种都用了**，而且第二种被读成一个具体的包：
+
+**机制 ≠ 规则。** `ApiError`（携带 HTTP 状态码）、`contracts`（校验器）、`log_sanitize`、
+`extract_text`、`radar_adapter`（渲染适配）、`trace`（纯那一半）这 6 个是**所有域对象共用的机制**，
+放不进任何一条业务规则里。它们进 `domain/internal/`，并带一条硬约束：**成员必须是叶子**。
+
+这条约束是**规则 6** 的承重墙：`providers → domain` 是唯一允许的反向边，且只许指向叶子。
+它由 `providers/model.py` 要抛 `ApiError` 这件事逼出来 —— 反向边指向叶子就没有传递性，
+`providers` 拿到的是一个不会再引入 `domain` 其他部分的机制件。判据要求那条边**真的存在、
+目标真是叶子**，否则"providers 压根不碰 domain"时也是绿的（空判）。
+
+### 22.3 扩面抓到的真 bug（本轮最值钱的一条）
+
+门禁第 14 步的观察面从 `api/` 扩到 5 个生产层 + `scripts/`（96 个模块）后，**第一次跑就报**：
+
+```
+FAIL services/diagnosis_service.py:113  normalize_score 里用到 're'，但模块级没有这个绑定
+```
+
+`normalize_score()` 专为"provider 把分数写成数字字符串"留了一条 `re.fullmatch` 分支
+（LLM 输出 `"85"` 而不是 `85` 是常态），但该模块**从未 import 过 `re`**。
+即：模型一旦返回 `"85"`，`diagnose_resume()` 就是 `NameError`。
+
+判据本身**一个字没改**，只是把 `--roots` 从 1 个值变成 6 个值，就从绿变红。
+**判据的覆盖面决定了它能看见什么，而不是它写得多仔细**；而观察面是**要跟着风险一起搬**的 ——
+7c 把观察面定成 `api/` 当时是对的（那时新失效模式只在 api/）。
+
+### 22.4 三类"藏在引用里"的缺陷（既不是 import，也不含 `tools` 字样）
+
+| 缺陷 | 为什么躲得过既有判据 | 现在的判据 |
+| --- | --- | --- |
+| `parents[1]` 深度漂移（`contracts.py` 深了一层） | 不是 import、不含 `tools`，且只报"下游找不到文件"，不报"我搬过家" | 静态判 `parents[N]` 的 N == 文件深度（附"确实扫到了"的正面证据） |
+| `patch("model_router.urlopen")` 裸模块名 | 只在使用它的那一行炸，报错像环境问题 | 每个 mock 目标的首段必须能被 `find_spec` 解析（与运行时的判定标准一致） |
+| `domain` 里的**函数级** `import flask`（`trace`） | 7c 之前没人管 `domain/` 的 flask 依赖 | `test_layering.py` 规则 2（函数体内的也算）→ 逼出 `trace` 拆分 |
+
+`trace` 的拆法不是"读代码觉得合理"，而是**消费者清点**：`trace_id()` 的 4 个消费者全在 `api/`，
+`new_trace_id()` 的消费者在服务层。于是拆分是唯一正确的切法。
+
+### 22.5 "只改了引用"怎么证（可复算）
+
+`git mv` 的 `R 0 0` 在改完 import 之后就不再可复现。所以口径换成更强、且**任何时候都能重跑**的：
+
+> 对每个被搬走的模块，把它相对 HEAD 的每一处改动**做一次引用归一化**之后，
+> 旧行与新行必须**逐字相同**；不相同的地方必须落在**声明过的白名单**里。
+
+实测：**7 个逐字节相同 / 12 个只改引用 / 4 个已声明**（3 处散文 + `trace` 拆分），
+合计改动仅 `-29 / +59` 行。脚本 `work/verify7d-moves.py`，白名单不写理由就加不进来。
+
+### 22.6 门禁
+
+判据步骤 14 → **15 步**（新增"`tools/` 零残留"，shell 分支 + 契约测试两路）。全绿：
+**pytest 511 / node 85 / schema 32 / 冒烟 70 / 名字解析 96 模块 0 失败 /
+活文档 8 份 436 处引用 0 死链**。
+
+**第 10 步的观察面也扩了**：`LIVING_DOCS` 5 → 8 份（补 `HANDOFF.md` 与 `contracts/*.md`），
+并新增第三种形态「仓库内路径」（`PAGE_RE`/`JS_DIR_RE` 抽不出 `tools/validate_schema.py`
+这种写法）。第一版扩面报了 68 处，逐条看只有 40 处是真的 —— 收窄两条之后才是可用的判据。
+详见 `docs/phase7d-report.md` §7.1。
+
+变异注入 **17/17 全部被抓到** —— 其中 2 条是**反向控制**（① 同一处注入，判据只扫 `api/` 时
+**不该**报；② 追加一条**仓库外 / 部署 URL** 路径，第 10 步必须**仍然绿**），
+用来证明"扩面"既真的扩大了观察面、又没有把假阳性一起扩进来。
+
+### 22.7 遗留
+
+1. ~~`contracts/*.md` 不在任何路径判据的观察面里~~ → **本轮已补**（§22.6、`phase7d-report.md` §7.1）。
+2. `api/trace.py` 目前住 `api/` 顶层；若 `api/` 再分层，它应与 `http_layer.py` 一类同住。
+3. `deliverables/` 与 `CHANGELOG.md` 里的 `tools/` **一字未改** —— 那是历史记录，改掉就是伪造历史。
+4. **历史语境的豁免是行级的**，所以"同一行里既有历史标记、又有一个现况引用"时后者不会被判。
+   实测残留一处（`product-scope.md` §2 表格里的 `tools/knowledge.py`，它在一张已声明
+   「已过时」的表里，所以不是漂移）。下次给这类行补现况引用要**另起一行**。
+
+细节见 `docs/phase7d-report.md`。

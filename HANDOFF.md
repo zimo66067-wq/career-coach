@@ -37,8 +37,9 @@
 | HTTP 入口（单函数分发） | `api/index.py` |
 | 编排与事务边界 | `services/` |
 | 领域规则（纯逻辑，不碰 DB 与框架） | `domain/` |
+| 领域层的层内工具（机制件，无仓库内依赖 —— 这条是硬约束，见 `tests/test_layering.py` 规则 6） | `domain/internal/` |
 | 表级读写（唯一拼 SQL 的地方） | `repositories/` |
-| 引擎 / 脱敏 / 评分 / provider | `tools/`、`tools/providers/` |
+| 外部服务适配（模型路由 / OCR / 单位数据） | `providers/` |
 | 前端 canonical（Vercel 静态根） | `public/` |
 | 前端发布镜像（GitHub Pages） | `docs/` |
 
@@ -58,9 +59,10 @@
     python scripts/env-example-check.py              # .env.example 与代码读取点双向一致
     python scripts/sync_mirror.py --check            # 发布镜像不变量
 
-三个 JSON Schema 的 fixture 校验用 `python tools/validate_schema.py`；
+三个 JSON Schema 的 fixture 校验用 `python domain/validate_schema.py`；
 真实 HTTP 冒烟用 `python scripts/phase4-http-smoke.py`。完整的门禁顺序与"每步在防什么"
-见 `docs/phase6b3-report.md`（Phase 7a 新增的两步见 `docs/phase7a-report.md`）。
+见 `docs/phase6b3-report.md`（Phase 7a 新增的两步见 `docs/phase7a-report.md`，
+Phase 7d 把观察面扩到 5 层与新增第 15 步见 `docs/phase7d-report.md`）。
 
 ## 仓库约定（不随时间变化的那部分）
 

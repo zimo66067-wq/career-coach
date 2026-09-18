@@ -57,6 +57,21 @@
 > `GET /api/auth/me`；拿不到答复（断网 / 5xx）判为**拦下**而非放行；强制态三层兜底关不掉。
 > 豁免名单刻意只有 `public/pages/states.html`（内部 QA 状态墙）。服务端安全实现一行未改。
 > 参考 `docs/phase6b3-report.md`。
+>
+> **Phase 7d 更新（2026-09-17）**：`tools/` **整层已归并**（23 模块 / 6440 行），
+> 以下结论随之改变 ——
+>
+> | 审计条目 | 位置 | 现状 |
+> | --- | --- | --- |
+> | `tools/*.py` 是"引擎与工具"那一层（§1 表格的 Domain-ish 行、§7、§8、§9、§10） | §1/§7/§8/§9/§10 | **该层已不存在**。领域规则 → `domain/`；层内机制（`api_errors`/`contracts`/`extract_text`/`log_sanitize`/`radar_adapter`）→ `domain/internal/`；外部服务适配 → `providers/`；`database.py` → `repositories/`。映射表见 `docs/phase7d-report.md` §2 |
+> | "不存在 `domain/` 层、`repositories/` 层" | §1 | Phase 2 已成假（`domain/` 纯规则 + `repositories/` 唯一拼 SQL），Phase 7d 起 `domain/` 又多收了一层 |
+> | `tools/providers/model.build_model_router` | §8 调用路径图 | `providers.model.build_model_router`；`api` 里那一份仍在（§3.2 的收敛属 Phase 5 已裁决事项） |
+> | §11.2 / §11.3 的覆盖率数字 | §11 | **不改写**（那是 2026-09-13 的实测值，把路径换成新名字等于伪造测量）。本节标题已声明为基线 |
+>
+> **本文件正文的处理口径（Phase 7d 定）**：§1 技术栈、§4~§8 这类**现况断言**里的路径
+> 已逐条改成归并后的真实路径；§11 这类**基线测量**一节不改，靠标题里的「基线」声明
+> 豁免（判据 `scripts/live-doc-path-check.py` 认这个词，不认「快照」——
+> 快照说的是范围，基线说的是时间点，只有后者是历史结论）。
 
 ---
 
@@ -66,15 +81,17 @@
 | --- | --- | --- |
 | 后端 | Python 3.11（CI）/ 本地 3.10.11；Flask + Werkzeug | `.github/workflows/ci.yml`、`api/index.py:130` |
 | 部署 | Vercel Serverless Function，单一入口 `api/index.py`，`maxDuration: 60` | `vercel.json` |
-| 数据 | SQLite（本地/测试）/ PostgreSQL（生产，`DATABASE_URL`）双方言 | `tools/database.py:21-23` |
-| 模型 | 智谱 Chat（主）、千帆 V2 Chat（备）、千帆 Embedding | `tools/model_router.py:329/418`、`tools/match_requirements.py` |
+| 数据 | SQLite（本地/测试）/ PostgreSQL（生产，`DATABASE_URL`）双方言 | `repositories/database.py::dialect()` |
+| 模型 | 智谱 Chat（主）、千帆 V2 Chat（备）、千帆 Embedding | `providers/model_router.py`（`ZhipuModelRouter` / `QianfanModelRouter`）、`domain/match_requirements.py` |
 | 前端 | 原生 ES5 风格 JS + 手写 CSS，无构建步骤、无框架、无包管理 | `public/js/*.js`、无 `package.json` |
 | 静态托管 | Vercel 静态根 = `public/`（实测）；`docs/` 为 GitHub Pages 镜像 | 见 §12 |
 | 图表 | ECharts 5.5（CDN + 本地 vendor 双路径） | `public/js/radar.js:3-4` |
-| OCR | 可选 OCR provider（扫描件 PDF 兜底） | `tools/ocr_provider.py` |
+| OCR | 可选 OCR provider（扫描件 PDF 兜底） | `providers/ocr_provider.py` |
 | 测试 | pytest 9.0.3 + `node --test`；schema 校验 + 敏感扫描 + pip-audit | `ci.yml` |
 
-**不存在**：`package.json`、`package-lock.json`、Dockerfile、`pyproject.toml`、make/CI 之外的构建脚本、`domain/` 层、`repositories/` 层。
+**不存在**：`package.json`、`package-lock.json`、Dockerfile、`pyproject.toml`、make/CI 之外的构建脚本。
+（本行原文还写着「不存在 `domain/` 层、`repositories/` 层」—— Phase 2 就已成假，**Phase 7d 起**①`domain/` 是真层、
+②`tools/` 已不存在。旧行的措辞保留在文件头的阶段账本里。）
 
 ---
 
@@ -188,18 +205,20 @@
 
 ## 5. Domain / Data Model
 
-**当前没有 domain 层。** 领域概念散落在 Service 与 tools 中，以 `dict` 传递，靠 `contracts/*.json` 做形状校验。
+**本节的「当前没有 domain 层」是 Phase 0 的结论** —— Phase 2 已建立 `domain/`（纯规则）+ `repositories/`（唯一拼 SQL），
+**Phase 7d 又把 `tools/` 整层并了进来**，所以本节 §5.1 的契约加载点、§5.2 的实体现状都要按文件头的阶段账本读。
+下面两张表按审计当时的写法保留（契约文件本身没变，只有加载它的模块换了位置）。
 
 ### 5.1 现有契约（4 个 JSON Schema）
 
 | Schema | 行数 | 运行时代码加载 | 用途 |
 | --- | --- | --- | --- |
-| `resume-profile.schema.json` | 77 | ✅ `tools/contracts.py:25` | ResumeProfile |
-| `job-profile.schema.json` | 63 | ✅ `tools/contracts.py:30` | JobProfile |
+| `resume-profile.schema.json` | 77 | ✅ `domain/internal/contracts.py::RESUME_PROFILE_VALIDATOR` | ResumeProfile |
+| `job-profile.schema.json` | 63 | ✅ `domain/internal/contracts.py::JOB_PROFILE_VALIDATOR` | JobProfile |
 | `interview-turn.schema.json` | 55 | ❌ 仅 CI + 测试 | InterviewTurn |
 | `ability-profile.schema.json` | 72 | ❌ 仅 CI + 测试 | AbilityProfile |
 
-`contracts/scoring.md`(116) 是 R/M/I/C0/C7 的唯一执行口径文档，`tools/rescore.py` 是其实现。
+`contracts/scoring.md`(116) 是 R/M/I/C0/C7 的唯一执行口径文档，`domain/rescore.py` 是其实现。
 
 ### 5.2 领域实体现状
 
@@ -220,13 +239,13 @@
 
 | Provider | 文件 | 行数 | 选择方式 | 默认 | 消费者 |
 | --- | --- | --- | --- | --- | --- |
-| 模型（Chat） | `tools/model_router.py` + `tools/providers/model.py` | 512 + 74 | `DUMATE_MODEL` | 智谱 → 千帆 → 规则降级 | diagnosis / interview / optimizer / apply |
-| Embedding | `tools/match_requirements.py` | 554 | `QIANFAN_EMBEDDING_AK/SK` | BM25 | F2/F3 匹配 |
-| ASR | `tools/providers/asr.py` | 113 | `ASR_PROVIDER` | mock | **仅死路由 + voice_handler** |
-| OCR | `tools/ocr_provider.py` | 173 | — | 关闭 | 扫描件 PDF 上传 |
-| Organization | `tools/providers/organization.py` | 112 | `ORG_DATA_PROVIDER` | `unconfigured`（永不返回数据） | F5 索引 |
+| 模型（Chat） | `providers/model_router.py` + `providers/model.py` | 512 + 74 | `DUMATE_MODEL` | 智谱 → 千帆 → 规则降级 | diagnosis / interview / optimizer / apply |
+| Embedding | `domain/match_requirements.py` | 554 | `QIANFAN_EMBEDDING_AK/SK` | BM25 | F2/F3 匹配 |
+| ASR | ~~`providers/asr.py`~~ | — | — | — | **Phase 1 已整条删除**（连同 `voice_handler` 与 `/api/wf04/asr`） |
+| OCR | `providers/ocr_provider.py` | 173 | — | 关闭 | 扫描件 PDF 上传 |
+| Organization | `providers/organization.py` | 112 | `ORG_DATA_PROVIDER` | `unconfigured`（永不返回数据） | F5 索引 |
 
-**缺陷**：`build_model_router` 在 `tools/providers/model.py` 与 `api/index.py` 各有一份（见 `dependency-map.md` §3.2）。
+**缺陷**：`build_model_router` 在 `providers/model.py` 与 `api/*` 各有一份（见 `dependency-map.md` §3.2）。
 
 ---
 
@@ -243,7 +262,9 @@
 | 投递 | `applications` |
 | **F5 单位/职位（恒空）** | `organizations`、`organization_aliases`、`organization_profiles`、`source_snapshots`、`job_postings`、`job_posting_versions`、`job_embeddings` |
 
-`tools/database.py` 1579 行同时承担：双方言连接、建表 DDL（SQLite 与 PostgreSQL 各一份，**手工保持同步**）、全部 CRUD。
+`repositories/database.py` 同时承担：双方言连接、建表 DDL（SQLite 与 PostgreSQL 各一份，**手工保持同步**）、全部 CRUD。
+（原行写的是 `tools/database.py`（旧路径）1579 行 —— 路径随 Phase 7d 归并改掉；行号不再写死在正文里，
+它会自己漂移，Phase 7c 的 §21.5 已经记过这一条。）
 
 ---
 
@@ -251,7 +272,7 @@
 
 ```
 route_api
- └── services/*  ──► tools/providers/model.build_model_router() 或 api.index.build_model_router()
+ └── services/*  ──► providers.model.build_model_router() 或 api.* 里的那一份
       └── ModelRouter.call(task_name, user_input, context?)
            ├── 载入 prompts/<task>.md（冻结提示词）
            ├── ZhipuModelRouter._try_call   （ZHIPU_API_KEY）
@@ -264,8 +285,8 @@ route_api
 | task key | prompt 文件 | 调用点 |
 | --- | --- | --- |
 | `resume_diagnosis` | `prompts/resume/diagnose.md` | `services/diagnosis_service.py:327` |
-| `resume_rewrite` | `prompts/resume/rewrite.md` | `tools/optimizer.py:113` |
-| `interview_question` | `prompts/interview/interviewer.md` | `tools/interview_engine.py:247` |
+| `resume_rewrite` | `prompts/resume/rewrite.md` | `domain/optimizer.py:113` |
+| `interview_question` | `prompts/interview/interviewer.md` | `domain/interview_engine.py:247` |
 | `cover_letter` | `prompts/apply/cover-letter.md` | `services/apply_service.py:87` |
 | `resume_report` | `prompts/resume/report-deep.md` | **无** |
 | `jd_extract` | `prompts/match/jd-extract.md` | **无** |
@@ -273,7 +294,7 @@ route_api
 | `interview_review` | `prompts/interview/review.md` | **无** |
 | `seven_day_plan` | `prompts/plan/seven-day.md` | **无** |
 
-另有非 `ModelRouter` 的模型调用：`tools/match_requirements.py` 的 Embedding（千帆）。
+另有非 `ModelRouter` 的模型调用：`domain/match_requirements.py` 的 Embedding（千帆）。
 
 **降级策略现状**：每个 AI 能力都有规则兜底（诊断走规则评分、面试走题库、求职信走模板、匹配走 BM25），即 DoD #21 大体已满足，但缺自动化断言。
 

@@ -10,13 +10,12 @@
 > **Phase 1 更新（2026-09-13）**：本文件列出的全部 Phase 1 删除项已执行完毕，以下条目
 > **只描述删除前的状态**：
 >
-> - §1 的 `api/f2_major.py`(703)、§3.1 的 `services.task_service ──► api.f2_major` **违规已消失**
+> - §1 的 `api/f2_major.py`(703)（旧路径）、§3.1 的 `services.task_service ──► api.f2_major` **违规已消失**
 >   （dependency inversion 3 → 2）、§3.2 的 `tools.tasks`、§3.3 页面专属脚本里的 `f2-major`、
 >   §4.1「既是路由又是业务又是服务器」、§4.2 的**两套匹配逻辑并存**（已只剩一套）、
 >   §5 的 `/api/f2_major` 退休垫片
 > - §3.2 / §4.3 的 `tools.voice_handler ──► tools.providers.asr` 整条链已删除
-> - §4.3 / §7 所列的以下资产已于本阶段全部删除：`public/js/voice.js`、`tools/voice_handler.py`、
->   `tools/providers/asr.py`、`/api/wf04/asr`、3 个 ASR/TTS env
+> - §4.3 / §7 所列的以下资产已于本阶段全部删除（旧路径）：`public/js/voice.js`、`tools/voice_handler.py`、`tools/providers/asr.py`、`/api/wf04/asr`、3 个 ASR/TTS env
 > - §1 的 `kb.html` / `kb.js` / `/api/knowledge/*` 已删除（`tools/knowledge.py` 保留为内部题库）
 > - C7 预测链（`rescore` → `scoring.md` §4 → schema `scenario_day7` → `radar.js` / `f4-report.html`）
 >   已整体删除
@@ -32,7 +31,7 @@
 >   `services/diagnosis_service.py:324` 与 `services/interview_service.py:50` 仍
 >   `from api.index import build_model_router`。新的 `domain/` 与 `repositories/`
 >   两包经静态扫描确认**不 import flask / api / services**，分层方向在新增代码上成立；
->   既有两处的修复属于 Phase 5（`build_model_router` 应从 `tools/providers/model.py`
+>   既有两处的修复属于 Phase 5（`build_model_router` 应从 `tools/providers/model.py`（旧路径）
 >   经 provider registry 注入）。
 > - **§7 "无 migration 机制"已解决**：新增 `repositories/migrations.py`，版本化、幂等、
 >   `/api/health` 可观测。
@@ -48,8 +47,8 @@
 >   改为依赖 `tools.providers.model`（叶子模块，模块级 import 不再有循环导入问题）。
 >   同时发现并修掉了它们的**第二层依赖**：`tools.trace.trace_id()` 要 Flask 请求上下文，
 >   服务用它兜底 → 服务单测必须 `with app.test_request_context()`。现在 trace 由 web 层
->   解析后**注入**服务，`tools/trace.py` 的 flask 改为函数内延迟导入。
-> - **§3.2 收敛完成**：`build_model_router` 全仓库**只有一处定义**（`tools/providers/model.py`），
+>   解析后**注入**服务，`tools/trace.py`（旧路径）的 flask 改为函数内延迟导入。
+> - **§3.2 收敛完成**：`build_model_router` 全仓库**只有一处定义**（`tools/providers/model.py`（旧路径）），
 >   其余模块一律 `from tools.providers import model as model_provider` 后属性查找。
 >   打桩点因此唯一，打错会 AttributeError（此前打错是**静默失效**）。
 > - **新增门禁** `tests/test_layering.py`（8 项，进 pytest）：跨层 import（含函数体内）、
@@ -76,9 +75,32 @@
 >
 > 细节见 `docs/phase7c-report.md`。
 
+> **Phase 7d 更新（2026-09-17）**：`tools/` **已整层归并完毕**（23 模块 / 6440 行 → 22 个 `git mv`
+> + 1 个拆分）。全仓 249 处引用已改写，`import tools` 现在抛 `ModuleNotFoundError`。
+> Phase 7 的四个子阶段（7a/7b/7c/7d）**全部完成**。
+>
+> - **§1 表里的 `tools/*.py` / `tools/providers/*.py` / `tools/database.py`（旧路径）三行由本阶段接管**：
+>   前两行拆成 `domain/`（领域规则）+ `domain/internal/`（层内工具）+ `providers/`（外部服务适配），
+>   第三行落 `repositories/database.py`（§5 早就写明 repositories 就是它拆出来的）。
+>   本文件下方的 §1 表格与 §2.2 是 **Phase 0 快照**，保留以见历史。
+> - **§2.1 / §2.2 的箭头集合换了名字，方向没变**：`api → services → domain → repositories/providers`
+>   仍是唯一合法方向。`services → providers` 与 `domain → providers` 这两条边在 7d 之后
+>   是**跨层引用**里唯一的例外形态，由 `tests/test_layering.py` 的规则 6 管（见下）。
+> - **新增规则 6**：`providers → domain` 是唯一允许的反向边，且**只允许指向叶子模块**。
+>   它是被 `providers/model.py` 抛 `ApiError` 这件事逼出来的 —— 把 `ApiError`
+>   放进 `domain/internal/`（机制，不是规则），再把反向边限定在叶子上，反向边就没有传递性。
+>   判据同时要求"那条边真的存在、目标真是叶子"（否则 providers 压根不碰 domain 时也是绿的）。
+> - **§5 的目标结构现在与实际一致**（第 4 条约束的措辞已按落地结果改写）。
+> - **门禁第 14 步的观察面从 `api/` 扩到 5 个生产层 + `scripts/`**（96 个模块）。
+>   扩面当天就抓到一条与 7d 无关的老 bug：`services/diagnosis_service.py::normalize_score`
+>   用 `re.fullmatch` 却从未 `import re`（provider 把分数写成 `"85"` 时必炸）。
+> - **新增门禁第 15 步**：`tools/` 零残留（shell 分支 + 契约测试两路）。
+>
+> 细节见 `docs/phase7d-report.md`。
+
 ---
 
-## 1. 实际目录与规模
+## 1. 实际目录与规模（Phase 0 审计基线；表内路径是**当时**的，不随归并改写）
 
 | 层 | 路径 | 文件 | 行数 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -103,7 +125,7 @@
 
 ---
 
-## 2. 实测依赖边
+## 2. 实测依赖边（Phase 0 审计基线；箭头上的名字见文件头账本）
 
 ### 2.1 合法方向：`api → services → tools → (providers | database)`
 
@@ -141,6 +163,11 @@ tools.radar_adapter    ──► （被 services.interview_service 引用）
 
 `tools/` **不反向依赖 `services/`**，这一点是干净的。
 
+> **Phase 7d 后**：上图整体作废（`tools.` 这个名字已经不存在），方向没变、节点换了家：
+> `tools.interview_engine → domain.interview_engine`、`tools.model_router → providers.model_router`、
+> `tools.database → repositories.database`、`tools.tasks` 已于 Phase 1 删除。
+> 现状见文件头「Phase 7d 更新」与 `docs/phase7d-report.md §2`。
+
 ### 2.3 前端
 
 ```
@@ -157,7 +184,7 @@ public/pages/*.html
 
 ---
 
-## 3. 依赖违规清单
+## 3. 依赖违规清单（Phase 0 审计基线；逐条处置进度见文件头账本）
 
 ### 3.1 Service → API 倒置（3 处，必须修）
 
@@ -224,7 +251,7 @@ public/pages/*.html
 
 ---
 
-## 4. 无效 / 退休 / 重复资产
+## 4. 无效 / 退休 / 重复资产（Phase 0 审计基线；逐条处置进度见文件头账本）
 
 ### 4.1 死路由（Phase 0 审计快照；表中两条均已于 Phase 1 处理）
 
@@ -327,7 +354,11 @@ Vercel 静态根是 `public/`，**其中所有文件都对公网可读**。实�
 
 ---
 
-## 5. 目标依赖结构（Phase 5 落地）
+## 5. 目标依赖结构
+
+> **Phase 7d 之后：下面这段"目标结构"已经落地**（`routes/` 那层的实际形态是
+> `api/handlers/*` + `api/dispatch.py`，见 `docs/phase7c-report.md`）。
+> 四条硬性约束的现状：1 ✅（由 `tests/test_layering.py` 判）、2 ✅、3 ✅、4 ✅（本阶段完成）。
 
 ```
 api/
@@ -341,8 +372,9 @@ api/
 │   └── auth.py             # auth / history
 services/                   # 编排 + 事务边界，不再被 api 反向依赖
 domain/                     # CareerEvidence / TargetJob / Gap / Decision / Action 规则
+├── internal/               # 领域层的**层内工具**：机制，不是规则；成员必须是叶子
 repositories/               # database.py 拆出的表级读写
-providers/                  # model / asr(待删) / organization(封存) 统一注册
+providers/                  # model / ocr / organization 外部服务适配
 ```
 
 硬性约束（Phase 5 验收）：
@@ -350,4 +382,11 @@ providers/                  # model / asr(待删) / organization(封存) 统一�
 1. `services/`、`domain/`、`repositories/`、`providers/` **不得** import `api.*`。
 2. `build_model_router` 只保留 `providers/model.py` 一处。
 3. `api/` 下任何模块不得有 `app = Flask(...)` / `app.add_url_rule` 之外的模块级副作用。
-4. `tools/` 逐步并入 `domain/` + `providers/`，或降级为 `domain` 的内部工具；保留期不超过两个 Phase。
+4. ~~`tools/` 逐步并入 `domain/` + `providers/`，或降级为 `domain` 的内部工具；保留期不超过两个 Phase。~~
+   **✅ 已执行（Phase 7d，2026-09-17）**：`tools/` 整层已消失。
+   落地结果是**两种都用了**：领域规则与引擎进 `domain/`；6 个"机制件"降级为
+   `domain/internal/`（`api_errors` / `contracts` / `extract_text` / `log_sanitize` /
+   `radar_adapter` / `trace`）；外部服务适配进 `providers/`；`database.py` 进 `repositories/`；
+   `account.py` 进 `services/account_service.py`。
+   判据：`tests/test_phase7d_contract.py` 的映射表（23 条）+ 门禁第 15 步。
+   新增规则 6：`providers → domain` 只许指向 `domain/internal/` 的叶子。
