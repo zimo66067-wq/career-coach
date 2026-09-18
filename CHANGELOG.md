@@ -4,6 +4,52 @@
 
 ## [Unreleased]
 
+### Added - 2026-09-17 拆 `api/index.py`（Phase 7c）
+
+Phase 7 的第三个子阶段。**纯结构重构，对外行为零变化** —— 逻辑一行没改写，
+可证：把原文件的分支区间与 14 个 handler 的函数体各自做「非空行计数器」，
+两边**逐行相等含重数**（831 行全部对上，去重 598）；比对方（基线副本）也与
+`git show 131f83d:api/index.py` **逐字节相同**。
+
+- **1621 行的入口 → 24 个模块，入口只剩 108 行**（`route_api()` 原 917 行 / 664–1580 行，
+  内含 38 个 `if route ==` + 12 个 `route.startswith(` = 50 个路由分支条件；
+  被搬走的区间 688–1578 共 891 行）。拆法：`api/app.py` / `constants.py` / `sentinel.py` /
+  `startup.py` / `http_layer.py` / `security.py` / `validation.py` / `routing.py` /
+  `dispatch.py` + `api/handlers/*` 14 模块
+- **`api/index.py` 不改名**：`vercel.json` 的 `functions` 指向它、`vercel-dead-routes.py`
+  是 `from api.index import app` —— 文件名与 `app` 变量名是**部署契约**。
+  `REPOSITORY_ROOT` + `sys.path` 插入也留在入口（线上 `tools/` / `services/` 能被 import 全靠它）
+- **哨兵下沉到叶子模块**：`dispatch ⇄ handlers` 是真 import 环，实测真写一次就
+  `ImportError: cannot import name 'dispatch' from partially initialized module 'api.dispatch'`
+  —— 与 `dependency-map.md §3.5` 警告的形态同源。`UNHANDLED` 因此住进
+  `api/sentinel.py`，两个方向都只依赖叶子
+- **入口的再导出面变成双向判据**：`imported − 本模块用过` = 纯再导出，必须**真的有人在取**。
+  这条把 `migration_status` 正确地挤掉了（消费者已改从 `api.startup` 取），
+  并暴露出 `tests/test_migrations.py` 里一句注释在断言"它仍然再导出"——**注释是错的，已修**
+- **打桩点跟着实现搬**：`extract_txt` / `ocr_pdf` / `consent_serializer` 已不在 `api.index`，
+  仍打在那里就是空判。7 个测试文件被迫改，并新增一条守卫用例：打桩目标不存在时要**响亮地失败**
+- **新增门禁第 14 步** `scripts/api-import-check.py`（用 `symtable` 走解释器自己的作用域规则）：
+  这是本轮**唯一的新失效模式** —— 某个模块少 import 一个名字，只在没被用例覆盖的那条分支上
+  `NameError`，于是 pytest 会绿、评审会漏。前 13 步没有任何一步看得见它。含 13 项自检探针
+  （3 项是"必须报错"的反向探针）
+- **新增 `tests/test_phase7c_contract.py`（12 项）**，每条主判据配一条反向探针
+- **修掉门禁自己的两个洞（都在第 6 步 / 整体退出码上，见 phase7c-report §4）**：
+  ① 第 6 步 `git diff --check HEAD` 在 `git` 不在 PATH 时执行的是 `command not found`，
+  `&&` 短路后**那格什么都不打印**，读起来和 `clean` 一样 —— `gate7b.log` 就是这样，
+  那格应视为**未验证**；② 门禁**恒以 0 退出**，所以"看退出码"本身是空判
+  （实测外层 wrapper 报 127 而门禁一步没跑）。现在 git 走绝对路径 + 前置断言，
+  且每步结论进汇总、任一步失败即 `exit 1`
+- **修掉四处写错的规模数字**：入口「101 行」实测 105（改这个数字的动作又把它变成 106）、
+  「39 条 `if route ==`」实测 38、「50 条本地路由规则」实测 49、「参数化 13 条」实测 15；
+  另有「919 行 `route_api()`」实测 917。新增 `work/verify-numbers.py` 把每条断言与它的算法钉住
+  ——**会自我漂移的量（行数）改为判不变量（膨胀比 1.457，落在 1.3~1.6）**，只记快照
+- **门禁判据 13 步 → 14 步**（另加"第 0 步"git 可用性前置断言）；pytest 482 → **495**；
+  敏感扫描 252 → **277** 文件
+  （+25：23 个新 `api/` 模块 + 1 个门禁脚本 + 本阶段报告；新契约测试在 `tests/`，
+  该目录本就在扫描口径之外）
+- 变异测试 `work/mutate7c.py` **14/14 全部被抓到**。其中"成环"要两条注入分开证：
+  真写 reverse import 证**环是真的**（连收集都过不去），死代码里的 reverse import 证**判据是活的**
+
 ### Added - 2026-09-17 wf03 路由去留 + 公开文档范围（Phase 7b）
 
 Phase 7 的第二个子阶段。**没有新能力，对外行为零变化**。两件事都**先问对问题再动手**：

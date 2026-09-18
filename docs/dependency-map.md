@@ -59,6 +59,23 @@
 >
 > 细节见 `docs/phase5-report.md`。
 
+> **Phase 7c 更新（2026-09-17）**：`api/index.py` **已拆**（1621 行 → 24 个模块，入口 108 行）。
+> 拆分后 `api/` 内部的依赖方向是**单向**的，且**由判据锁住**：
+>
+> - **§3.3「API 模块兼任服务器」这一类缺陷在 `api/` 里终结**：模块级副作用
+>   （`@app.after_request` / `@app.errorhandler` / `import 即建表`）改为**显式注册**
+>   （`register_http_layer(app)` / `bootstrap()`），入口是唯一持有 app 的地方。
+> - **§3.5 的"循环引用风险"在 `api/` 内部从"侥幸避开"变成"结构上不可能"**：哨兵
+>   `UNHANDLED` 下沉到叶子模块 `api/sentinel.py`，`dispatch ⇄ handlers` 那个真环被拆掉。
+>   **这一条本轮是实测出来的，不是推演**：往 `api/handlers/health.py` 写一行
+>   `import api.index`，pytest **连收集都过不去** ——
+>   `ImportError: cannot import name 'dispatch' from partially initialized module 'api.dispatch'`。
+> - **§2.1 的依赖边方向没变**：`api → services → tools → (providers | database)` 仍是唯一合法方向。
+>   变的是**节点粒度**：§2.1 图里的单个 `api/index.py` 现在是 24 个模块，箭头集合不变
+>   （逐字迁移，见 §3 的证明）。图中标注的 `✗ … (§3.1 违规)` 两处已于 Phase 5 修掉。
+>
+> 细节见 `docs/phase7c-report.md`。
+
 ---
 
 ## 1. 实际目录与规模
@@ -104,6 +121,12 @@ api/index.py
 │                                    └── ✗ api.f2_major                        (§3.1 违规)
 └── tools.*（大量直接使用）
 ```
+
+> **Phase 7c 后**：上图是 Phase 0 快照，`api/index.py` 这一个节点现已摊成 24 个模块
+> （`api/app.py`、`api/routing.py`、`api/dispatch.py`、`api/handlers/*` …）。
+> **箭头集合一字未变** —— 分支体是逐行搬的，`work/verify-verbatim.py` 证明 831 个非空行
+> 两边逐行相等含重数。图中两处 `✗ … (§3.1 违规)` 已于 Phase 5 修掉，保留原文以见历史。
+> 现状见文件头「Phase 7c 更新」。
 
 ### 2.2 `tools/` 内部
 
@@ -163,6 +186,15 @@ public/pages/*.html
 
 它是**唯一一个既是路由又是业务又是服务器**的文件，且被 `services/task_service.py` 以业务身份 import。
 
+> **Phase 7c 补充**：`api/f2_major.py` 本身已于 Phase 1 整树删除，但**这一类缺陷在
+> `api/index.py` 上原样留存到 7c** —— 1621 行里同时有 `app = Flask(__name__)` 的模块级副作用、
+> 50 个路由分支、以及 `import 即顺带跑一次迁移` 的隐式引导。
+> 7c 把这三样都移出「模块级副作用」形态：中间件改为 `register_http_layer(app)`、
+> 引导改为显式 `bootstrap()`、路由分支搬进 `api/handlers/*`。
+> **判据**：`tests/test_phase7c_contract.py` 的 `test_http_layer_registers_the_expected_middleware_set`
+> 钉住注册项集合（1 after + 1 before + 6 errorhandler），`test_entry_module_has_no_route_branches`
+> 钉住入口不再有业务分支。
+
 ### 3.4 重复实现：两套「JD 要求提取 + 匹配权重」
 
 | | `services/match_service.py` + `tools/match_requirements.py` | `api/f2_major.py` |
@@ -177,6 +209,18 @@ public/pages/*.html
 ### 3.5 循环引用风险
 
 当前无硬循环（`tools` 不回指 `services`），但 `api/index.py ↔ services/*` 已是双向：`api → services` 是正常调用，`services → api` 是倒置。一旦有人在 `api/index.py` 顶层 import 那些 service 函数就会形成真循环——现状靠「函数内延迟 import」侥幸避开。
+
+> **Phase 7c 后续（这条已两段结清）**：
+> 1. **`services → api` 那半条已于 Phase 5 修掉**（`diagnosis_service` / `interview_service` 改依赖
+>    `tools.providers.model`），见文件头「Phase 5 更新」。
+> 2. **`api/` 内部新长出来的那半条是真环，7c 实测踩到并拆掉了。** 拆 871 行到 14 个 handler 后，
+>    `api/dispatch.py` 要 import handler，handler 又要 `UNHANDLED` —— 真写出来就是
+>    `ImportError: cannot import name 'dispatch' from partially initialized module 'api.dispatch'`
+>    （连 pytest 收集都过不去）。修法不是"函数内延迟 import"（那是把环推迟，**本文件上一句
+>    刚批评过的写法**），而是把哨兵下沉到叶子模块 `api/sentinel.py`，让两个方向都只依赖叶子。
+>    **判据**：`test_sentinel_is_a_leaf_shared_by_dispatch_and_handlers` +
+>    `test_no_api_module_imports_the_entry_point`（后者由 AST 扫描，连死代码里的 reverse import
+>    也报 —— 变异测试分别用"真 import"与"死代码 import"两条注入证明了环是真的、判据是活的）。
 
 ---
 
