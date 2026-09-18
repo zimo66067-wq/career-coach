@@ -20,6 +20,21 @@ import api.index as api_module
 
 ROOT = Path(__file__).resolve().parents[1]
 
+
+def api_package_source():
+    """`api/` 全包的源码拼起来（Phase 7c 前只有 index.py 一个文件）。
+
+    7c 把入口拆成 24 个模块之后，"某个字符串还在不在 API 层"这件事**不能再靠读
+    `api/index.py` 一个文件**来判 —— 路由名、错误分支、限流调用都搬到了 `api/handlers/*`
+    与 `api/*.py`。观察面必须跟着扩到整个包，否则判据会变成恒真/恒假。
+    """
+    return "\n".join(
+        path.read_text(encoding="utf-8-sig")
+        for path in sorted((ROOT / "api").rglob("*.py"))
+        if "__pycache__" not in path.parts
+    )
+
+
 # Every endpoint that belonged to the retired capability.  They must not answer.
 RETIRED_API_PATHS = [
     "/api/f2/health",
@@ -93,7 +108,7 @@ def test_the_legacy_prototype_tree_is_gone():
 
 
 def test_module_no_longer_imports_the_retired_capability():
-    source = (ROOT / "api" / "index.py").read_text(encoding="utf-8")
+    source = api_package_source()
     assert "f2_major" not in source
     assert "task_service" not in source
     assert "tools.tasks" not in source
@@ -285,7 +300,7 @@ def test_assets_rewrite_targets_the_deployed_tree():
 def test_no_dead_routes_in_vercel_config():
     """每条 static 重写的目标都必须存在；每条 _route 都必须有处理器。"""
     config = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
-    index_source = (ROOT / "api" / "index.py").read_text(encoding="utf-8")
+    index_source = api_package_source()
 
     for rule in config["rewrites"]:
         destination = rule["destination"]

@@ -9,7 +9,13 @@ from pathlib import Path
 import pytest
 
 import api.index as api_module
+import api.validation as api_validation
 import tools.ocr_provider as ocr
+
+# Phase 7c：`ocr_pdf` 的**调用点**从 `api/index.py` 搬到了 `api/validation.py`
+# （`read_uploaded_document` 的 SystemExit 分支）。所以下面的打桩必须打在
+# `api.validation` 上：打在 `api.index` 上属性仍然存在，`monkeypatch.setattr` 不会报错，
+# 但上传路径根本不会用它 —— 那就是空判。
 
 
 def raw_client(monkeypatch):
@@ -190,7 +196,7 @@ def test_upload_scanned_pdf_ocr_success(monkeypatch):
         "张三，三年后端开发经验，精通 Python、Go 与 MySQL，负责订单与支付系统，"
         "主导过日活十万级服务的稳定性建设，具备完整的项目交付与团队协作能力。"
     )
-    monkeypatch.setattr(api_module, "ocr_pdf", lambda path: {"ok": True, "text": ocr_text})
+    monkeypatch.setattr(api_validation, "ocr_pdf", lambda path: {"ok": True, "text": ocr_text})
     response = consented_client(monkeypatch).post(
         "/api/wf01/upload",
         data={"file": (io.BytesIO(_blank_pdf_bytes()), "scanned.pdf")},
@@ -206,7 +212,7 @@ def test_upload_scanned_pdf_ocr_failure_message(monkeypatch):
     monkeypatch.setenv("OCR_API_KEY", "test-key")
     monkeypatch.setenv("OCR_SECRET_KEY", "test-secret")
     monkeypatch.setattr(
-        api_module, "ocr_pdf", lambda path: {"ok": False, "error": "ocr_failed", "message": "OCR 服务异常"}
+        api_validation, "ocr_pdf", lambda path: {"ok": False, "error": "ocr_failed", "message": "OCR 服务异常"}
     )
     response = consented_client(monkeypatch).post(
         "/api/wf01/upload",

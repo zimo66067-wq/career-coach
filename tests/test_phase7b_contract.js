@@ -26,6 +26,26 @@ const root = path.resolve(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 const exists = (rel) => fs.existsSync(path.join(root, rel));
 
+/* ── Phase 7c：`api/` 全包源码 ─────────────────────────────────────
+ * 7c 把 `api/index.py` 拆成 24 个模块，本文件原先那几处「读 api/index.py 找路由分支」
+ * 的判断必须跟着搬：`route == "wf03/upload"` 现在在 `api/handlers/wf03.py`，
+ * health 的 `"wf03": "available"` 在 `api/handlers/health.py`。
+ * 只有**本地 Flask 路由表**（`"/api/wf03/upload"`）仍然留在 `api/index.py` —— 它是入口契约。
+ * 两处分开读，是为了让"路由实现了"与"路由被挂上了"各自可判。
+ */
+function apiPackageSource() {
+  const out = [];
+  (function walk(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === '__pycache__') continue;
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(abs);
+      else if (entry.name.endsWith('.py')) out.push(fs.readFileSync(abs, 'utf8'));
+    }
+  })(path.join(root, 'api'));
+  return out.join('\n');
+}
+
 /* ── 纯函数：递归列出 public/ 下的 md（相对路径，posix 分隔符） ──────── */
 function publicMarkdownFiles(dir, base) {
   const out = [];
@@ -56,12 +76,13 @@ test('7b-1 /api/wf03/* 三条路由保留：重写、Flask 规则、处理分支
     assert.ok(vercel.includes('_route=wf03/' + p.split('/').pop() + '"'),
       'vercel.json 的 ' + p + ' 重写目标不对');
   }
-  const api = read('api/index.py');
+  const api = apiPackageSource();          // 处理分支 / health 条目：7c 后散在 api/handlers/*
+  const entry = read('api/index.py');      // 本地 Flask 路由表：7c 后仍在入口
   for (const r of ['"wf03/upload"', '"wf03/jd"', '"wf03/match"']) {
     assert.ok(api.includes('route == ' + r), 'route_api() 缺处理分支 ' + r);
   }
   for (const p of ['"/api/wf03/upload"', '"/api/wf03/jd"', '"/api/wf03/match"']) {
-    assert.ok(api.includes(p), '本地 Flask 规则表缺 ' + p);
+    assert.ok(entry.includes(p), '本地 Flask 规则表缺 ' + p);
   }
   assert.match(api, /"wf03":\s*"available"/, 'health 的 workflows 段不再报告 wf03');
   // 判据自检：假路由必须抓得到

@@ -16,7 +16,21 @@ import pytest
 from itsdangerous import BadSignature, SignatureExpired
 
 import api.index as api_module
+import api.security as api_security
+import api.validation as api_validation
 from tools.providers import model as model_provider
+
+# Phase 7c：本文件要打桩的两个点搬了家 ——
+#
+#   extract_txt / extract_docx / extract_pdf / validate_upload  →  api.validation
+#   consent_serializer                                          →  api.security
+#
+# 它们原先住在 `api/index.py`（那时入口就是全部），7c 把上传抽取与同意签名拆到各自的
+# 模块后，**打桩位置必须跟着搬**。打在 `api.index` 上是"静默失效"：属性还在，
+# `monkeypatch.setattr` 会成功，但上传路径用的是搬家后的绑定 —— 测试会变成空判。
+# 这正是 `tests/test_layering.py` 花一整节讲的那类坑，所以这里显式 import 出模块对象，
+# 让"打在哪"在代码里看得见。
+VALIDATION_STUBS = ("extract_txt", "extract_docx", "extract_pdf", "validate_upload")
 
 
 RESUME = "项目经历：负责接口开发并完成上线验证，持续跟进问题闭环。"
@@ -114,28 +128,28 @@ def upload_bytes(client, filename, content):
 
 
 def test_text_minimum_length_accepted(client, monkeypatch):
-    monkeypatch.setattr(api_module, "extract_txt", lambda _path: "x" * 20)
+    monkeypatch.setattr(api_validation, "extract_txt", lambda _path: "x" * 20)
     response = upload_bytes(client, "resume.txt", b"x" * 20)
     assert response.status_code == 200
     assert len(response.json["resumeText"]) == 20
 
 
 def test_text_below_minimum_rejected(client, monkeypatch):
-    monkeypatch.setattr(api_module, "extract_txt", lambda _path: "x" * 19)
+    monkeypatch.setattr(api_validation, "extract_txt", lambda _path: "x" * 19)
     response = upload_bytes(client, "resume.txt", b"x" * 19)
     assert response.status_code == 422
     assert response.json["error"] == "invalid_resume_text"
 
 
 def test_text_maximum_length_accepted(client, monkeypatch):
-    monkeypatch.setattr(api_module, "extract_txt", lambda _path: "a" * 200_000)
+    monkeypatch.setattr(api_validation, "extract_txt", lambda _path: "a" * 200_000)
     response = upload_bytes(client, "resume.txt", b"a" * 100)
     assert response.status_code == 200
     assert len(response.json["resumeText"]) == 200_000
 
 
 def test_text_over_maximum_rejected(client, monkeypatch):
-    monkeypatch.setattr(api_module, "extract_txt", lambda _path: "a" * 200_001)
+    monkeypatch.setattr(api_validation, "extract_txt", lambda _path: "a" * 200_001)
     response = upload_bytes(client, "resume.txt", b"a" * 100)
     assert response.status_code == 413
     assert response.json["error"] == "payload_too_large"
@@ -153,7 +167,7 @@ def test_diagnose_missing_resume_text_rejected(client):
 
 
 def test_file_exactly_10mb_accepted(client, monkeypatch):
-    monkeypatch.setattr(api_module, "extract_txt", lambda _path: RESUME)
+    monkeypatch.setattr(api_validation, "extract_txt", lambda _path: RESUME)
     response = upload_bytes(client, "resume.txt", b"x" * (10 * 1024 * 1024))
     assert response.status_code == 200
 
@@ -177,9 +191,9 @@ def test_missing_file_rejected(client):
 
 
 def test_docx_and_pdf_upload_routes(client, monkeypatch):
-    monkeypatch.setattr(api_module, "validate_upload", lambda _path, _extension: {})
-    monkeypatch.setattr(api_module, "extract_docx", lambda _path: RESUME)
-    monkeypatch.setattr(api_module, "extract_pdf", lambda _path: RESUME)
+    monkeypatch.setattr(api_validation, "validate_upload", lambda _path, _extension: {})
+    monkeypatch.setattr(api_validation, "extract_docx", lambda _path: RESUME)
+    monkeypatch.setattr(api_validation, "extract_pdf", lambda _path: RESUME)
     docx = upload_bytes(client, "resume.docx", b"docx-bytes")
     pdf = upload_bytes(client, "resume.pdf", b"pdf-bytes")
     assert docx.status_code == 200 and docx.json["resumeText"] == RESUME
@@ -249,7 +263,7 @@ def test_expired_consent_token_rejected(monkeypatch):
             raise SignatureExpired("expired")
 
     monkeypatch.setenv("DUMATE_CONSENT_SECRET", "test-consent-secret")
-    monkeypatch.setattr(api_module, "consent_serializer", lambda: ExpiredSerializer())
+    monkeypatch.setattr(api_security, "consent_serializer", lambda: ExpiredSerializer())
     api_module.app.config.update(TESTING=True)
     response = api_module.app.test_client().post(
         "/api/wf02/diagnose",
@@ -266,7 +280,7 @@ def test_tampered_consent_token_rejected(monkeypatch):
             raise BadSignature("bad signature")
 
     monkeypatch.setenv("DUMATE_CONSENT_SECRET", "test-consent-secret")
-    monkeypatch.setattr(api_module, "consent_serializer", lambda: BadSerializer())
+    monkeypatch.setattr(api_security, "consent_serializer", lambda: BadSerializer())
     api_module.app.config.update(TESTING=True)
     response = api_module.app.test_client().post(
         "/api/wf02/diagnose",
@@ -469,3 +483,31 @@ def test_admin_resumes_lists_rows(monkeypatch, client):
 def test_admin_export_requires_password(client):
     response = client.get("/api/admin/export")
     assert response.status_code == 403
+
+
+# ---------------------------------------------------------------- #
+# Phase 7c：打桩点守卫
+# ---------------------------------------------------------------- #
+
+
+def test_phase7c_patch_points_live_where_the_upload_path_looks():
+    """守卫：本文件的打桩点必须真的住在**会被调用**的模块上。
+
+    Phase 7c 把上传抽取与同意签名搬出了 `api/index.py`。上面那些
+    `monkeypatch.setattr(api_validation, ...)` 之所以有效，前提是
+    `api.validation.read_uploaded_document` 用的是**本模块**的绑定。
+
+    如果哪天这些东西又搬一次而本文件没跟着搬，`setattr` 会以 `AttributeError` 立刻响
+    （`monkeypatch` 默认 `raising=True`）—— 这个测试把"响"提前到静态层面，
+    省得靠一条条边界用例去发现，也挡住"打在 api.index 上、属性还在、于是静默失效"那条路。
+    """
+    for name in VALIDATION_STUBS:
+        assert callable(getattr(api_validation, name)), "api.validation 上缺打桩点：%s" % name
+    assert callable(api_validation.ocr_pdf), "api.validation 上缺打桩点：ocr_pdf"
+    assert callable(api_security.consent_serializer), "api.security 上缺打桩点：consent_serializer"
+
+    # 反面：入口模块只是个分发器 + 再导出，不该再持有这些实现。
+    # 若这条变红，说明有人把实现挪回了入口 —— 那就等于 7c 白拆了。
+    for name in VALIDATION_STUBS + ("read_uploaded_resume", "read_uploaded_job",
+                                    "consent_serializer", "require_consent"):
+        assert not hasattr(api_module, name), "api.index 不该再持有 %s" % name

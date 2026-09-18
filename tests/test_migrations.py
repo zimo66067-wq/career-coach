@@ -17,9 +17,18 @@ them.  These tests therefore build a **genuine legacy database** — the old
 import sqlite3
 
 import api.index as api_module
+import api.startup as api_startup
 from domain.application import LEGACY_FALLBACK_STATUS, ApplicationStatus
 from repositories import migrations
 from tools import database
+
+# Phase 7c：`_MIGRATION_ERROR` / `migration_status` 从 `api/index.py` 搬到了 `api/startup.py`。
+# `api.index` **不再**再导出 `migration_status` —— 7c 的契约判据要求入口的再导出面**双向干净**
+# （多留一个没人取的符号就会红），而本文件已经从 `api.startup` 取，于是入口那份没有消费者、
+# 属于纯垃圾，被删掉了。所以**打桩必须打在归属地**：重置别处的 `_MIGRATION_ERROR` 不会影响
+# `api.startup.migration_status()` 读的那个变量，测试就变成空判。`run_migration_status` 这个
+# 别名让下面每一处都看得见打的是谁。
+run_migration_status = api_startup.migration_status
 
 VERSION_APPLICATION_STATUS = migrations.VERSION_APPLICATION_STATUS
 VERSION_CAREER_PROFILES = migrations.VERSION_CAREER_PROFILES
@@ -339,7 +348,7 @@ def test_health_self_heals_a_database_whose_migrations_never_ran(tmp_path, monke
     path = _point_at(tmp_path / "health.db", monkeypatch)
     assert not path.exists(), "测试前提：这是一个全新的数据库"
 
-    state = api_module.migration_status()
+    state = run_migration_status()
 
     assert state["ok"] is True
     assert state["error"] is None
@@ -351,9 +360,9 @@ def test_health_self_heals_a_database_whose_migrations_never_ran(tmp_path, monke
 def test_health_reports_a_failed_migration_instead_of_pretending_ok(tmp_path, monkeypatch):
     _point_at(tmp_path / "broken.db", monkeypatch)
     monkeypatch.setattr(migrations, "MIGRATIONS", (("2099-01-01-broken", _boom),))
-    monkeypatch.setattr(api_module, "_MIGRATION_ERROR", None)
+    monkeypatch.setattr(api_startup, "_MIGRATION_ERROR", None)
 
-    state = api_module.migration_status()
+    state = run_migration_status()
 
     assert state["ok"] is False
     assert state["expected"] == ["2099-01-01-broken"]

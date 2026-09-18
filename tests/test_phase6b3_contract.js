@@ -39,6 +39,25 @@ function read(tree, rel) {
   return fs.readFileSync(path.join(root, tree, rel), 'utf8');
 }
 
+// Phase 7c：后端入口拆成了 24 个模块（`api/index.py` 只剩分发器 + 路由表），
+// 所以「这几条安全性质还在不在后端」**不能再只读 api/index.py**：
+//   httponly / samesite        → api/security.py
+//   enforce_usage 限流调用     → api/handlers/account.py
+//   auth 四条路由名            → api/handlers/account.py
+// 观察面跟着实现一起搬，否则判据会从"检查实现"退化成"检查搬家后剩下的空壳"。
+function apiPackageSource() {
+  const out = [];
+  (function walk(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === '__pycache__') continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.py')) out.push(fs.readFileSync(full, 'utf8'));
+    }
+  })(path.join(root, 'api'));
+  return out.join('\n');
+}
+
 // 判据只应观察**代码**，不该把注释里的说明当成实现。
 // 直接 includes() 会连注释一起扫，于是"本文件不读 localStorage"这句安全说明
 // 反倒把判据扫红 —— 逼人去删掉最该留下的那句话。
@@ -161,7 +180,7 @@ test('auth-gate.js 不以本地存储判定登录态', () => {
 });
 
 test('D7 不得回退既有服务端安全性质（HttpOnly / 限流 / 四个 auth 端点）', () => {
-  const api = fs.readFileSync(path.join(root, 'api', 'index.py'), 'utf8');
+  const api = apiPackageSource();
   assert.match(api, /httponly=True/, '会话 Cookie 必须是 HttpOnly —— 加门禁不能把它降级');
   assert.match(api, /samesite="None" if secure else "Lax"/, 'SameSite 口径被改动');
   assert.match(api, /enforce_usage\("auth_register", 5, 3600/, '注册限流（5 次/小时）被移除或改动');
