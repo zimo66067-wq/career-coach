@@ -183,8 +183,8 @@ CareerProfile        TargetJob                InterviewSession        Action
 | **D7** | 进入即强制注册/登录（弹窗门禁）如何落地？ | ✅ **已实现（Phase 6b-3）**，见 §10.3 / §18 |
 | **D3** | 单位/职位检索：30 天期限从哪天起算？期间是否有任何数据授权在谈？ | 决定是封存还是直接删除 |
 | **D4** | `applications` 现有生产数据是否允许迁移到新 7 态模型？ | 决定 migration 写法 |
-| **D5** | 组织级问题：`workflows/`（1519 行 DuMate 文档）是否还有跨团队用途？ | 决定删除还是搬到 `docs/dumate/` |
-| **D6** | `deliverables/`(53 文件) 与 `handoffs/`(6 文件) 属交付存档，是否随 Phase 7 归档出仓库？ | 影响仓库体积 |
+| **D5** | 组织级问题：`workflows/`（1519 行 DuMate 文档）是否还有跨团队用途？ | ✅ **已决策：保留原地、不归档**（Phase 8 裁决，见 §10.6）—— 它仍被答辩证据索引与冻结清单引用 |
+| **D6** | `deliverables/`(53 文件) 与 `handoffs/`(6 文件) 属交付存档，是否随 Phase 7 归档出仓库？ | ✅ **已决策：保留原地、不归档**（Phase 8 裁决，见 §10.6）—— 多个脚本把它当运行期写入路径 |
 
 ---
 
@@ -283,8 +283,8 @@ CareerProfile        TargetJob                InterviewSession        Action
 | D2 账号手机号 | ✅ 已决策 | **不去掉**，注册保持手机号 + 邮箱，`users` 表不动 |
 | D3 单位/职位检索 | ⏸ **暂缓删除，设期限** | 见 §10.5 |
 | D4 `applications` 迁移 | ✅ 已决策 | 允许迁移生产数据，已执行（`23f75cf`） |
-| D5 `workflows/` 去留 | ✅ 已决策 | **保留原地**，Phase 7 统一归档（见 §10.6） |
-| D6 `deliverables/` 归档 | ✅ 已决策 | 同上 |
+| D5 `workflows/` 去留 | ✅ 已决策 | **保留原地、不归档**（Phase 8 修正原「Phase 7 归档」口径，见 §10.6） |
+| D6 `deliverables/` 归档 | ✅ 已决策 | **保留原地、不归档**（同上） |
 | D7 进入即强制注册/登录 | ✅ 已实现 | Phase 6b-3 落地：政策层 + 原生 dialog 门禁（见 §10.3 / §18） |
 | D8 诊断 → 证据的转换策略 | ✅ 已决策 | **方案 A**，见 §10.7 |
 
@@ -307,10 +307,29 @@ CareerProfile        TargetJob                InterviewSession        Action
 
 **当前必须守住的口径**：任何材料都不得声称已有单位库或实时职位覆盖。索引恒空是设计状态，不是缺陷。
 
-### 10.6 D5/D6 · 仓库体积口径
+### 10.6 D5/D6 · 保留原地（Phase 8 裁决：不归档）
 
-`workflows/`（1519 行、0 引用）与 `deliverables/`（历史证据材料）**保留原地**，Phase 7 统一归档。
-本阶段不删，避免在核心闭环尚未打通时扩大改动面。
+**裁决：`workflows/`(7 文件)、`deliverables/`(53 文件)、`handoffs/`(6 文件) 三者一律保留原地，不归档、不删除。**
+原裁决写的「Phase 7 统一归档」**作废**：Phase 7 全程（7a~7d）做的是门禁扩面、wf03 去留、
+`api/index.py` 拆分与 `tools/` 归并，从未执行任何归档；Phase 8 复核后判定**不应归档**。
+
+**前提被证伪**：D5 的立论依据是 `docs/dependency-map.md` 里的「`workflows/` 全仓代码 0 引用」。
+该断言只在「有没有代码 import 它」这**一个方向**成立，漏掉了另外三条真实且在用的引用面：
+
+| 引用面 | 证据 | 归档会破坏什么 |
+| --- | --- | --- |
+| 答辩证据链 | `docs/defense-evidence-index.md` 与 `public/` 镜像的 Q10 / Q11 / Q15 / Q22 / Q26 直接指向 `workflows/wf-06-ops.md`、`wf-04-interview.md`；Q22 / Q23 / Q28 / Q29 / Q30 指向 `deliverables/g9-submission-checklist.md`、`g8-user-testing.md`、`deliverables/README.md` | 评委按索引翻不到证据原文，证据链断裂 |
+| 冻结清单 | `scripts/p0-07-freeze.py` 把 `workflows/*.md`、`deliverables/**/*` 显式登记为冻结交付组 | 冻结清单指向空目录，交付包不完整 |
+| 运行期写路径 | `scripts/run-wf-e2e.py`、`scripts/run-rehearsal.py`、`scripts/p0-05/06/07`、`scripts/backup-sessions.py` 默认往 `deliverables/` 下写（如 `deliverables/wf-evidence-<date>/rehearsal-10x.json`） | 脚本下次运行即失败 |
+
+`workflows/*.md` 也不是「只读说明书」：正文里是**可执行命令**（`python domain/validate_schema.py …`、
+`python domain/redflag.py …`、`python domain/deidentify.py …`、`python -m pytest tests/test_contracts.py`）。
+Phase 8 修死链时它被一并改写（`tools/` → `domain/`），恰恰因为**它引用的路径要能跑通**——
+一个被门禁追踪、必须随重构同步的文件不是死重。
+
+**结论口径：「代码 0 引用」≠「没人用」。** 这与 7b 的 wf03 是同一类教训——
+判据统计不到的引用面，不等于引用不存在。故本条不再以仓库体积为由归档任何交付物；
+体积口径让位于证据完整性。
 
 ### 10.7 D8 · 诊断 → 证据的转换策略：方案 A（已采纳）
 
@@ -358,7 +377,7 @@ Voice remnants（删除）、retired routes（删除 + `/assets/*` 修正）。
 
 **Phase 2 入口条件已满足**：D4 已决策（允许迁移 `applications` 生产数据到新 7 态模型），
 migration 可以落笔。仍需 D5（`workflows/` 去留）、D6（`deliverables/` 归档）决定仓库体积口径，
-D3 阻塞 F5 阶段 2。
+D3 阻塞 F5 阶段 2。（**补记（Phase 8）**：D5 / D6 已裁决为**保留原地、不归档**，见 §10.6。）
 
 ---
 
@@ -411,8 +430,8 @@ vercel 死路由 = 0、真实 HTTP 冒烟 **37/37**。
 | ID | 状态 |
 | --- | --- |
 | D3 单位/职位检索 | ⏸ 封存中，**期限 2026-10-13**（见 §10.5） |
-| D5 `workflows/` | ✅ 保留原地，Phase 7 归档 |
-| D6 `deliverables/` | ✅ 保留原地，Phase 7 归档 |
+| D5 `workflows/` | ✅ 保留原地、不归档（Phase 8 裁决，见 §10.6） |
+| D6 `deliverables/` | ✅ 保留原地、不归档（同上） |
 | D7 进入即强制注册弹窗 | ⏳ Phase 6 实现 |
 | D8 诊断 → 证据 | ✅ 方案 A，已在 Phase 3 落地 |
 | **D9 面试新事实抽取** | ✅ **方案 A**（2026-09-16 裁决），Phase 4 落地（见 §12.1） |

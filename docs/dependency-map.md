@@ -347,7 +347,11 @@ Vercel 静态根是 `public/`，**其中所有文件都对公网可读**。实�
 
 ### 4.7 其他孤儿
 
-- `workflows/`（7 文件 ~1519 行）：**全仓代码 0 引用**，是 DuMate 的工作流文档。
+- `workflows/`（7 文件 ~1519 行）：**全仓代码 0 引用** —— 注意此断言**只覆盖 import 这一个方向**。
+  它仍被 `docs/defense-evidence-index.md` 的 Q10/Q11/Q15/Q22/Q26、`scripts/p0-07-freeze.py` 的冻结组、
+  以及 `README.md` 的结构说明引用，且正文含真实可执行命令（`python domain/validate_schema.py …`、
+  `python domain/redflag.py …`、`python -m pytest tests/test_contracts.py`）。
+  **所以它不是死重**：Phase 8 裁决保留原地、不归档，见 `docs/product-scope.md` §10.6。
 - `tasks/`：仅一个 README.md。
 - `scripts/_wf04_inline.py`：下划线前缀，无调用方。
 - `.env.example` 中 `LOG_LEVEL`、`ENV`：**无任何消费者**。
