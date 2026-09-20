@@ -10,47 +10,66 @@
 * `scripts/phase4-http-smoke.py` 起的是**本地**端口，不是生产域名。
 
 三者可以同时全绿，而真实用户点进去一个流程都走不通。2026-09-20 就是这个状态：
-线上静态资源是最新的、CI 全绿，但 `/api/*` 的**每一个**路径都返回同一个 404。
+线上静态资源是最新的、CI 全绿，但 `/api/*` 的**每一个**路径都返回同一个 404
+（连 `/api/handlers/health` 这种「函数只要构建了就一定存在的路径」也是）——
+说明那次部署**一个 Serverless Function 都没有**，线上只有静态文件。
 
-两个判据（都是"线上 ≠ 本地"才能看见的）：
+三个判据（都是"线上 ≠ 本地"才能看见的）：
 
-1. **静态新鲜度**：取 HEAD 相对上一提交**真的变过**的静态文件，比线上字节与
+1. **探测源来自前端字面量**：`public/js/pages-api-config.js` 里写死的那个 Vercel 源
+   就是非 Vercel 宿主（GitHub Pages）唯一会去调的地址。**不在这里再抄一份域名** ——
+   写死第二份就等于给下一个人埋一个会漂移的事实；前端改了域名，探针自动跟着改。
+2. **静态新鲜度**：取最近一次改动 `public/` 的提交里**真的变过**的文件，比线上字节与
    `git cat-file -s HEAD:<path>`（**不是** `wc -c` —— 工作树含 CRLF，会虚高）。
    线上等于 HEAD 才能说"线上是当前版本"，否则连版本都不对，谈接口没意义。
-2. **同一性 + 响应来源**：业务接口的 404 与"绝对不存在的路径"的 404
-   **逐字节相同** ⇒ 这些接口没有被任何路由接住。
-   再叠一层：应用自己会给响应加 `Cache-Control: no-store`（`api/http_layer.py`），
-   响应里没有这个头 ⇒ 这个 404 **不是本应用产生的**。
+3. **响应是谁产生的**：本应用对**每一个**响应都加 `Cache-Control: no-store`
+   （`api/http_layer.py` 的 `after_request`）与 JSON 错误体。所以
+   「不带 `no-store` + HTML 404」= 这个响应不是本应用产生的。
+   把业务接口的响应与"绝对不存在的路径"的响应逐字节比一次，这条就有实证。
+
+判据的严格程度分两档（刻意不同）：
+
+* `/api/health` 是**硬门**：必须 200。它是唯一"不带参数就该成功"的接口。
+* 其余业务接口只要求**不是那个静态 404** —— 本应用回 400/401/415/422 都是**通了**
+  （缺 body、缺 token 本来就该这样）。把"非 200 即失败"当判据会在 API 修好的那一刻
+  变成假阳性，然后下一个人会把整条判据删掉。
 
 用法：
 
-    python scripts/api-prod-probe.py                      # 探默认生产域名
-    python scripts/api-prod-probe.py --origin https://x   # 探别处（修完复跑用）
-    python scripts/api-prod-probe.py --skip-freshness     # 只探接口
+    python scripts/api-prod-probe.py                          # 探前端字面量指向的源
+    python scripts/api-prod-probe.py --origin https://x       # 探别处（对比用）
+    python scripts/api-prod-probe.py --skip-freshness         # 只探接口
 
-出口码：0 = 全通过；1 = 有阻断；2 = 网络不可用（不作产品结论）。
+出口码：0 = 全通过；1 = 有阻断；2 = 探不了（没有可用源 / 网络不可用，不作产品结论）。
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import subprocess
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-DEFAULT_ORIGIN = "https://career-coach-omega-three.vercel.app"
+#: 前端写死 Vercel 源的地方。刻意不写死域名本身，只写死"去哪读"。
+LITERAL_SOURCES = ("public/js/pages-api-config.js", "public/js/account.js")
 
-#: 业务接口探针。第一条是硬门：`/api/health` 都必须 200。
+_LITERAL_RE = re.compile(r"https://[A-Za-z0-9.-]+\.vercel\.app")
+
+#: 业务接口探针。第一条是硬门（必须 200）；其余只要求"是应用回的"。
 API_PROBES = (
-    ("GET", "/api/health"),
-    ("POST", "/api/wf01/consent"),
-    ("POST", "/api/wf03/jd"),
-    ("GET", "/api/profile"),
+    ("GET", "/api/health", True),
+    ("POST", "/api/wf01/consent", False),
+    ("POST", "/api/wf03/jd", False),
+    ("GET", "/api/profile", False),
+    # 只要函数构建了，这个路径必然存在（api/handlers/health.py → /api/handlers/health）。
+    # 它 404 就等于"线上一个函数都没有"，与"路由映射写错了"是两种不同的病。
+    ("GET", "/api/handlers/health", False),
 )
 
-#: 对照组：这个路径**一定**不存在。用它给"404 长什么样"定标。
+#: 对照组：这个路径**一定**不存在。用它给"静态 404 长什么样"定标。
 CONTROL_PATH = "/__probe_definitely_missing__"
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +108,23 @@ def _git(*args):
     return done.stdout.strip() if done.returncode == 0 else None
 
 
+def frontend_literal_origins():
+    """扫发布树，返回 (前端写死的 https 源列表, [问题...])。"""
+    found = []
+    problems = []
+    for rel in LITERAL_SOURCES:
+        path = REPO_ROOT / rel
+        if not path.exists():
+            problems.append("%s 不存在" % rel)
+            continue
+        text = path.read_text(encoding="utf-8")
+        hits = sorted({match.group(0) for match in _LITERAL_RE.finditer(text)})
+        if not hits:
+            problems.append("%s 里找不到 https://*.vercel.app" % rel)
+        found.extend(hits)
+    return sorted(set(found)), problems
+
+
 def freshness_probes(limit=3):
     """挑「最近一次改动过 public/ 的提交」里变过的文件当版本探针。
 
@@ -118,7 +154,7 @@ def freshness_probes(limit=3):
 def check_freshness(opener, origin, probes, failures):
     print("== 1. 静态新鲜度（线上是否 = HEAD）==")
     if not probes:
-        print("  跳过：git 里没找到 HEAD~1..HEAD 变过的 public/ 文件")
+        print("  跳过：git 里没找到最近一次改 public/ 时变过的文件")
         return
     for path, url_path, blob_size in probes:
         status, body, _ = _fetch(opener, origin + url_path)
@@ -143,52 +179,83 @@ def check_api(opener, origin, failures):
         print("  网络不可用：%s" % control_body)
         return False
     control_digest = hashlib.md5(control_body).hexdigest()
-    print("  对照（应 404）%-34s code=%s md5=%s" % (CONTROL_PATH, control_status, control_digest[:12]))
+    control_no_store = "no-store" in control_headers.get("cache-control", "")
+    print("  对照（应 404）%-34s code=%s md5=%s no-store=%s"
+          % (CONTROL_PATH, control_status, control_digest[:12], control_no_store))
+    if control_no_store:
+        failures.append(
+            "对照组 %s 竟然带了 no-store —— 说明有 catch-all 路由把任意路径都送进了应用；"
+            "这时『与对照 404 相同』不再能证明接口没被接住，本探针的判据失效。"
+            % CONTROL_PATH)
     print()
 
-    same_as_control = []
-    for method, path in API_PROBES:
+    static_404 = []
+    for method, path, hard_gate in API_PROBES:
         status, body, headers = _fetch(opener, origin + path, method=method)
         if status is None:
-            print("  %-4s %-30s 取不到（%s）" % (method, path, body))
+            print("  %-4s %-28s 取不到（%s）" % (method, path, body))
             failures.append("%s %s 取不到：%s" % (method, path, body))
             continue
         digest = hashlib.md5(body).hexdigest()
         no_store = "no-store" in headers.get("cache-control", "")
         flags = []
+        served_by_app = True
         if digest == control_digest:
             flags.append("与对照 404 逐字节相同")
-            same_as_control.append(path)
+            served_by_app = False
         if not no_store:
-            # 应用自己会设 no-store；没有它 => 这个响应不是本应用产生的
+            # 应用无条件设 no-store；没有它 => 这个响应不是本应用产生的
             flags.append("响应缺 no-store（非本应用产生）")
-        if status != 200:
-            flags.append("非 200")
-        mark = "OK " if not flags else "!! "
-        print("  %s%-4s %-30s code=%-4s md5=%s  %s"
+            served_by_app = False
+        if hard_gate and status != 200:
+            flags.append("硬门未过（要求 200）")
+        if not served_by_app:
+            static_404.append(path)
+        elif not hard_gate:
+            flags.append("已由应用应答（非 200 不算失败）")
+        mark = "OK " if not flags or all("不算失败" in f for f in flags) else "!! "
+        print("  %s%-4s %-28s code=%-4s md5=%s  %s"
               % (mark, method, path, status, digest[:12], "；".join(flags)))
 
     print()
-    if same_as_control:
+    if static_404:
         failures.append(
-            "%d 个业务接口返回的 404 与不存在的路径**逐字节相同** → 这些接口没有被任何路由接住，"
-            "线上 Python 侧没有在服务这套 app（去 Vercel 看该次部署的 Functions 列表与构建日志）。"
-            % len(same_as_control))
-    health_status, _, _ = _fetch(opener, origin + "/api/health")
-    if health_status != 200:
-        failures.append("/api/health 未返回 200（当前 %s）—— 这是硬门。" % health_status)
+            "%d 个路径返回的都是同一份静态 404（连 `/api/handlers/health` 也在内）⇒ 那次部署"
+            "**没有构建出任何 Serverless Function**，线上只有静态文件。"
+            "去 Vercel 看该次部署的 Functions 列表与构建日志；重点核对 Project Settings 里的"
+            "**Root Directory / Output Directory / Framework Preset** —— 函数没被构建时，"
+            "`vercel.json` 里那些 `/api/xxx -> /api?_route=xxx` 重写全部落空，"
+            "而静态资源照样是最新的，所以 CI 与『站点可达性』都会给你绿灯。"
+            % len(static_404))
     return True
 
 
 def main():
     parser = argparse.ArgumentParser(description="生产 API 探针")
-    parser.add_argument("--origin", default=DEFAULT_ORIGIN, help="要探测的源，默认生产域名")
+    parser.add_argument("--origin", default=None, help="要探测的源；默认取前端字面量")
     parser.add_argument("--skip-freshness", action="store_true", help="只探接口，不探版本")
     args = parser.parse_args()
-    origin = args.origin.rstrip("/")
+
+    literal, literal_problems = frontend_literal_origins()
+    for problem in literal_problems:
+        print("提示：%s" % problem)
+
+    if args.origin:
+        origin = args.origin.rstrip("/")
+        source = "--origin 指定"
+        if literal and origin not in literal:
+            print("提示：%s 不在前端字面量 %s 里 —— 你探的不是前端真的会去调的地址。"
+                  % (origin, "、".join(literal)))
+    elif literal:
+        origin = literal[0]
+        source = "前端字面量（%s）" % "、".join(LITERAL_SOURCES)
+    else:
+        print("探不了：前端字面量里没有可用的 https 源，也没有给 --origin。")
+        return 2
 
     head = _git("rev-parse", "--short", "HEAD") or "?"
     print("目标源：%s" % origin)
+    print("来源：%s" % source)
     print("本地 HEAD：%s" % head)
     print()
 
@@ -208,7 +275,7 @@ def main():
         for item in failures:
             print("  阻断：%s" % item)
         return 1
-    print("  线上静态 = HEAD，业务接口全部 200。")
+    print("  线上静态 = HEAD，业务接口都已被应用接住（/api/health = 200）。")
     return 0
 
 

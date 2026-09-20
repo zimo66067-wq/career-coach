@@ -30,6 +30,8 @@
     {"path": "docs/observability.md", "why": "可观测性规范：日志落盘前必须过哪个脚本"},
     {"path": "public/observability.md", "why": "上一行的发布镜像"},
 
+    {"path": "docs/release-checklist.md", "why": "上线剩余步骤台账：逐条标【谁做】、正文含可执行命令与判据脚本路径。讲的是【现在】还差什么，状态只允许在实测后更新 —— 它就是 Live 文档的定义"},
+
     {"path": "tests/TEST_PLAN.md", "why": "测试计划：列的是当前该存在的测试文件"},
     {"path": "tests/acceptance/acceptance-checklist.md", "why": "验收门逐条核对表：含可执行命令"},
     {"path": "tests/fixtures-synthetic/README.md", "why": "合成样本规则（现状）"},

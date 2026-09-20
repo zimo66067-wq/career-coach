@@ -15,12 +15,24 @@
       看起来像死路由，其实不是）。只要**存在一个方法**没落到兜底，就算接上了。
     · 带参数的重写（`$1`）拿不到真实参数值，同样只要求"不是全方法兜底 404"。
 
+上面的判据只管**方向 A：重写 → 处理分支**。还有**方向 B：本地路由 → 重写覆盖**，
+它原来没人看，而恰恰是"只坏在生产"的那种病：
+
+    线上入口是**枚举式**的 —— `api/index.py` 里新增一条 `/api/xxx`，必须同时在
+    `vercel.json` 里加一条 `source`，否则线上直接静态 404，而本地 `test_client()` 全绿
+    （本地走 `/api/xxx` 直连，根本不经过重写）。所以逐条核：每个本地路由要么**本身就是
+    某条重写的 destination**（函数自己的路径，如 `/api`），要么被某条 `source` 匹配上
+    （含 `(.*)` / `:param` 形态）。这条不联网、不依赖部署状态。
+
+两条判据合起来才闭合：A 抓"重写指向了空分支"，B 抓"分支没有重写指过来"。
+
 用法（仓库根目录）：
     .venv-audit/Scripts/python.exe scripts/vercel-dead-routes.py
-退出码：有死路由 = 1。
+退出码：有死路由 或 有未被覆盖的本地路由 = 1。
 """
 import json
 import os
+import re
 import sys
 import tempfile
 
@@ -64,6 +76,65 @@ def is_fallthrough(entry):
     return entry[1] == 404 and entry[2] == FALLTHROUGH_MESSAGE
 
 
+def source_matcher(source):
+    """把一条 rewrite 的 `source` 编译成能匹配具体路径的正则。
+
+    只支持 `vercel.json` 里真实用到的两种形态：
+    `(.*)`（正则捕获组）与 `:name` / `:name*`（路径参数）。
+    刻意不做通用的 vercel 路由语法模拟 —— 那会变成又一份需要维护的规格。
+    """
+    pattern = re.escape(source)
+    pattern = pattern.replace(r"\(\.\*\)", ".*")
+    pattern = re.sub(r":[A-Za-z_]\w*\*", ".*", pattern)
+    pattern = re.sub(r":[A-Za-z_]\w*", "[^/]*", pattern)
+    return re.compile("^" + pattern + "$")
+
+
+def local_rules():
+    """本地路由表 = `api/index.py` 里 `add_url_rule` 注册的那一批（endpoint 前缀 route_）。"""
+    return sorted(
+        str(rule) for rule in app.url_map.iter_rules() if rule.endpoint.startswith("route_")
+    )
+
+
+def uncovered_local_rules(config):
+    """本地路由里，既不是某条重写的 destination、也没被任何 source 覆盖的那些。"""
+    sources = [rule["source"] for rule in config["rewrites"]]
+    matchers = [source_matcher(source) for source in sources]
+    destinations = {
+        rule["destination"].split("?", 1)[0] for rule in config["rewrites"]
+    }
+    missing = []
+    for rule in local_rules():
+        if rule in destinations:
+            continue
+        # /api/target-jobs/<id>/analyse → /api/target-jobs/sample/analyse
+        concrete = re.sub(r"<[^>]+>", "sample", rule)
+        if not any(matcher.match(concrete) for matcher in matchers):
+            missing.append((rule, concrete))
+    return missing
+
+
+def self_test(config):
+    """反向控制探针：抽掉一条精确重写，方向 B 必须立刻报出对应的那条路由。
+
+    没有这一步，方向 B 可能因为匹配正则写得太松（例如把所有 source 都编译成 `^.*$`）
+    而**永远绿** —— 那种"绿着失效"比红更贵。返回问题串，通过则返回 None。
+    """
+    exact = [
+        rule["source"] for rule in config["rewrites"]
+        if rule["source"].startswith("/api/") and "(" not in rule["source"] and ":" not in rule["source"]
+    ]
+    if not exact:
+        return "vercel.json 里找不到「精确路径」形态的 API 重写，方向 B 无法自检（结构变了？）"
+    victim = exact[0]
+    weakened = {"rewrites": [rule for rule in config["rewrites"] if rule["source"] != victim]}
+    missing = {rule for rule, _ in uncovered_local_rules(weakened)}
+    if victim not in missing:
+        return ("抽掉重写 %s 以后方向 B 仍然全绿 —— 匹配逻辑失效，这条判据不可信" % victim)
+    return None
+
+
 def main():
     config, rewrites = rewritten_routes()
     client = app.test_client()
@@ -73,12 +144,28 @@ def main():
         if all(is_fallthrough(entry) for entry in seen):
             dead.append((source, route))
 
-    print("重写总数 %d / API 重写 %d / 死路由 %d" % (len(config["rewrites"]), len(rewrites), len(dead)))
+    uncovered = uncovered_local_rules(config)
+    probe_problem = self_test(config)
+
+    print("重写总数 %d / API 重写 %d / 死路由 %d"
+          % (len(config["rewrites"]), len(rewrites), len(dead)))
     for source, route in dead:
         print("  DEAD %s -> _route=%s" % (source, route))
     if not dead:
-        print("  所有 API 重写都能落到处理分支（参数化路由按方法逐个探过）")
-    return 1 if dead else 0
+        print("  [A] 所有 API 重写都能落到处理分支（参数化路由按方法逐个探过）")
+
+    print("本地路由 %d / 未被重写覆盖 %d" % (len(local_rules()), len(uncovered)))
+    for rule, concrete in uncovered:
+        print("  UNCOVERED %s（线上会拿它当静态路径，必然 404）" % rule)
+    if not uncovered:
+        print("  [B] 每个本地路由要么是重写目标本身、要么被某条 source 覆盖")
+
+    if probe_problem:
+        print("  自检失败：%s" % probe_problem)
+    else:
+        print("  自检通过：抽掉一条重写后方向 B 会红（判据不是空判）")
+
+    return 1 if (dead or uncovered or probe_problem) else 0
 
 
 if __name__ == "__main__":
