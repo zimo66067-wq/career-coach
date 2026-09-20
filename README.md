@@ -75,7 +75,11 @@ ZHIPU_API_KEY=...
 DUMATE_MODEL=glm-4.7-flash
 # 可选：ZHIPU_FALLBACK_MODEL=...（备用智谱 Chat 模型）
 DUMATE_CONSENT_SECRET=...          # 同意令牌签名密钥（生产必需）
-DUMATE_ALLOWED_ORIGINS=https://zimo66067-wq.github.io,https://career-coach-o7eu.vercel.app
+# 只需列**跨源**的前端。Vercel 自己托管的页面是同源，origin_allowed() 直接放行
+# （api/http_layer.py 里 `normalized == request.host_url` 那一条），不必登记。
+# 因此这里只有 GitHub Pages 的源；不要在名单里写已经下线的 Vercel 域名 —— 它会被
+# 当成"这个源能用"的证据留下来，而真正要问的是它还在不在。
+DUMATE_ALLOWED_ORIGINS=https://zimo66067-wq.github.io
 APP_ENV=production
 DATABASE_URL=...              # 生产必需：Neon Postgres 连接串（账号/历史持久化）
 SESSION_TTL_DAYS=30           # 可选：登录会话有效期（1-90 天）
@@ -84,6 +88,13 @@ SESSION_TTL_DAYS=30           # 可选：登录会话有效期（1-90 天）
 # 可选：RESUME_DB_PATH（SQLite 会话存储路径，仅本地/测试；生产配置 DATABASE_URL）
 # 可选：DEV_DEMO（仅管理员演示数据注入，生产保持空）
 ```
+
+> **上线自检**：`python scripts/api-prod-probe.py` 一次跑出两件事 —— 线上静态资源是不是就是
+> 本地 HEAD，以及业务接口是不是真的通。它填的是别处判据的观察面空洞：
+> `scripts/vercel-dead-routes.py` 只比**配置**（配置全对、线上函数没起来时它照样绿），
+> `scripts/p0-05-link-check.py` 只判链接**可达**，`scripts/phase4-http-smoke.py` 起的是**本地**端口。
+> 2026-09-20 实测就是这三者全绿、而 `/api/*` 每个路径都返回同一个 404 的状态。
+> 修完部署后用它复跑：`--origin` 可以指向任意环境。
 
 API 已实现 WF-01~WF-06 全链路：
 
