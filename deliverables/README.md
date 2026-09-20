@@ -8,7 +8,7 @@
 | # | 交付物 | 文件名 | 格式要求 | 状态 | 负责人 | 说明 |
 |---|---|---|---|---|---|---|
 | 1 | 方案文档 PDF | `submission-vX.Y.pdf` | ≤20 页 / ≤50MB | 待产出 | DuMate | 完整方案：背景、架构、四功能、隐私安全、测试验证 |
-| 2 | 演示录屏 MP4 | `demo-vX.Y.mp4` | 4分30秒主路径，含降级演示 | 待产出 | DuMate | 按 docs/demo-script.md 分镜录制 |
+| 2 | 演示录屏 MP4 | `demo-vX.Y.mp4` | 4分30秒主路径，含降级演示 | 待产出 | DuMate | 按 docs/design/demo-script.md 分镜录制 |
 | 3 | 200字简介 | `intro-200.txt` | 纯文本，≤200字 | 待产出 | DuMate | 提交表单用，含产品名与核心卖点 |
 | 4 | 分享 URL 说明 | `share-url.md` | 匿名访问验证记录（三种环境截图编号） | 待产出 | DuMate | 跨环境验证见 docs/capability_matrix.md |
 | 5 | Skill 导出 | `skill/` | DuMate 可复用对话 Skill 包 | 待产出 | DuMate | 含工作流定义与提示词模块 |

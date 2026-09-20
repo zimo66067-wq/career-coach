@@ -46,8 +46,8 @@ tags:
 
 ```
 # 文件模式
-步骤1: python tools/extract_text.py --input {{resume_file_path}} --output /tmp/resume_raw.txt
-步骤2: python tools/deidentify.py --input /tmp/resume_raw.txt --output /tmp/resume_clean.txt
+步骤1: python domain/internal/extract_text.py --input {{resume_file_path}} --output /tmp/resume_raw.txt
+步骤2: python domain/deidentify.py --input /tmp/resume_raw.txt --output /tmp/resume_clean.txt
 步骤3: 验证 /tmp/resume_clean.txt 尾部含 "pii_removed:true"
 步骤4: 正则扫描确认无 PII 残留
 ```
@@ -58,8 +58,8 @@ tags:
 ### 验收命令
 
 ```bash
-python tools/extract_text.py --input tests/fixtures-synthetic/resumes/resume-01-swe.txt --output /tmp/wf01_raw.txt
-python tools/deidentify.py --input /tmp/wf01_raw.txt --output /tmp/wf01_clean.txt
+python domain/internal/extract_text.py --input tests/fixtures-synthetic/resumes/resume-01-swe.txt --output /tmp/wf01_raw.txt
+python domain/deidentify.py --input /tmp/wf01_raw.txt --output /tmp/wf01_clean.txt
 grep -c "pii_removed:true" /tmp/wf01_clean.txt  # 应为 1
 grep -cE "1[3-9][0-9]{9}" /tmp/wf01_clean.txt   # 应为 0
 python -m pytest tests/test_extract.py tests/test_deidentify.py -v
@@ -114,7 +114,7 @@ assert r['status'] == 'degraded'
 assert r['degraded'] is True
 print('WF-02 degradation test passed')
 "
-python tools/validate_schema.py --schema contracts/resume-profile.schema.json --instance tests/fixtures-synthetic/abilities/score-input-01.json
+python domain/validate_schema.py --schema contracts/resume-profile.schema.json --instance tests/fixtures-synthetic/abilities/score-input-01.json
 ```
 
 ### 截图清单
@@ -142,7 +142,7 @@ python tools/validate_schema.py --schema contracts/resume-profile.schema.json --
 2. **配置工具调用链**：
 
 ```
-步骤1: python tools/match_requirements.py --resume {{resume_clean_text}} --job {{jd_text}} --backend bm25 --output /tmp/match_result.json
+步骤1: python domain/match_requirements.py --resume {{resume_clean_text}} --job {{jd_text}} --backend bm25 --output /tmp/match_result.json
 步骤2: 解析 /tmp/match_result.json，提取四态统计
 步骤3: 展示匹配结果（covered/weak/missing/unknown 分布）
 ```
@@ -154,7 +154,7 @@ python tools/validate_schema.py --schema contracts/resume-profile.schema.json --
 ### 验收命令
 
 ```bash
-python tools/match_requirements.py --resume tests/fixtures-synthetic/resumes/resume-01-swe.txt --job tests/fixtures-synthetic/jobs/job-01-swe.txt --backend bm25 --output /tmp/wf03_match.json
+python domain/match_requirements.py --resume tests/fixtures-synthetic/resumes/resume-01-swe.txt --job tests/fixtures-synthetic/jobs/job-01-swe.txt --backend bm25 --output /tmp/wf03_match.json
 python -c "
 import json
 r = json.load(open('/tmp/wf03_match.json'))
@@ -250,7 +250,7 @@ print('WF-04 interview test passed, score_I:', report['score_I'])
 
 ```
 步骤1: 构造 score-input JSON（包含 R/M/I 子分数）
-步骤2: python tools/rescore.py --input /tmp/score_input.json --output /tmp/score_result.json
+步骤2: python domain/rescore.py --input /tmp/score_input.json --output /tmp/score_result.json
 步骤3: 解析 C0, C7_low, C7_high
 ```
 
@@ -362,4 +362,4 @@ A: 将工具调用封装为 DuMate 平台的自定义 Skill，通过 Skill 入�
 A: 所有工作流已内置降级路径（DEGRADED_OUTPUTS），降级输出标注 `degraded=true`，可正常走通流程。
 
 **Q: Embedding 后端如何切换？**
-A: 设置环境变量 `ZHIPU_API_KEY`（智谱AI免费2000万Token），运行 `python tools/match_requirements.py --backend embedding`。详见 `docs/embedding-migration-guide.md`。
+A: 设置环境变量 `ZHIPU_API_KEY`（智谱AI免费2000万Token），运行 `python domain/match_requirements.py --backend embedding`。

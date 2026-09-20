@@ -42,13 +42,13 @@ RESUME_READY -> DIAGNOSING -> VALIDATING -> SCORING -> DIAGNOSED
 
 步骤3: 将模型输出写入 /tmp/resume_profile.json
 
-步骤4: python tools/validate_schema.py \
+步骤4: python domain/validate_schema.py \
     --schema contracts/resume-profile.schema.json \
     --instance /tmp/resume_profile.json
   - 退出码 0 = VALID，继续
   - 退出码 1 = INVALID，进入 SCHEMA_FAILED
 
-步骤5: python tools/redflag.py \
+步骤5: python domain/redflag.py \
     --output /tmp/resume_profile.json \
     --against <resume_clean_text 文件路径>
   - 退出码 0 = 通过，继续
@@ -132,12 +132,12 @@ RESUME_READY -> DIAGNOSING -> VALIDATING -> SCORING -> DIAGNOSED
 
 ```bash
 # Schema 校验（用合成 fixture）
-python tools/validate_schema.py \
+python domain/validate_schema.py \
   --schema contracts/resume-profile.schema.json \
   --instance tests/fixtures-synthetic/resumes/resume-01-swe.expected.json
 
 # 事实锁校验
-python tools/redflag.py \
+python domain/redflag.py \
   --output tests/fixtures-synthetic/resumes/resume-01-swe.expected.json \
   --against tests/fixtures-synthetic/resumes/resume-01-swe.txt
 
@@ -170,8 +170,8 @@ python -m pytest tests/test_contracts.py tests/test_fault_injection.py -v
 ### 工具调用链
 1. 装配 `prompts/resume/diagnose.md` 系统提示 + `resume_clean_text` 用户输入
 2. 调用模型（`resume_diagnosis` 路由），获取 ResumeProfile JSON
-3. `python tools/validate_schema.py --schema contracts/resume-profile.schema.json --instance /tmp/resume_profile.json`
-4. `python tools/redflag.py --output /tmp/resume_profile.json --against <resume_clean.txt 路径>`
+3. `python domain/validate_schema.py --schema contracts/resume-profile.schema.json --instance /tmp/resume_profile.json`
+4. `python domain/redflag.py --output /tmp/resume_profile.json --against <resume_clean.txt 路径>`
 5. 规则引擎按 `scoring.md` 公式计算 R 分（`R = 结构*15% + 表达*20% + 成果*25% + 技能*20% + ATS*20%`）
 6. （可选）装配 `prompts/resume/report-deep.md` 生成深度报告
 
@@ -198,10 +198,10 @@ python -m pytest tests/test_contracts.py tests/test_fault_injection.py -v
 
 ### 验收命令
 ```bash
-python tools/validate_schema.py \
+python domain/validate_schema.py \
   --schema contracts/resume-profile.schema.json \
   --instance tests/fixtures-synthetic/resumes/resume-01-swe.expected.json
-python tools/redflag.py \
+python domain/redflag.py \
   --output tests/fixtures-synthetic/resumes/resume-01-swe.expected.json \
   --against tests/fixtures-synthetic/resumes/resume-01-swe.txt
 python -m pytest tests/test_contracts.py tests/test_fault_injection.py -v

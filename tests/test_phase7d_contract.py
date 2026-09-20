@@ -417,12 +417,23 @@ def test_mock_targets_resolve_to_real_modules():
 # ------------------------------------------------------------------ #
 
 def _load_live_doc_judge():
-    """把 `scripts/live-doc-path-check.py` 当模块加载（这个脚本没有任何副作用）。"""
+    """把 `scripts/live-doc-path-check.py` 当模块加载**并完成清单装载**（这个脚本没有副作用）。
+
+    Phase 8 起 `LIVING_DOCS` / `HISTORICAL` / `MIRRORS` 不再是模块级字面量，
+    而是 `load_manifest()` 的产物 —— 只 `exec_module` 而不装载，它们全是空列表，
+    下面那条"观察面必须含 HANDOFF.md"的断言会因为**三个空集合**而失败，
+    读起来像"7d 的缺口回来了"，其实只是装配少了一步。
+    这是 7c 那类"读源码的静态断言"失效的同一族：判据的接口变了，调用方要跟着变。
+
+    装载报错时**直接失败**，不降级：清单坏了却让测试继续跑，等于在测一个空的观察面。
+    """
     path = ROOT / "scripts" / "live-doc-path-check.py"
     assert path.exists(), "活文档路径判据不见了"
     spec = importlib.util.spec_from_file_location("live_doc_path_check", str(path))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    problems = module.load_manifest(str(ROOT))
+    assert not problems, "观察面清单装载失败：%s" % problems
     return module
 
 

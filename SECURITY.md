@@ -39,7 +39,7 @@
 
 1. 在千帆控制台生成新 AK/SK → 更新 `.env` 文件（本地，不入库）。
 2. 旧 AK/SK 在千帆控制台禁用（不立即删除，保留 24 小时观察期）。
-3. 跑 `pytest tests/ -v` 确认新凭证可用 → 跑 `python tools/match_requirements.py --backend embedding` 验证 embedding 接口。
+3. 跑 `pytest tests/ -v` 确认新凭证可用 → 跑 `python domain/match_requirements.py --backend embedding` 验证 embedding 接口。
 4. 24 小时观察期无异常后，在千帆控制台彻底删除旧 AK/SK。
 5. 在 HANDOFF.md 记录轮换日期与原因。
 
@@ -85,7 +85,7 @@
 
 ### 4.1 去标识化字段清单
 
-进入任何模型调用与评分流程前，以下字段必须由 `tools/deidentify.py` 脱除：
+进入任何模型调用与评分流程前，以下字段必须由 `domain/deidentify.py` 脱除：
 
 | 字段 | 脱除标记 | 检测方式 |
 |---|---|---|
@@ -102,7 +102,7 @@
 
 ### 4.3 日志脱敏
 
-- 所有工作流日志落盘前必须经 `tools/log_sanitize.py` 管道处理（复用 deidentify 规则 + token/AK-SK 模式）。
+- 所有工作流日志落盘前必须经 `domain/internal/log_sanitize.py` 管道处理（复用 deidentify 规则 + token/AK-SK 模式）。
 - 质量门：日志扫描不含姓名、电话、邮箱、身份证号、音频或完整简历。
 - 日志保留 7 天后自动清理。
 

@@ -10,12 +10,12 @@
 
 | # | 规则项 | 核验内容 | 状态 | 证据 / 备注 |
 |---|---|---|---|---|
-| 1 | 赛事名称 | iCAN 无代码开发挑战赛 · DuMate 方向 | 已验证 | 见 docs/PRD.md 第1节 |
+| 1 | 赛事名称 | iCAN 无代码开发挑战赛 · DuMate 方向 | 已验证 | 见 docs/design/PRD.md 第1节 |
 | 2 | 提交截止日期 | 2026-10-15（以官方规则为准） | 待验证 | 需访问 iCAN 官网确认最新日期 |
 | 3 | 主产品载体 | DuMate 对话任务与可复用 Skill | 已验证 | README.md 明确声明 |
 | 4 | 交付物清单 | 方案 PDF / 演示 MP4 / 200 字简介 / 分享 URL / Skill 导出 / 冻结清单 | 已验证 | 见 deliverables/README.md |
 | 5 | 方案文档限制 | ≤20 页 / ≤50MB | 已验证 | deliverables/README.md 命名规范 |
-| 6 | 演示录屏限制 | 4 分 30 秒主路径 | 已验证 | docs/demo-script.md 分镜表 |
+| 6 | 演示录屏限制 | 4 分 30 秒主路径 | 已验证 | docs/design/demo-script.md 分镜表 |
 | 7 | 提交方式 | GitHub 私有仓库为唯一事实源 + DuMate 平台提交 | 已验证 | README.md 双 Agent 分工 |
 | 8 | 代码可用性 | 评委需可匿名访问分享 URL | 待验证 | G9 阶段跨环境验证 |
 | 9 | 团队规模限制 | 以官方规则为准 | 待验证 | 需访问 iCAN 官网确认 |
@@ -42,7 +42,7 @@
 | N9 | WF-03 JD 匹配 | 注入 JD 被置 flag | prompt_injection_flags 非空 | 已验证 | 2026-08-01 | `[CAP-010]` |
 | N10 | WF-04 面试 | 文字面试状态机流转 | start→answer→end 完整流转 | 已验证 | 2026-08-05 | tests/test_api.py::test_f3_interview_full_flow |
 | N11 | WF-04 面试 | answer_quote 子串校验 | 非子串时该轮作废 | 已验证 | 2026-08-01 | `[CAP-012]` |
-| N12 | WF-04 面试 | 敏感问题阻断 | 20 条敏感问题全部阻断 | 已验证 | 2026-08-05 | tests/test_new_tools.py（20 条模式逐一断言） |
+| N12 | WF-04 面试 | 敏感问题阻断 | 20 条敏感问题全部阻断 | 已验证 | 2026-08-05 | `domain/interview_engine.py` 的 `SENSITIVE_PATTERNS`（20 条逐条正则）+ `tests/test_interview_full_flow.py::test_sensitive_question_replaced_with_generic` |
 | N13 | WF-04 面试 | 语音 ASR 增强 | 按键说话 → 文字转写 | 待验证 | — | `[CAP-014]` |
 | N14 | WF-05 能力聚合 | C0 复算对齐 | R/M/I/C0/C7 diff 全 0.00 | 已验证 | 2026-08-01 | `[CAP-015]` |
 | N15 | WF-05 能力聚合 | 七天计划生成 | 恰好 7 条 / day 1-7 不重复 / 30-45 分钟 | 已验证 | 2026-08-05 | tests/test_api.py::test_f4_ability_report_consented_full_flow + validate_schema |
@@ -87,15 +87,22 @@
 
 ### 2.5 语音能力
 
+> **本节能力已于 Phase 1 整条移除**（commit `4367ec5`：浏览器端语音 ASR/TTS 脚本连同
+> `test_voice_browser.py` 一并删除）。V3/V5 原先标的「已验证」是**随证据文件一起失效的假陈述**
+> —— 证据没了，能力也没了。下表保留为**当时的评估记录**，不代表现状。
+> 域层仍保留低置信度确认的判定
+> （`tests/test_interview_full_flow.py::test_low_asr_confidence_requires_confirmation`），
+> 但浏览器端不再有语音输入。文字链路是等价稳定主链路，不受影响。
+
 | # | 语音功能 | 测试内容 | 预期行为 | 状态 | 截图编号 |
 |---|---|---|---|---|---|
-| V1 | ASR 语音输入 | 按键说话 → 文字转写 | 转写成功 + 置信度显示 | 待验证 | `[CAP-038]` |
-| V2 | ASR 低置信度处理 | 置信度 < 0.75 | 触发用户确认提示 | 待验证 | `[CAP-039]` |
-| V3 | ASR 故障降级 | ASR 接口超时/错误 | 10 秒内回退文字主链路 | 已验证 | tests/test_voice_browser.py（故障回退 + 10s 计时器） |
-| V4 | TTS 语音播报 | 面试官问题语音输出 | 语音播放正常 | 待验证 | `[CAP-041]` |
-| V5 | TTS 故障降级 | TTS 接口不可用 | 不阻断主链路 | 已验证 | tests/test_voice_browser.py（tts_error 非阻断） |
+| V1 | ASR 语音输入 | 按键说话 → 文字转写 | 转写成功 + 置信度显示 | 已移除 | — |
+| V2 | ASR 低置信度处理 | 置信度 < 0.75 | 触发用户确认提示 | 已移除 | — |
+| V3 | ASR 故障降级 | ASR 接口超时/错误 | 10 秒内回退文字主链路 | 已移除 | — |
+| V4 | TTS 语音播报 | 面试官问题语音输出 | 语音播放正常 | 已移除 | — |
+| V5 | TTS 故障降级 | TTS 接口不可用 | 不阻断主链路 | 已移除 | — |
 
-> 语音为增强链路，文字是等价稳定主链路（见 PRD 第2节 F3 说明）。
+> 语音曾作为增强链路，文字是等价稳定主链路（见 PRD 第2节 F3 说明）。
 
 ---
 

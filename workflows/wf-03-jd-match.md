@@ -41,13 +41,13 @@ DIAGNOSED -> JD_INPUT -> JD_EXTRACTING -> JD_CONFIRMING -> MATCHING -> JD_READY
 
 步骤3: 写入 /tmp/job_profile.json
 
-步骤4: python tools/validate_schema.py \
+步骤4: python domain/validate_schema.py \
     --schema contracts/job-profile.schema.json \
     --instance /tmp/job_profile.json
   - exit 0 = VALID，继续
   - exit 1 = INVALID，降低 temperature 重试一次
 
-步骤5: python tools/redflag.py \
+步骤5: python domain/redflag.py \
     --output /tmp/job_profile.json \
     --against <jd_text 文件路径>
   - exit 0 = 通过
@@ -62,7 +62,7 @@ DIAGNOSED -> JD_INPUT -> JD_EXTRACTING -> JD_CONFIRMING -> MATCHING -> JD_READY
 ### 3.2 匹配阶段
 
 ```
-步骤7: python tools/match_requirements.py \
+步骤7: python domain/match_requirements.py \
     --resume <resume_clean.txt> \
     --job /tmp/job_profile.json \
     --backend embedding \
@@ -72,7 +72,7 @@ DIAGNOSED -> JD_INPUT -> JD_EXTRACTING -> JD_CONFIRMING -> MATCHING -> JD_READY
   - 需配置 QIANFAN_API_KEY 环境变量
   - 未配置或调用失败时 exit 4，自动切备用
 
-步骤8（备用）: python tools/match_requirements.py \
+步骤8（备用）: python domain/match_requirements.py \
     --resume <resume_clean.txt> \
     --job /tmp/job_profile.json \
     --backend bm25 \
@@ -165,24 +165,24 @@ DIAGNOSED -> JD_INPUT -> JD_EXTRACTING -> JD_CONFIRMING -> MATCHING -> JD_READY
 
 ```bash
 # Schema 校验
-python tools/validate_schema.py \
+python domain/validate_schema.py \
   --schema contracts/job-profile.schema.json \
   --instance tests/fixtures-synthetic/jobs/job-01-swe.expected.json
 
 # 注入防御校验
-python tools/validate_schema.py \
+python domain/validate_schema.py \
   --schema contracts/job-profile.schema.json \
   --instance tests/fixtures-synthetic/jobs/job-04-injection.expected.json
 
 # BM25 匹配
-python tools/match_requirements.py \
+python domain/match_requirements.py \
   --resume tests/fixtures-synthetic/resumes/resume-01-swe.txt \
   --job tests/fixtures-synthetic/jobs/job-01-swe.expected.json \
   --backend bm25 \
   --output /tmp/wf03_match.json
 
 # 分数复算
-python tools/rescore.py \
+python domain/rescore.py \
   --input tests/fixtures-synthetic/abilities/score-input-01.json \
   --expect C0=68.27
 
@@ -216,10 +216,10 @@ python -m pytest tests/test_match.py tests/test_contracts.py -v
 ### 工具调用链
 1. 装配 `prompts/match/jd-extract.md` 系统提示 + `jd_text` 用户输入
 2. 调用模型（`jd_extract` 路由），获取 JobProfile JSON
-3. `python tools/validate_schema.py --schema contracts/job-profile.schema.json --instance /tmp/job_profile.json`
-4. `python tools/redflag.py --output /tmp/job_profile.json --against <jd_text.txt>`
+3. `python domain/validate_schema.py --schema contracts/job-profile.schema.json --instance /tmp/job_profile.json`
+4. `python domain/redflag.py --output /tmp/job_profile.json --against <jd_text.txt>`
 5. 展示关键要求列表，等待用户确认（`user_confirmed=true`）
-6. `python tools/match_requirements.py --resume <resume_clean.txt> --job /tmp/job_profile.json --backend embedding --output /tmp/match_result.json`
+6. `python domain/match_requirements.py --resume <resume_clean.txt> --job /tmp/job_profile.json --backend embedding --output /tmp/match_result.json`
 7. （备用）`--backend bm25` 降级匹配
 8. 规则引擎按 `scoring.md` 公式计算 M 分
 9. 装配 `prompts/match/explain.md` 生成匹配解释报告
@@ -247,14 +247,14 @@ python -m pytest tests/test_match.py tests/test_contracts.py -v
 
 ### 验收命令
 ```bash
-python tools/validate_schema.py \
+python domain/validate_schema.py \
   --schema contracts/job-profile.schema.json \
   --instance tests/fixtures-synthetic/jobs/job-01-swe.expected.json
-python tools/match_requirements.py \
+python domain/match_requirements.py \
   --resume tests/fixtures-synthetic/resumes/resume-01-swe.txt \
   --job tests/fixtures-synthetic/jobs/job-01-swe.expected.json \
   --backend bm25 --output /tmp/wf03_match.json
-python tools/rescore.py \
+python domain/rescore.py \
   --input tests/fixtures-synthetic/abilities/score-input-01.json --expect C0=68.27
 python -m pytest tests/test_match.py tests/test_contracts.py -v
 ```

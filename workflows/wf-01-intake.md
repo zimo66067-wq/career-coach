@@ -27,8 +27,8 @@ INIT -> CONSENT -> EXTRACTING -> DEIDENTIFYING -> RESUME_READY
 ### 3.1 主路径
 
 ```
-步骤1: python tools/extract_text.py --input <用户文件> --output /tmp/resume_raw.txt
-步骤2: python tools/deidentify.py --input /tmp/resume_raw.txt --output /tmp/resume_clean.txt
+步骤1: python domain/internal/extract_text.py --input <用户文件> --output /tmp/resume_raw.txt
+步骤2: python domain/deidentify.py --input /tmp/resume_raw.txt --output /tmp/resume_clean.txt
 步骤3: 校验 /tmp/resume_clean.txt 尾部含 "pii_removed:true"
 步骤4: 用 grep/正则扫描 /tmp/resume_clean.txt，确认无手机号/邮箱/身份证残留
 ```
@@ -87,13 +87,13 @@ INIT -> CONSENT -> EXTRACTING -> DEIDENTIFYING -> RESUME_READY
 
 ```bash
 # 用合成样本端到端测试
-python tools/extract_text.py --input tests/fixtures-synthetic/resumes/resume-01-swe.txt --output /tmp/wf01_raw.txt
-python tools/deidentify.py --input /tmp/wf01_raw.txt --output /tmp/wf01_clean.txt
+python domain/internal/extract_text.py --input tests/fixtures-synthetic/resumes/resume-01-swe.txt --output /tmp/wf01_raw.txt
+python domain/deidentify.py --input /tmp/wf01_raw.txt --output /tmp/wf01_clean.txt
 grep -c "pii_removed:true" /tmp/wf01_clean.txt  # 应为 1
 grep -cE "1[3-9][0-9]{9}" /tmp/wf01_clean.txt   # 应为 0
 
 # DOCX 路径测试
-python tools/extract_text.py --input tests/fixtures-synthetic/resumes/resume-01-swe.docx --output /tmp/wf01_docx.txt  # 若有 docx fixture
+python domain/internal/extract_text.py --input tests/fixtures-synthetic/resumes/resume-01-swe.docx --output /tmp/wf01_docx.txt  # 若有 docx fixture
 
 # 现有测试
 python -m pytest tests/test_extract.py tests/test_deidentify.py -v
@@ -120,8 +120,8 @@ python -m pytest tests/test_extract.py tests/test_deidentify.py -v
 - 校验: `grep -c "pii_removed:true" /tmp/resume_clean.txt` == 1；手机号/邮箱/身份证正则扫描命中数 == 0
 
 ### 工具调用链
-1. `python tools/extract_text.py --input <用户文件> --output /tmp/resume_raw.txt`（文件模式）
-2. `python tools/deidentify.py --input /tmp/resume_raw.txt --output /tmp/resume_clean.txt`
+1. `python domain/internal/extract_text.py --input <用户文件> --output /tmp/resume_raw.txt`（文件模式）
+2. `python domain/deidentify.py --input /tmp/resume_raw.txt --output /tmp/resume_clean.txt`
 3. 正则扫描确认无 PII 残留（手机号 `1[3-9]\d{9}`、邮箱、身份证 `\d{17}[\dXx]`）
 
 ### 状态转换
@@ -146,8 +146,8 @@ python -m pytest tests/test_extract.py tests/test_deidentify.py -v
 
 ### 验收命令
 ```bash
-python tools/extract_text.py --input tests/fixtures-synthetic/resumes/resume-01-swe.txt --output /tmp/wf01_raw.txt
-python tools/deidentify.py --input /tmp/wf01_raw.txt --output /tmp/wf01_clean.txt
+python domain/internal/extract_text.py --input tests/fixtures-synthetic/resumes/resume-01-swe.txt --output /tmp/wf01_raw.txt
+python domain/deidentify.py --input /tmp/wf01_raw.txt --output /tmp/wf01_clean.txt
 grep -c "pii_removed:true" /tmp/wf01_clean.txt  # 应为 1
 grep -cE "1[3-9][0-9]{9}" /tmp/wf01_clean.txt   # 应为 0
 python -m pytest tests/test_extract.py tests/test_deidentify.py -v

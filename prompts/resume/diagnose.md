@@ -1,6 +1,6 @@
 # prompts/resume/diagnose.md · F1 简历诊断提示词
 
-> 用法：将「系统提示」与「用户输入（去标识化简历文本）」一并提交模型；输出必须过 `tools/validate_schema.py` + `tools/redflag.py` 后才允许展示。
+> 用法：将「系统提示」与「用户输入（去标识化简历文本）」一并提交模型；输出必须过 `domain/validate_schema.py` + `domain/redflag.py` 后才允许展示。
 
 ## 系统提示
 

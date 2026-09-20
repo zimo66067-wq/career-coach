@@ -52,14 +52,14 @@ SETUP -> ASK -> ANSWER -> ASSESS -> FOLLOW_UP_OR_NEXT -> ... -> COMPLETE -> REPO
 
 步骤3: 写入 /tmp/interview_turn_{N}.json
 
-步骤4: python tools/validate_schema.py \
+步骤4: python domain/validate_schema.py \
     --schema contracts/interview-turn.schema.json \
     --instance /tmp/interview_turn_{N}.json
   - 业务规则校验：answer_quote 必须是 answer 的子串，否则该轮作废重评
   - exit 0 = VALID，继续
   - exit 1 = INVALID，重试一次（降低 temperature）
 
-步骤5: python tools/redflag.py \
+步骤5: python domain/redflag.py \
     --output /tmp/interview_turn_{N}.json \
     --against <resume_clean.txt> <jd_text.txt>
   - 检查模型输出中是否有语料外数字
@@ -176,7 +176,7 @@ SETUP -> ASK -> ANSWER -> ASSESS -> FOLLOW_UP_OR_NEXT -> ... -> COMPLETE -> REPO
 
 ```bash
 # InterviewTurn Schema 校验
-python tools/validate_schema.py \
+python domain/validate_schema.py \
   --schema contracts/interview-turn.schema.json \
   --instance tests/fixtures-synthetic/interviews/interview-01.json
 
@@ -218,8 +218,8 @@ python -m pytest tests/test_contracts.py::test_interview_turns_valid -v
 1. 从 JobProfile 选取 importance 最高的 5 个要求作为 targets
 2. 装配 `prompts/interview/interviewer.md` + ResumeProfile + JobProfile + 历史轮次 + 本轮问答
 3. 调用模型（`interview_question` 路由），获取 InterviewTurn JSON
-4. `python tools/validate_schema.py --schema contracts/interview-turn.schema.json --instance /tmp/interview_turn_{N}.json`
-5. `python tools/redflag.py --output /tmp/interview_turn_{N}.json --against <resume_clean.txt> <jd_text.txt>`
+4. `python domain/validate_schema.py --schema contracts/interview-turn.schema.json --instance /tmp/interview_turn_{N}.json`
+5. `python domain/redflag.py --output /tmp/interview_turn_{N}.json --against <resume_clean.txt> <jd_text.txt>`
 6. 检查 `safety_flags`（非空展示警告，敏感问题阻断提问）
 7. 循环步骤 2-6（最多 5 主问题 + 最多 5 追问 = 最多 10 轮）
 8. 5 主问题完成后规则引擎计算 I 分（`I = 结构*25% + 相关*25% + 具体*20% + 追问*15% + 表达*15%`）
@@ -250,7 +250,7 @@ python -m pytest tests/test_contracts.py::test_interview_turns_valid -v
 
 ### 验收命令
 ```bash
-python tools/validate_schema.py \
+python domain/validate_schema.py \
   --schema contracts/interview-turn.schema.json \
   --instance tests/fixtures-synthetic/interviews/interview-01.json
 python -m pytest tests/test_fault_injection.py::test_answer_quote_not_substring_rejected -v

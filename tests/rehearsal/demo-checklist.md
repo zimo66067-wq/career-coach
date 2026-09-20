@@ -1,4 +1,4 @@
-# demo-checklist.md · 彩排走查清单（配合 docs/demo-script.md）
+# demo-checklist.md · 彩排走查清单（配合 docs/design/demo-script.md）
 
 ## 会前检查（T-1 天）
 

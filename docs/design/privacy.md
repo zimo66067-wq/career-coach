@@ -2,7 +2,7 @@
 
 ## 1. 去标识化字段清单
 
-进入任何模型调用与评分流程前，以下字段必须由 `tools/deidentify.py` 脱除：
+进入任何模型调用与评分流程前，以下字段必须由 `domain/deidentify.py` 脱除：
 
 | 字段 | 脱除标记 |
 |---|---|
@@ -25,7 +25,7 @@
 
 ## 4. 日志脱敏
 
-- 所有工作流日志落盘前必须经 `tools/log_sanitize.py` 管道处理（复用 deidentify 规则 + token/AK-SK 模式）。
+- 所有工作流日志落盘前必须经 `domain/internal/log_sanitize.py` 管道处理（复用 deidentify 规则 + token/AK-SK 模式）。
 - 质量门：日志扫描不含姓名、电话、邮箱、身份证号、音频或完整简历。
 
 ## 5. 用户删除流程（WF-06 约定）

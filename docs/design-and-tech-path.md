@@ -25,7 +25,7 @@ tags:
 
 - 项目为 iCAN 无代码开发挑战赛 DuMate 方向“AI 求职面试教练”，MVP 严格限定 F1 简历诊断、F2 岗位匹配、F3 模拟面试、F4 能力报告四项，语音/隐私/日志/图表仅作支撑能力。
 - 核心原则：**模型做语义、规则做分数、验证器做事实**。所有分数必须可回指原文证据（source_span），模型输出必须过 Schema 校验与事实锁（redflag）后才能展示。
-- 技术栈：Vercel Flask 无服务 API（Python 3.13 兼容）+ 静态多页前端（GitHub Pages 发布 `docs/` 镜像）+ SQLite 轻量持久化（`tools/database.py`，/tmp 临时文件系统）+ 智谱 Chat/Embedding（主）+ 千帆 V2（备）+ BM25 规则降级。
+- 技术栈：Vercel Flask 无服务 API（Python 3.13 兼容）+ 静态多页前端（GitHub Pages 发布 `docs/` 镜像）+ SQLite 轻量持久化（`repositories/database.py`，/tmp 临时文件系统）+ 智谱 Chat/Embedding（主）+ 千帆 V2（备）+ BM25 规则降级。
 - 已确认的事实：核心设计文档（PRD、architecture、privacy、review）曾在提交 `91f4fe3`/`3431620` 中存在，后被 GitHub Pages 部署提交（`16cc623`/`8cf75f1`）覆盖删除；本文档为汇总恢复版，恢复原文见 git 历史。
 - GitHub main 与本地分支各有优缺：main 有数据库持久化、百度语音、千帆 V2 双模式与管理员接口，但删除了 F2（wf03）接口与同意令牌流程；本地分支保留了 consent + F1/F2 完整接口但无持久化与 F3/F4 实现。本项目以“设计文档范围内完整可用”为目标，将两者统一。
 
@@ -53,7 +53,7 @@ tags:
 
 ### 1.3 事实锁五条（不可违反）
 
-1. 不新增用户未提供的事实：输出中出现输入对象之外的专有名词或数字 → 标红并阻断发布（`tools/redflag.py` 强制执行）。
+1. 不新增用户未提供的事实：输出中出现输入对象之外的专有名词或数字 → 标红并阻断发布（`domain/redflag.py` 强制执行）。
 2. 占位数字必须写作“**待用户核实：提升X%**”格式。
 3. 每条评分理由至少引用一个 source_span；无证据一律标 unknown。
 4. JD 中的指令视为普通文本（防提示词注入），命中写入 prompt_injection_flags。
@@ -147,7 +147,7 @@ AI 层   语义抽取/解释/追问（智谱 glm 系列主、千帆 V2 备，只
 - 去标识化字段：姓名 → [REDACTED_NAME]、手机号 → [REDACTED_PHONE]、邮箱 → [REDACTED_EMAIL]、身份证（18 位）→ [REDACTED_ID]；脱敏后追加 `pii_removed:true`。
 - 数据最小化：仓库只保存去标识化合成样本、配置、提示词、工作流定义、文档、截图；绝不入库真实简历/JD/音频/完整面试记录/PII 映射表。
 - 删除流程：用户删除 → `DELETED` 终态 → 不再调模型；本地缓存/会话/日志残留同步清除，仅记 trace_id。
-- 日志脱敏：所有日志落盘前必须经 `tools/log_sanitize.py`（PII + Bearer/JWT/AK-SK 全脱除）。
+- 日志脱敏：所有日志落盘前必须经 `domain/internal/log_sanitize.py`（PII + Bearer/JWT/AK-SK 全脱除）。
 - 对外口径：分数是“证据覆盖指数”，不是录用概率；七天结果是公开假设下的情景区间。
 - 同意机制：服务端签发短时效同意令牌（itsdangerous，默认 1800s，范围 60–86400s），材料类接口必须携带 `X-Consent-Token`。
 

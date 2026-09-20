@@ -42,7 +42,7 @@ INTERVIEW_DONE -> AGGREGATING -> RESCORING -> DIMENSION_MAPPING -> PLAN_GENERATI
     "I": { 五个子分 }
   }
 
-步骤3: python tools/rescore.py \
+步骤3: python domain/rescore.py \
     --input /tmp/score-input.json \
     --expect C0=<预期值>
   - 复算 R/M/I/C0/C7_low/C7_high
@@ -107,13 +107,13 @@ INTERVIEW_DONE -> AGGREGATING -> RESCORING -> DIMENSION_MAPPING -> PLAN_GENERATI
 
 步骤8: 将 plan 写入 AbilityProfile.plan
 
-步骤9: python tools/validate_schema.py \
+步骤9: python domain/validate_schema.py \
     --schema contracts/ability-profile.schema.json \
     --instance /tmp/ability_profile.json
   - exit 0 = VALID
   - exit 1 = INVALID（plan 条数/时长/artifact 缺失等）
 
-步骤10: python tools/redflag.py \
+步骤10: python domain/redflag.py \
     --output /tmp/ability_profile.json \
     --against <resume_profile.json> <job_profile.json> <interview_turn_1.json> ... <interview_turn_N.json> contracts/scoring.md
   - --against 必须包含全部上游合同 JSON + scoring.md
@@ -125,7 +125,7 @@ INTERVIEW_DONE -> AGGREGATING -> RESCORING -> DIMENSION_MAPPING -> PLAN_GENERATI
 ### 3.4 雷达图生成
 
 ```
-步骤11: python tools/radar_adapter.py \
+步骤11: python domain/internal/radar_adapter.py \
     --input /tmp/ability_profile.json \
     --output /tmp/radar_option.json
   - 输出 ECharts option（6 indicator, max=100, 3 series）
@@ -213,22 +213,22 @@ INTERVIEW_DONE -> AGGREGATING -> RESCORING -> DIMENSION_MAPPING -> PLAN_GENERATI
 
 ```bash
 # 分数复算对拍
-python tools/rescore.py \
+python domain/rescore.py \
   --input tests/fixtures-synthetic/abilities/score-input-01.json \
   --expect C0=68.27
 
 # AbilityProfile Schema 校验
-python tools/validate_schema.py \
+python domain/validate_schema.py \
   --schema contracts/ability-profile.schema.json \
   --instance tests/fixtures-synthetic/abilities/ability-01.json
 
 # 雷达图生成
-python tools/radar_adapter.py \
+python domain/internal/radar_adapter.py \
   --input tests/fixtures-synthetic/abilities/ability-01.json \
   --output /tmp/wf05_radar.json
 
 # 事实锁校验（--against 必须包含全部上游合同 + scoring.md）
-python tools/redflag.py \
+python domain/redflag.py \
   --output tests/fixtures-synthetic/abilities/ability-01.json \
   --against tests/fixtures-synthetic/resumes/resume-01-swe.expected.json \
             tests/fixtures-synthetic/jobs/job-01-swe.expected.json \
@@ -266,13 +266,13 @@ python -m pytest tests/test_rescore.py tests/test_fault_injection.py -v
 
 ### 工具调用链
 1. 收集 R/M/I 子分及证据，构造 `score-input.json`
-2. `python tools/rescore.py --input /tmp/score-input.json --expect C0=<预期值>`
+2. `python domain/rescore.py --input /tmp/score-input.json --expect C0=<预期值>`
 3. 六维能力映射（R/M/I 子分 -> 6 个维度，sources 指向真实对象 ID）
 4. 装配 `prompts/plan/seven-day.md` + 缺口清单 + STAR 缺失 + unknown 待确认项
 5. 调用模型（`seven_day_plan` 路由），生成 plan JSON 数组（7 条）
-6. `python tools/validate_schema.py --schema contracts/ability-profile.schema.json --instance /tmp/ability_profile.json`
-7. `python tools/redflag.py --output /tmp/ability_profile.json --against <全部上游合同 + scoring.md>`
-8. `python tools/radar_adapter.py --input /tmp/ability_profile.json --output /tmp/radar_option.json`
+6. `python domain/validate_schema.py --schema contracts/ability-profile.schema.json --instance /tmp/ability_profile.json`
+7. `python domain/redflag.py --output /tmp/ability_profile.json --against <全部上游合同 + scoring.md>`
+8. `python domain/internal/radar_adapter.py --input /tmp/ability_profile.json --output /tmp/radar_option.json`
 
 ### 状态转换
 - 初始态: INTERVIEW_DONE
@@ -299,14 +299,14 @@ python -m pytest tests/test_rescore.py tests/test_fault_injection.py -v
 
 ### 验收命令
 ```bash
-python tools/rescore.py \
+python domain/rescore.py \
   --input tests/fixtures-synthetic/abilities/score-input-01.json --expect C0=68.27
-python tools/validate_schema.py \
+python domain/validate_schema.py \
   --schema contracts/ability-profile.schema.json \
   --instance tests/fixtures-synthetic/abilities/ability-01.json
-python tools/radar_adapter.py \
+python domain/internal/radar_adapter.py \
   --input tests/fixtures-synthetic/abilities/ability-01.json --output /tmp/wf05_radar.json
-python tools/redflag.py \
+python domain/redflag.py \
   --output tests/fixtures-synthetic/abilities/ability-01.json \
   --against tests/fixtures-synthetic/resumes/resume-01-swe.expected.json \
             tests/fixtures-synthetic/jobs/job-01-swe.expected.json \

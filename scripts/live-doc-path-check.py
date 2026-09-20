@@ -55,26 +55,48 @@
 范围只含"活文档"（描述现在是什么样）。历史报告（docs/phase*-report.md、CHANGELOG.md、
 docs/iteration-*.md、handoffs/、deliverables/）记录的是当时是什么样，不改写，也不在这里查。
 
+观察面**不再写死在本文件里**（Phase 8 改）：改读 `contracts/living-docs.json`。
+理由是 7d 暴露的老问题 —— 观察面写死 = 一份隐式清单，谁都不知道"今天到底看着几份、
+漏了哪几份"。7d 实测：本文件只看着 8 份，而仓里 85 份 md 含路径引用、其中 409 处是死链，
+**没有任何判据在看着它们**。把清单变成可判对象之后，加一份活文档就必须改一处显式的地方。
+
+配套三条**双向**自检（只判"清单里的都通过了"是不够的 —— 那只证明清单没写错，
+不证明清单没漏）：
+
+  自检 A：清单里列的每个 `living` 路径必须真实存在。—— 清单本身也会过期（文档改名/
+          删除后没人改清单），过期清单会让整条判据看着很宽、实际什么都没看。
+  自检 B：**含路径引用的 md 必须全部被登记**（在 `living` 里，或命中某条 `historical`）。
+          这条是 Phase 8 补的核心洞：新写一份带路径引用的文档而不登记，以前是"静默不查"，
+          现在是"红"。含 0 处引用的 md 无需登记（判据本来也不看它）。
+  自检 C：`historical` 的每条 glob 至少要命中 1 个文件。—— 否则那条规则是**废话**：
+          它一条都不豁免，读者却以为"这类文件已经处理过了"。
+
+另有一条**反向**自检（Phase 8 加的，最容易踩）：
+  若一个路径同时命中 `living` 与 `historical`，**以 `living` 为准**。
+  实例：`deliverables/README.md` 是交付包的现状索引（活文档），而 `deliverables/**`
+  整体是冻结证据。不加这条优先级，前者会被后者静默豁免。
+
 用法：python scripts/live-doc-path-check.py [--root .] [--verbose]
 退出码 0 = 通过；1 = 有漂移 / 判据失效。
 """
 from __future__ import print_function
 
+import fnmatch
+import hashlib
 import io
+import json
 import os
 import re
 import sys
 
-LIVING_DOCS = [
-    "docs/architecture.md",
-    "docs/dependency-map.md",
-    "docs/product-scope.md",
-    "docs/README.md",
-    "public/README.md",
-    "HANDOFF.md",
-    "contracts/README.md",
-    "contracts/scoring.md",
-]
+MANIFEST = "contracts/living-docs.json"
+
+#: 由 `load_manifest()` 填充。**不再写死在本文件里** —— 见文件头「观察面不再写死」。
+LIVING_DOCS = []
+#: [(glob, why)] 历史记录族。命中的文件不查；`living` 优先于它。
+HISTORICAL = []
+#: [(a, b, why)] 逐字节镜像对。同名 ≠ 镜像，所以必须逐对显式登记（见清单里的 why_note）。
+MIRRORS = []
 
 # 历史语境措辞。只认"同一行"或"祖先章节标题"，不做邻近行放宽（见文件头说明）。
 #
@@ -157,6 +179,84 @@ SKIP_DIRS = {".git", "node_modules", "__pycache__", ".workbuddy"}
 def read(root, rel):
     with io.open(os.path.join(root, rel), "r", encoding="utf-8", newline="") as f:
         return f.read().replace("\r\n", "\n")
+
+
+def all_md(root):
+    """全仓 `.md` 相对路径（跳过 SKIP_DIRS 与虚拟环境目录）。"""
+    out = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [x for x in dirnames
+                       if x not in SKIP_DIRS and not x.startswith(".venv")]
+        for n in filenames:
+            if n.endswith(".md"):
+                out.append(os.path.relpath(os.path.join(dirpath, n), root)
+                           .replace(os.sep, "/"))
+    return sorted(out)
+
+
+def ref_count(root, rel):
+    """该文件里有多少处路径引用（`refs_in` 的口径）。0 处的 md 无需登记。"""
+    return sum(len(refs_in(line)) for line in read(root, rel).split("\n"))
+
+
+def is_historical(rel, historical=None):
+    """`rel` 是否命中某条历史记录族。
+
+    `fnmatch` 的 `*` 会跨 `/`（与 glob 不同），所以 `deliverables/**` 能匹配深层文件 ——
+    这正是这里要的语义："整个交付树都是冻结记录"。命中即返回那条 glob（便于打印）。
+    """
+    for glob, _why in (HISTORICAL if historical is None else historical):
+        if fnmatch.fnmatch(rel, glob):
+            return glob
+    return None
+
+
+def load_manifest(root):
+    """读 `contracts/living-docs.json`，填充 LIVING_DOCS / HISTORICAL / MIRRORS。
+
+    返回问题列表（空 = 好）。清单缺失/损坏**不降级**：宁可红，也不要"悄悄退回写死的 8 份"
+    —— 那正是 7d 那种"看着很宽其实只看了 8 份"的状态。
+    """
+    global LIVING_DOCS, HISTORICAL, MIRRORS
+    LIVING_DOCS, HISTORICAL, MIRRORS = [], [], []
+    path = os.path.join(root, MANIFEST)
+    if not os.path.exists(path):
+        return ["观察面清单缺失：`%s` 不存在，判据无观察面" % MANIFEST]
+    try:
+        with io.open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except ValueError as exc:
+        return ["观察面清单不是合法 JSON：`%s`（%s）" % (MANIFEST, exc)]
+
+    problems = []
+    for item in data.get("living") or []:
+        p = (item or {}).get("path")
+        if not p:
+            problems.append("清单里有 living 条目缺 `path`")
+            continue
+        if not (item or {}).get("why"):
+            problems.append("living 条目缺 `why`：`%s`（每项必须写理由）" % p)
+        LIVING_DOCS.append(p)
+    for item in data.get("historical") or []:
+        g = (item or {}).get("glob")
+        if not g:
+            problems.append("清单里有 historical 条目缺 `glob`")
+            continue
+        if not (item or {}).get("why"):
+            problems.append("historical 条目缺 `why`：`%s`（每项必须写理由）" % g)
+        HISTORICAL.append((g, (item or {}).get("why", "")))
+    for item in data.get("mirrors") or []:
+        if not item or not item.get("a") or not item.get("b"):
+            continue          # `why_note` 这类说明性条目，不是镜像对
+        MIRRORS.append((item["a"], item["b"], item.get("why", "")))
+    return problems
+
+
+def sha(path):
+    h = hashlib.sha256()
+    with io.open(path, "rb") as f:
+        h.update(f.read())
+    return h.hexdigest()
 
 
 def declared(root):
@@ -283,12 +383,18 @@ def classify(lines, idx, have, kind=None, base=None):
 
 
 def audit(root):
-    """返回 (total, counts, excused, offenders, have)。"""
+    """返回 (total, counts, excused, offenders, have, missing, unregistered)。
+
+    刻意返回 `missing` / `unregistered` 而不是自己跳过 —— 早期版本用 `continue` 跳过不存在的
+    清单条目，结果"清单过期"与"文档干净"在输出上长得一模一样（Phase 8 修）。
+    """
     have = declared(root)
     counts = {"page": {"exists": 0}, "js": {"exists": 0}, "path": {"exists": 0}}
     total, excused, offenders = 0, [], []
+    missing = []
     for rel in LIVING_DOCS:
         if not os.path.exists(os.path.join(root, rel)):
+            missing.append(rel)
             continue
         lines = read(root, rel).split("\n")
         for i in range(len(lines)):
@@ -301,7 +407,16 @@ def audit(root):
                     excused.append((rel, i + 1, kind, base, detail))
                 else:
                     offenders.append((rel, i + 1, kind, base))
-    return total, counts, excused, offenders, have
+    # 自检 B：含路径引用的 md 必须全部被登记（living 或命中 historical）。
+    unregistered = []
+    living_set = set(LIVING_DOCS)
+    for rel in all_md(root):
+        if rel in living_set or is_historical(rel) is not None:
+            continue
+        n = ref_count(root, rel)
+        if n:
+            unregistered.append((rel, n))
+    return total, counts, excused, offenders, have, missing, unregistered
 
 
 def main():
@@ -311,10 +426,13 @@ def main():
         root = argv[argv.index("--root") + 1]
     verbose = "--verbose" in argv
 
-    total, counts, excused, offenders, have = audit(root)
+    problems = list(load_manifest(root))
+    total, counts, excused, offenders, have, missing, unregistered = audit(root)
 
     # ── 判据自检：空集与探针 ──
-    problems = []
+    if len(LIVING_DOCS) < 20:
+        problems.append("观察面只有 %d 份活文档，判据近乎空判（清单是不是被删空了？）"
+                        % len(LIVING_DOCS))
     if total < 10:
         problems.append("活文档里只找到 %d 处路径引用，判据近乎空判" % total)
     if len(have["page"]) < 4:
@@ -325,6 +443,33 @@ def main():
         problems.append("全仓只找到 %d 个 .py/.md/.json，判据近乎空判" % len(have["path"]))
     if len(have["layer"]) < 8:
         problems.append("只认到 %d 个顶层目录，path 类的首段过滤近乎空判" % len(have["layer"]))
+
+    # ── 自检 A：清单里列的 must 存在（清单本身也会过期）──
+    for rel in missing:
+        problems.append("观察面清单过期：`%s` 在 living 里但文件不存在"
+                        "（改名/删除后没人改清单，这条判据就在看空气）" % rel)
+    # ── 自检 B：含路径引用的 md 必须全部被登记 ──
+    for rel, n in unregistered:
+        problems.append("未登记的活文档：`%s`（含 %d 处路径引用，却既不在 living 里、"
+                        "也不命中任何 historical 族）—— 要么登记它，要么给 historical 补一条规则"
+                        % (rel, n))
+    # ── 自检 C：historical 的每条 glob 至少要命中 1 个文件（否则是废话规则）──
+    allrel = all_md(root)
+    for glob, _why in HISTORICAL:
+        if not any(fnmatch.fnmatch(rel, glob) for rel in allrel):
+            problems.append("historical 规则是废话：`%s` 一个文件都没命中"
+                            "（它一条都不豁免，读者却以为这类文件已经处理过了）" % glob)
+    # ── 反向自检：同名 ≠ 镜像；登记了的镜像对必须逐字节一致 ──
+    for a, b, _why in MIRRORS:
+        if not os.path.exists(os.path.join(root, a)):
+            problems.append("镜像对的左侧不存在：`%s`" % a)
+            continue
+        if not os.path.exists(os.path.join(root, b)):
+            problems.append("镜像对的右侧不存在：`%s`" % b)
+            continue
+        if sha(os.path.join(root, a)) != sha(os.path.join(root, b)):
+            problems.append("镜像漂移：`%s` 与 `%s` 内容不一致（改了一边没改另一边）"
+                            % (a, b))
     # 探针 1：干净段落里一个不存在的页面路径必须被判为 offender
     probe = ["## 2. 用户页面", "", "| `public/pages/definitely-not-a-page.html` | 1 | x | ✅ |"]
     if classify(probe, 2, have)[2] != "offender":
@@ -398,6 +543,24 @@ def main():
     if classify(probe16, 2, have)[2] != "offender":
         problems.append("探针失效：『快照』被当成了历史语境（6b-2b 那条教训回退了）")
 
+    # 探针 17：`historical` 族必须真的能豁免**深层**文件，且不得顺手吞掉活文档。
+    #          （`fnmatch` 的 `*` 跨 `/`，所以 `deliverables/**` 能匹配深层路径 —— 这是要的语义；
+    #           但同一个特性也意味着写太宽的 glob 会把活文档一起豁免，所以两面都要钉住。）
+    if not is_historical("deliverables/p0-03-evidence/RUN_EVIDENCE_REPORT.md"):
+        problems.append("探针失效：`deliverables/**` 没有豁免深层文件（glob 语义不对）")
+    if is_historical("docs/capability_matrix.md"):
+        problems.append("探针失效：一份活文档被某条 historical 规则吞掉了")
+    # 探针 18：**living 优先于 historical**。`deliverables/README.md` 是交付包的现状索引（活文档），
+    #          同时又落在 `deliverables/**` 里。少了这条优先级，它会被静默豁免。
+    if is_historical("deliverables/README.md") and "deliverables/README.md" not in LIVING_DOCS:
+        problems.append("探针失效：既是活文档又命中 historical 的路径被历史族豁免了（缺优先级）")
+    # 探针 19：镜像判据必须**能红**。`docs/index.md` 与 `public/index.md` 同名但内容不同，
+    #          用它做反向对照 —— 若这两份被判成一致，说明 sha 比对是空判。
+    _pa = os.path.join(root, "docs", "index.md")
+    _pb = os.path.join(root, "public", "index.md")
+    if os.path.exists(_pa) and os.path.exists(_pb) and sha(_pa) == sha(_pb):
+        problems.append("探针失效：两份已知不同的同名文件被判为逐字节一致（镜像比对是空判）")
+
     if problems:
         print("FAIL 判据自检未通过：")
         for p in problems:
@@ -412,9 +575,10 @@ def main():
         return 1
 
     by_kind = "、".join("%s %d" % (KIND_LABEL.get(k, k), counts[k]["exists"]) for k in counts)
-    print("OK %d 份活文档、%d 处路径引用：%d 处存在（%s）、%d 处处于历史语境；"
-          "现存 %d 个页面、%d 个脚本、%d 个仓库内路径、%d 个顶层目录"
-          % (len(LIVING_DOCS), total,
+    print("OK 观察面 %d 份活文档（清单 `%s`：%d 条历史族、%d 对镜像）、%d 处路径引用："
+          "%d 处存在（%s）、%d 处处于历史语境；"
+          "现存 %d 个页面、%d 个脚本、%d 个仓库内路径、%d 个顶层目录；未登记 0 份、镜像无漂移"
+          % (len(LIVING_DOCS), MANIFEST, len(HISTORICAL), len(MIRRORS), total,
              sum(counts[k]["exists"] for k in counts), by_kind,
              len(excused), len(have["page"]), len(have["js"]), len(have["path"]),
              len(have["layer"])))

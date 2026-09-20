@@ -58,8 +58,8 @@
 
 步骤4: 日志记录
   - 日志落盘前必须过 log_sanitize.py
-  python tools/log_sanitize.py --input /tmp/app.log --output /tmp/app.clean.log
-  - 或管道方式: cat /tmp/app.log | python tools/log_sanitize.py > /tmp/app.clean.log
+  python domain/internal/log_sanitize.py --input /tmp/app.log --output /tmp/app.clean.log
+  - 或管道方式: cat /tmp/app.log | python domain/internal/log_sanitize.py > /tmp/app.clean.log
 ```
 
 ### 4.2 数据删除流程
@@ -137,7 +137,7 @@
 ```bash
 # 日志脱敏测试
 echo "姓名：张三 电话：13800138000 邮箱：test@example.com Bearer eyJabc.def.ghi api_key=sk-1234567890" \
-  | python tools/log_sanitize.py
+  | python domain/internal/log_sanitize.py
 
 # 故障注入测试（验证各类异常被正确拒绝/降级）
 python -m pytest tests/test_fault_injection.py -v
@@ -172,7 +172,7 @@ python -m pytest tests/ -v
 1. 捕获异常（工具退出码 / 网络异常 / 超时），记录 `trace_id` + 输入摘要哈希
 2. 查降级映射表，选择对应降级路径
 3. 10s 内执行降级（保留已确认数据，只回退当前节点，展示降级横幅）
-4. `python tools/log_sanitize.py --input /tmp/app.log --output /tmp/app.clean.log`
+4. `python domain/internal/log_sanitize.py --input /tmp/app.log --output /tmp/app.clean.log`
 5. （删除路径）用户确认 -> 清除会话状态与 `/tmp/` 中间文件 -> 记录 `trace_id`（不含内容）-> DELETED
 
 ### 状态转换
@@ -203,7 +203,7 @@ python -m pytest tests/ -v
 ```bash
 # 日志脱敏测试
 echo "姓名：张三 电话：13800138000 邮箱：test@example.com Bearer eyJabc.def.ghi api_key=sk-1234567890" \
-  | python tools/log_sanitize.py
+  | python domain/internal/log_sanitize.py
 # 故障注入测试
 python -m pytest tests/test_fault_injection.py -v
 # 全部测试

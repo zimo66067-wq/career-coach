@@ -1,7 +1,7 @@
 # observability.md · 可观测性规范 (P2-03)
 
 > 本文件定义 career-coach 项目的 trace_id 规范、节点耗时记录、错误分类体系、匿名摘要导出格式与禁止记录清单。
-> 所有日志落盘前必须经过 `tools/log_sanitize.py` 脱敏处理。
+> 所有日志落盘前必须经过 `domain/internal/log_sanitize.py` 脱敏处理。
 
 ---
 
@@ -84,7 +84,7 @@ trace_id = cc-{YYYYMMDD}-{HHmmss}-{6位随机hex}
 - 耗时记录写入 `/tmp/trace_{trace_id}.jsonl`（JSON Lines 格式）。
 - 每行一条记录，按步骤顺序追加。
 - 会话结束后可按 trace_id 查询完整耗时链路。
-- 日志落盘前过 `tools/log_sanitize.py`。
+- 日志落盘前过 `domain/internal/log_sanitize.py`。
 
 ---
 
@@ -245,7 +245,7 @@ trace_id = cc-{YYYYMMDD}-{HHmmss}-{6位随机hex}
 
 - 日志扫描不含姓名、电话、邮箱、身份证号、音频或完整简历。
 - 日志扫描不含 API Key、Secret Key、Bearer Token、access_token。
-- 日志落盘前必须经过 `tools/log_sanitize.py` 管道处理。
+- 日志落盘前必须经过 `domain/internal/log_sanitize.py` 管道处理。
 - 违反质量门的日志不得落盘，必须修复后重新输出。
 
 ### 5.4 日志保留与清理

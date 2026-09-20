@@ -31,7 +31,7 @@
   │         └─ answer_quote 子串校验，规则算 I
   └─ WF-05 聚合 R/M/I → rescore.py 复算对齐 scoring.md
             → AbilityProfile → radar_adapter.py → ECharts/表格
-    WF-06  异常 10s 内降级（states.html 五态）；删除按 docs/privacy.md
+    WF-06  异常 10s 内降级（states.html 五态）；删除按 docs/design/privacy.md
 ```
 
 ## 3. 双 Agent 协作（GitHub 异步接力）

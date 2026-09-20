@@ -34,8 +34,8 @@
 | 端到端全链路 | `tests/test_e2e_full_chain.py` | 新增 |
 | 端到端既有链 | `tests/test_e2e.py`、`test_e2e_closed_loop.py` | 既有 |
 | 前端数据链 | `tests/test_frontend_chain.js` | 新增 |
-| 前端契约 | `tests/test_public_page_states.js`、`test_resume_upload.js`、`test_job_upload.js`、`test_publish_mirror.js` | 既有 |
-| 契约/故障注入/脱敏/评分/雷达/隐私/语音 | `tests/test_contracts.py`、`test_fault_injection.py`、`test_log_sanitize.py`、`test_rescore.py`、`test_radar_adapter.py`、`test_new_tools.py`、`test_voice_browser.py` 等 | 既有 |
+| 前端契约 | `tests/test_public_page_states.js`、`test_resume_upload.js`、`test_upload_progress.js`、`test_publish_mirror.js` | 既有 |
+| 契约/故障注入/脱敏/评分/雷达/隐私/面试 | `tests/test_contracts.py`、`test_fault_injection.py`、`test_log_sanitize.py`、`test_rescore.py`、`test_radar_adapter.py`、`test_interview_full_flow.py` 等 | 既有 |
 
 ## 4. 测试用例矩阵（正常 / 边界 / 异常）
 
@@ -130,7 +130,7 @@
 2. **低分/材料不足引导（已实现）**：当匹配分低于 50 或简历过短（<200 字）时，接口返回 `low_score_analysis`（summary + 至少 3 个角度的中长文本 + 委婉建议），前端在结果栏以分析卡片展示，避免用户只看到一个刺眼的低分数字。
 2. **存储边界**：SQLite 默认在 `/tmp`，Vercel 冷启动后数据丢失；已提供 `admin/resumes`、`admin/export` 供人工导出，测试覆盖其鉴权与列表行为。
 3. **会话安全**：`session_id` 由前端持有且无服务端身份绑定，属当前 MVP 边界。
-4. **外部联调**：智谱/千帆 embedding、语音 ASR/TTS 等真实密钥联调脚本（`test_embedding_*.py`、`test_zhipu_*.py`、`test_voice_browser.py` 的手工模式）需要密钥，不作为无密钥 CI 的必跑项。
+4. **外部联调**：智谱/千帆 embedding 等真实密钥联调脚本（`test_embedding_*.py`、`test_zhipu_*.py` 的手工模式）需要密钥，不作为无密钥 CI 的必跑项。
 5. **方法不匹配**：材料接口以 GET 访问返回 404 而非 405，为当前 fail-closed 设计，测试按现状固化。
 
 ## 9. CI 集成

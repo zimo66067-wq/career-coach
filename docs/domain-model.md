@@ -234,7 +234,7 @@ P0 Gap > P1 Gap > 关键证据验证 > 行为问题 > 通用题库
 
 ## 8. 数据表（Phase 2 新增 10 张，库内共 30 张）
 
-SQLite 与 PostgreSQL 两份 DDL 同步维护（`tools/database.py`）；`schema_migrations`
+SQLite 与 PostgreSQL 两份 DDL 同步维护（`repositories/database.py`）；`schema_migrations`
 由 `repositories/migrations.py` 建，其余 9 张在 DDL 里。
 
 | 表 | 用途 |
@@ -304,7 +304,13 @@ SQLite 与 PostgreSQL 两份 DDL 同步维护（`tools/database.py`）；`schema
 | 面试**新事实自动抽取** | ✅ Phase 4（D9=方案 A）：`wf04/end` 一次性抽取，域层 `candidate_evidence()` 强制只产 pending |
 | 行动闭环与结果回流 | ✅ Phase 4 完成（2026-09-16） |
 | 求职信接地（Target Job + 已确认证据） | ✅ Phase 4b 完成（2026-09-17，后端）；前端 F5 尚未传 `targetJobId` |
-| 前端消费（导航 / 目标岗位工作区） | ⏳ Phase 6 |
+| 前端消费（导航 / 目标岗位工作区 / 行动闭环） | ✅ Phase 6b-1 完成（2026-09-17） |
 
-**口径**：后端闭环已可用，但**没有任何页面消费这些接口**（`js/job-upload.js` 仍无宿主）。
-因此对外材料中不得出现"上传简历 + 贴 JD 就能拿到投递建议"这类描述 —— 那要到 Phase 6。
+**口径**：后端闭环已可用，**且前端已消费** —— 目标岗位工作区落在
+`public/pages/target-job.html` + `public/js/target-job.js`（走 `/api/target-jobs`），
+行动闭环落在 `public/pages/action-loop.html` + `public/js/action-loop.js`（走 `/api/actions`）。
+
+原 `public/js/job-upload.js`（**已于 Phase 6b-1 退役**）绑定的是只产匹配分数、产不出 Decision 与 Gap
+的旧接口，其替代实现见 `docs/architecture.md` 头部的 Phase 3 更新行。
+因此「上传简历 + 贴 JD → 拿到投递建议」这条主路径**现在是成立的** ——
+本行在 Phase 6b-1 之前写的"任何页面都没消费、不得对外描述"的禁令随之解除。
