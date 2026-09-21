@@ -18,11 +18,30 @@
   1. 每行只能是空行 / `#` 注释 / `NAME=VALUE`；
   2. 每个变量名恰好出现一次；
   3. 模板里的每个变量都必须在代码里被读到（否则是废弃变量）；
-  4. 代码里读到的每个变量都必须在模板里（例外见 NOT_DOCUMENTED，且**每条都要写理由**）。
+  4. 代码里读到的每个变量都必须在模板里（例外见 NOT_DOCUMENTED，且**每条都要写理由**）；
+  5. **反引号里的每个路径都必须存在**（2026-09-21 新增，见下）。
 
 观察面：`api/`、`services/`、`domain/`、`repositories/`、`providers/`、`scripts/` 下的
 `.py` / `.js`，只认 `os.environ.get("X")` / `os.environ["X"]` / `getenv("X")` 这三种读法。
 `tests/` 不在观察面内 —— 测试用 `monkeypatch.setenv` 造变量是测试夹具，不是部署清单。
+
+## 第 5 条为什么长在这里（2026-09-21）
+
+第 1~4 条只判**变量名**。于是"用途"那几行里写的路径**没人看** —— 而它恰好是一个空洞：
+第 10 步的活文档判据观察面是 **md 文件**（逐条登记在 `contracts/living-docs.json`），
+`.env.example` 不是 md，两边都没它的份。实测结果：它攒了 **10 处**指向本轮之前那一层
+工具的路径（Phase 7d 已把那一层整层并入 `domain/` + `providers/`），外加 2 处把常量指到了
+`api/index.py`（7c 拆分后它在 `api/constants.py`，游客令牌签发在 `api/security.py`）。
+一个模板把读者指到已经不存在的文件上，就是一份会误导部署的文档。
+
+（措辞刻意不写成路径形态：`tests/test_phase7d_contract.py` 会把**字符串常量**里
+路径形态的旧层名全部扫出来，这里说的是"那一层"，不是在引用它 —— 与它同一份白名单里
+另外几条"出处说明"是同一种情况，所以也不去给白名单加行。）
+
+**已知边界（这是决定，不是遗漏）**：这里只判"路径存在"，不判散文断言的正确性 ——
+"未设置时用 `api/constants.py` 里的 `DEFAULT_GUEST_MAX_AGE_SECONDS`"里，
+"那个常量在那个文件里"是判不了的（要判它得读自然语言）。机械可判的那一半先关掉，
+剩下的一半只能靠人读；**不假装有判据**。
 
 用法：python scripts/env-example-check.py [--root .] [--verbose]
 退出码 0 = 通过；1 = 有漂移 / 判据失效。
@@ -45,6 +64,10 @@ SKIP_FILES = ("scripts/env-example-check.py",)
 ASSIGN_RE = re.compile(r"^([A-Z][A-Z0-9_]*)=(.*)$")
 READ_RE = re.compile(r"""(?:environ(?:\.get)?\(|getenv\(|environ\[)\s*['"]([A-Z][A-Z0-9_]*)['"]""")
 NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
+#: 反引号里的**路径**（第 5 条）。扩展名白名单刻意收窄：`` `DEFAULT_GUEST_MAX_AGE_SECONDS` ``
+#: 这种常量名、`` `====` `` 这种分隔符都不是路径，不该被卷进来；
+#: `` `providers/model.py::build_model_router` `` 这种带成员的写法只取到 `.py` 为止。
+PATH_RE = re.compile(r"`([A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:py|js|json|md|sh|yml|yaml))`")
 
 # 代码里读、但**有意不进模板**的变量。白名单必须逐条写理由 —— 这是判据，
 # 不是"先放行再说"：下面有探针检查这些键真的还在被读取，避免名单腐烂成一张护身符。
@@ -98,12 +121,31 @@ def code_reads(root):
     return found
 
 
+def path_refs(env_path):
+    """返回 [(行号, 路径)] —— 模板里反引号包住的全部路径引用（第 5 条的观察面）。"""
+    refs = []
+    for i, raw in enumerate(io.open(env_path, encoding="utf-8", newline="").read()
+                              .replace("\r\n", "\n").split("\n"), 1):
+        for match in PATH_RE.finditer(raw):
+            refs.append((i, match.group(1)))
+    return refs
+
+
+def path_ref_problems(env_path, root):
+    """第 5 条：反引号里的路径必须存在。理由与已知边界见模块文档。"""
+    problems, refs = [], path_refs(env_path)
+    for lineno, rel in refs:
+        if not os.path.exists(os.path.join(root, rel.replace("/", os.sep))):
+            problems.append("%s:%d 反引号里的路径不存在：%s" % (ENV_FILE, lineno, rel))
+    return problems, refs
+
+
 def check(root, verbose=False):
-    """返回 (problems, declared_unique, used)。外部可用来做探针。"""
+    """返回 (problems, declared_unique, used, path_refs)。外部可用来做探针。"""
     env_path = os.path.join(root, ENV_FILE)
     problems = []
     if not os.path.exists(env_path):
-        return ["找不到 %s" % ENV_FILE], set(), {}
+        return ["找不到 %s" % ENV_FILE], set(), {}, []
 
     names, parse_problems = parse_env(env_path)
     problems.extend(parse_problems)
@@ -127,10 +169,15 @@ def check(root, verbose=False):
             problems.append("代码在读 %s，但模板里没有它（%s）"
                             % (n, ", ".join(sorted(used[n]))))
 
+    ref_problems, refs = path_ref_problems(env_path, root)
+    problems.extend(ref_problems)
+
     if verbose:
         for n in sorted(declared & set(used)):
             print("   %-34s %s" % (n, ", ".join(sorted(used[n]))))
-    return problems, declared, used
+        for lineno, rel in refs:
+            print("   第 %-4d 行引用 %s" % (lineno, rel))
+    return problems, declared, used, refs
 
 
 def main():
@@ -140,7 +187,7 @@ def main():
         root = argv[argv.index("--root") + 1]
     verbose = "--verbose" in argv
 
-    problems, declared, used = check(root)
+    problems, declared, used, refs = check(root, verbose)
 
     # ── 判据自检：空判防线 + 探针 ──
     self_check = []
@@ -148,6 +195,9 @@ def main():
         self_check.append("模板只解析出 %d 个变量，判据近乎空判" % len(declared))
     if len(used) < 20:
         self_check.append("代码只解析出 %d 个读取点，判据近乎空判" % len(used))
+    # 第 5 条也有空判形态：模板里一个反引号路径都没有 ⇒ 那条判据什么都没看。
+    if len(refs) < 5:
+        self_check.append("模板里只解析出 %d 个路径引用，第 5 条近乎空判" % len(refs))
     # 探针 1：白名单里的每个键必须**真的还在被读取**，否则名单腐烂成了护身符
     for n in sorted(NOT_DOCUMENTED):
         if n not in used:
@@ -167,6 +217,22 @@ def main():
     hit = set(READ_RE.findall(probe_src))
     if hit != {"A_ONE", "A_TWO", "A_THREE"}:
         self_check.append("探针失效：env 读取点只认出了 %s" % sorted(hit))
+    # 探针 5：第 5 条必须**两头都判得出来** —— 负向（不存在的路径）要被抓，
+    # 正向（现存路径）要放行。只测一头的话，恒绿和恒红都看不出来。
+    for sample, should_exist in (("`definitely/missing/path.py`", False),
+                                 ("`api/index.py`", True)):
+        match = PATH_RE.search(sample)
+        if not match:
+            self_check.append("探针失效：反引号里的路径没被认出来 —— %s" % sample)
+            continue
+        found = os.path.exists(os.path.join(root, match.group(1).replace("/", os.sep)))
+        if found != should_exist:
+            self_check.append("探针失效：%s 的存在性判成了 %s（应为 %s）"
+                              % (match.group(1), found, should_exist))
+    # 探针 6：非路径的反引号内容**不该**被卷进来（常量名、分隔符都是模板里的常客）
+    for sample in ("`DEFAULT_GUEST_MAX_AGE_SECONDS`", "`====`", "`os.environ.get`"):
+        if PATH_RE.search(sample):
+            self_check.append("探针失效：%r 被误认成路径引用" % sample)
 
     if self_check:
         print("FAIL 判据自检未通过：")
@@ -175,16 +241,18 @@ def main():
         return 1
 
     if problems:
-        print("FAIL %s 与代码的实际 env 读取不一致（%d 处）：" % (ENV_FILE, len(problems)))
+        print("FAIL %s 与代码的实际 env 读取 / 路径引用不一致（%d 处）：" % (ENV_FILE, len(problems)))
         for p in problems:
             print("  " + p)
         print("  修法：模板里的废弃变量删掉；代码在读但模板没有的补进模板"
-              "（确实不该进模板的一次性脚本变量，加到本脚本的 NOT_DOCUMENTED 并写明理由）。")
+              "（确实不该进模板的一次性脚本变量，加到本脚本的 NOT_DOCUMENTED 并写明理由）；"
+              "反引号里的路径改成它现在真正所在的位置。")
         return 1
 
-    print("OK %s：%d 个变量（无重复）、每行合法、与代码读取点双向一致"
-          "（代码共读 %d 个，其中 %d 个按理由豁免）"
-          % (ENV_FILE, len(declared), len(used), len(NOT_DOCUMENTED)))
+    print("OK %s：%d 个变量（无重复）、每行合法、与代码读取点双向一致、"
+          "%d 个反引号路径引用全部存在"
+          "（代码共读 %d 个变量，其中 %d 个按理由豁免）"
+          % (ENV_FILE, len(declared), len(refs), len(used), len(NOT_DOCUMENTED)))
     if verbose:
         print("   豁免：%s" % ", ".join(sorted(NOT_DOCUMENTED)))
     return 0
