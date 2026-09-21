@@ -153,7 +153,9 @@ def test_upload_txt_deidentifies_and_sets_cors(monkeypatch):
     assert response.headers["Cache-Control"] == "no-store"
 
 
-def test_preflight_allows_only_public_pages_origin(monkeypatch):
+def test_preflight_allows_public_pages_origin_and_rejects_attacker(monkeypatch):
+    # 名字里的"only"已去掉：2026-09-21 起放行名单是**并集**（内置第一方源 ∪ 平台变量），
+    # 所以"只放行 Pages 源"这句话不再成立。本条验的是那两支之外仍然被拒。
     allowed = client(monkeypatch).open(
         "/api/wf02/diagnose", method="OPTIONS", headers={"Origin": "https://zimo66067-wq.github.io"}
     )

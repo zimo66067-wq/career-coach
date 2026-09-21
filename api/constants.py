@@ -32,6 +32,9 @@ MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_TEXT_CHARS = 200_000
 MIN_TEXT_CHARS = 20
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
+#: 仓库自带的第一方前端（GitHub Pages；`docs/` 那份前端的跨源宿主）。
+#: 它在 `api/http_layer.py:builtin_origins()` 里**永远**被放行，**不受平台变量影响** ——
+#: 平台变量是追加，不是替换；理由见 `api/http_layer.py` 模块文档（2026-09-21）。
 PUBLIC_PAGES_ORIGIN = "https://zimo66067-wq.github.io"
 TRACE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{6,96}$")
 CONSENT_TOKEN_SALT = "career-coach-consent-v1"

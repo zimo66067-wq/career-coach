@@ -21,6 +21,33 @@
 `register_http_layer` 的**注册项集合**是可数的：1 个 after_request、1 个 before_request、
 6 个 errorhandler。少注册一个不会有任何测试直接报错（表现是某个分支回落默认 HTML 错误页），
 所以 `tests/test_phase7c_contract.py` 把这个集合钉住了。
+
+## 为什么第一方前端**不听**平台变量（2026-09-21）
+
+`configured_origins()` 原来写的是"平台变量覆盖默认值"：
+
+    os.environ.get("DUMATE_ALLOWED_ORIGINS", PUBLIC_PAGES_ORIGIN)
+
+默认值本身是对的（不设置时就是仓库自带那个 Pages 源）。坏的是这个**替换**语义 ——
+平台只要设置了这个变量（哪怕是为了别的源），第一方源就被整体换掉，于是
+"**忘了把第一方源也列进去**"变成一条比"根本没设置"更坏的配置。而它三处都看不见：
+
+* 仓库里看不见（默认值是好的，diff 里也没有它）；
+* 本地 / CI 看不见（同源路径根本不经过 CORS，测试也不会去读线上配置）；
+* 门禁看不见（没有判据探线上）。
+
+2026-09-21 实测正是这个状态：`https://zimo66067-wq.github.io/career-coach/` 这个前端
+**真实在线**、且它调的就是本 API（`public/js/pages-api-config.js` 就是为它写的），
+但预检无 `Access-Control-Allow-Origin`、写操作回 403「请求来源未获授权」。
+
+现在改成**并集**：`第一方源 ∪ 平台变量里额外声明的源`。变量名保留（它已经出现在
+Vercel 控制台、`README.md`、`.env.example` 里，改名只增加迁移负担），语义是**追加**。
+这样"省略"不再是可能的破坏动作 —— 真要禁掉第一方源，只能改本文件的代码，
+而那会是一次 code review 里看得见的 diff（这是**决定**，不是遗漏）。
+
+判据两边都有：`tests/test_api_boundary.py` 的
+`test_cors_builtin_pages_origin_survives_env_override`（把语义改回替换即变红），
+以及 `scripts/api-prod-probe.py` 第 3 节（探线上，**带敌对源的反向控制**）。
 """
 import os
 import re
@@ -37,9 +64,27 @@ from api.app_instance import app
 from api.constants import PUBLIC_PAGES_ORIGIN
 
 
-def configured_origins():
-    values = os.environ.get("DUMATE_ALLOWED_ORIGINS", PUBLIC_PAGES_ORIGIN)
+def builtin_origins():
+    """仓库自带的第一方前端的源 —— **永远**在放行名单里，不受平台变量影响。
+
+    它不是"默认值"，是并集的一支。理由见模块文档「为什么第一方前端不听平台变量」。
+    """
+    return {PUBLIC_PAGES_ORIGIN.rstrip("/")}
+
+
+def env_origins():
+    """平台变量 `DUMATE_ALLOWED_ORIGINS` 里额外声明的跨源前端（可为空、可多个）。"""
+    values = os.environ.get("DUMATE_ALLOWED_ORIGINS", "")
     return {origin.strip().rstrip("/") for origin in values.split(",") if origin.strip()}
+
+
+def configured_origins():
+    """放行名单 = 第一方源 ∪ 平台变量里额外声明的源。
+
+    **刻意是并集，不是"变量覆盖默认值"** —— 后者正是 2026-09-21 那条渠道静默失效的机制
+    （见模块文档）。改成并集后，平台侧的**省略**不再能关掉第一方渠道。
+    """
+    return builtin_origins() | env_origins()
 
 
 def origin_allowed(origin):

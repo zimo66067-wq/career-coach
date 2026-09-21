@@ -328,6 +328,32 @@ def test_cors_localhost_rejected_in_production(monkeypatch):
     assert "Access-Control-Allow-Origin" not in response.headers
 
 
+def test_cors_builtin_pages_origin_survives_env_override(monkeypatch):
+    """平台变量是**追加**，所以覆盖它并不能关掉第一方源（2026-09-21 的真实缺口）。
+
+    反向控制就在这条用例里：把 `configured_origins()` 改回"变量覆盖默认值"的写法
+    （`os.environ.get("DUMATE_ALLOWED_ORIGINS", PUBLIC_PAGES_ORIGIN)`），
+    第一方源会被换掉 ⇒ 本用例第一段立刻变红。没有第一段，这条用例对那个语义
+    是绿的（它只证明"变量里的源被放行"）。
+    """
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("DUMATE_CONSENT_SECRET", "test-consent-secret")
+    monkeypatch.setenv("DUMATE_ALLOWED_ORIGINS", "https://extra.example")
+    api_module.app.config.update(TESTING=True)
+    raw = api_module.app.test_client()
+    for origin in ("https://zimo66067-wq.github.io", "https://extra.example"):
+        response = raw.open(
+            "/api/wf02/diagnose", method="OPTIONS", headers={"Origin": origin}
+        )
+        assert response.status_code == 204
+        assert response.headers.get("Access-Control-Allow-Origin") == origin
+    # 并集不等于全放行：没被声明过的源照旧被拒。没有这一段，"把所有源都放行"也是绿的。
+    hostile = raw.open(
+        "/api/wf02/diagnose", method="OPTIONS", headers={"Origin": "https://attacker.example"}
+    )
+    assert "Access-Control-Allow-Origin" not in hostile.headers
+
+
 def test_cors_attacker_origin_rejected(monkeypatch):
     monkeypatch.setenv("APP_ENV", "development")
     monkeypatch.setenv("DUMATE_CONSENT_SECRET", "test-consent-secret")
