@@ -72,7 +72,12 @@ career-coach/
 
 ```text
 ZHIPU_API_KEY=...
-DUMATE_MODEL=glm-4.7-flash
+DUMATE_MODEL=glm-4-flash-250414
+# ⚠️ 模型名要挑**能在 50 秒内出完**的：`MODEL_PARAMS.resume_diagnosis.timeout` 冻结在 50s，
+# 吞吐太低的模型（例如不带日期的 `glm-4-flash`）每个请求都会超时降级，而接口仍返回
+# HTTP 200 + 一份看起来正常的规则分数 —— 这是**看不出来**的坏。2026-09-21 实测见 `.env.example`。
+# 验收：`python scripts/api-prod-probe.py` 只看路由，**看不出这件事**；要用
+# `POST /api/wf02/diagnose` 返回的 `diagnosis_mode == "model"` 判。
 # 可选：ZHIPU_FALLBACK_MODEL=...（备用智谱 Chat 模型）
 DUMATE_CONSENT_SECRET=...          # 同意令牌签名密钥（生产必需）
 # **追加**放行的跨源前端，逗号分隔 —— 它**不是**"允许来源的全部"。第一方的

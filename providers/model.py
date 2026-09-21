@@ -58,17 +58,44 @@ class MockModelRouter:
         return self._provider.call(task, user_input)
 
 
-def build_model_router():
-    """按 MODEL_PROVIDER 构建模型路由；默认 auto 保持既有行为。"""
-    provider_name = (os.environ.get("MODEL_PROVIDER") or "auto").strip().lower()
-    if provider_name == "mock":
-        return MockModelRouter()
+def _chat_model_names():
+    """主/备 Chat 模型名的优先级链（唯一一份，供 build_model_router 与状态查询共用）。"""
     primary_model = (
         os.environ.get("DUMATE_MODEL")
         or os.environ.get("ZHIPU_MODEL")
         or os.environ.get("PRIMARY_MODEL")
     )
     fallback_model = os.environ.get("ZHIPU_FALLBACK_MODEL") or os.environ.get("FALLBACK_MODEL")
+    return primary_model, fallback_model
+
+
+def model_config_status():
+    """模型配置**是否真的可用**：key 与模型名**缺一不可**。
+
+    为什么要单独有这个：`/api/health` 原来只报 `ZHIPU_API_KEY` 是否存在，而
+    `build_model_router()` 要求「key **和** 模型名」都在。于是"key 配了、模型名忘了填"
+    时 health 报 `model_configured=True`，每一次诊断却落规则降级 —— 用户拿到的还是
+    HTTP 200 加一份看起来正常的规则分数。2026-09-21 在生产上实测到了这个假绿灯。
+
+    `reason` 是**粗粒度**的原因码，只说明"哪一类配置缺失"，不含任何密钥内容。
+    """
+    provider_name = (os.environ.get("MODEL_PROVIDER") or "auto").strip().lower()
+    if provider_name == "mock":
+        return {"ready": True, "provider": "mock", "reason": None}
+    primary_model, fallback_model = _chat_model_names()
+    if not os.environ.get("ZHIPU_API_KEY"):
+        return {"ready": False, "provider": "zhipu", "reason": "zhipu_api_key_missing"}
+    if not (primary_model or fallback_model):
+        return {"ready": False, "provider": "zhipu", "reason": "model_name_missing"}
+    return {"ready": True, "provider": "zhipu", "reason": None}
+
+
+def build_model_router():
+    """按 MODEL_PROVIDER 构建模型路由；默认 auto 保持既有行为。"""
+    provider_name = (os.environ.get("MODEL_PROVIDER") or "auto").strip().lower()
+    if provider_name == "mock":
+        return MockModelRouter()
+    primary_model, fallback_model = _chat_model_names()
     if not os.environ.get("ZHIPU_API_KEY") or not (primary_model or fallback_model):
         raise ApiError("model_not_configured", "诊断模型尚未配置完成，请联系服务管理员。", 503)
     return ZhipuModelRouter(primary_model=primary_model, fallback_model=fallback_model)

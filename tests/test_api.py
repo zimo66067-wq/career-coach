@@ -170,12 +170,27 @@ def test_preflight_allows_public_pages_origin_and_rejects_attacker(monkeypatch):
 
 def test_health_reports_zhipu_configuration(monkeypatch):
     monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
+    for name in ("DUMATE_MODEL", "ZHIPU_MODEL", "PRIMARY_MODEL"):
+        monkeypatch.delenv(name, raising=False)
     unconfigured = client(monkeypatch).get("/api/health")
     monkeypatch.setenv("ZHIPU_API_KEY", "test-key")
+    key_only = client(monkeypatch).get("/api/health")
+    monkeypatch.setenv("DUMATE_MODEL", "glm-4-flash-250414")
     configured = client(monkeypatch).get("/api/health")
     assert unconfigured.json["model_configured"] is False
     assert configured.json["model_configured"] is True
     assert unconfigured.json["workflows"]["wf04"] == "available"
+
+    # `model_configured` 只回答"有没有 key"，`model_ready` 才回答"能不能调模型"
+    # （`providers/model.py::model_config_status`）。这组断言就是那个假绿灯的反向控制：
+    # 只给 key、不给模型名时，前者为真而后者必须为假 —— 否则"忘了填模型名"的部署
+    # 会一直报"已配置"，而每次诊断都在降级。
+    assert key_only.json["model_configured"] is True
+    assert key_only.json["model_ready"] is False
+    assert key_only.json["model_reason"] == "model_name_missing"
+    assert unconfigured.json["model_reason"] == "zhipu_api_key_missing"
+    assert configured.json["model_ready"] is True
+    assert configured.json["model_reason"] is None
 
 
 def test_unknown_paths_remain_404(monkeypatch):
