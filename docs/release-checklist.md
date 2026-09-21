@@ -9,6 +9,9 @@
 > **当前状态（2026-09-21）**：**线上主渠道已经通了** —— 生产 `/api/health` = 200，
 > 其余接口都由应用应答，静态资源与 HEAD 逐字节相同。§一记录的是那个阻断的根因与修法
 > （留着是因为下一次同类症状会以同样的样子出现）；**现在需要你做的都在 §一末与 §二、§三**。
+>
+> §一末那条"GitHub Pages 调不到 API"已于同日**在代码侧修掉**（放行名单改成并集），
+> 剩一步：这次改动推上主干、部署完成后再跑一次探针确认第 3 节三行都 `OK`。
 
 ---
 
@@ -66,17 +69,18 @@ setuptools 自动发现报 `Multiple top-level packages discovered`。本地可�
 | # | 事项 | 谁 | 怎么做 / 判据 |
 |---|---|---|---|
 | 1 | 核对 Vercel 项目构建设置 | **【你】** | Settings → Build and Deployment：**Root Directory 留空**（= 仓库根 ✅ 已确认）、**Framework Preset 保持 `Flask`**、**Output Directory 留 `N/A`**（Flask 预设自己管静态根 —— 线上 `/capability_matrix.md` 正是从 `public/` 取的，说明它对）。**⚠️ 不要改成 `Other`**：那会切回"`api/` 下每个 `.py` 各自是函数"的约定，而本目录有 25 个 `.py`，其中 23 个不导出任何 handler。 |
-| 2 | 补齐生产环境变量 | **【你】** | Settings → Environment Variables（Production）：`ZHIPU_API_KEY`、`DUMATE_MODEL`、`DUMATE_CONSENT_SECRET`、`DATABASE_URL`、`APP_ENV=production`、`DUMATE_ALLOWED_ORIGINS`。缺 `DUMATE_CONSENT_SECRET` 会让同意令牌直接失败。 |
+| 2 | 补齐生产环境变量 | **【你】** | Settings → Environment Variables（Production）：`ZHIPU_API_KEY`、`DUMATE_MODEL`、`DUMATE_CONSENT_SECRET`、`DATABASE_URL`、`APP_ENV=production`。缺 `DUMATE_CONSENT_SECRET` 会让同意令牌直接失败。`DUMATE_ALLOWED_ORIGINS` 属**追加**项（2026-09-21 起语义是并集，见 §一末）：**不设也照样能用 GitHub Pages 渠道**，只有要额外放行别的跨源前端时才需要填。 |
 | 3 | ~~入口修复进主干后点 Redeploy~~ | — | ✅ **已完成**（2026-09-21）：修复（`ec1ce27`）推上主干后 Vercel 自己建了生产部署，**状态 success**，不用手点。 |
 | 4 | ~~复跑探针确认阻断解除~~ | **【我】** | ✅ **已完成**：`scripts/api-prod-probe.py` **退出码 0** —— 静态 = HEAD、`/api/health` = **200**、其余接口都是应用在应答（415 / 428 / 404 带 `no-store`）。 |
 | 5 | ~~取 Functions 列表与 Build Logs~~ | — | ✅ **不需要了**（定案靠本地隔离 import 对照，没用到平台日志）。保留此行的理由：万一以后又出现同类症状，这是最后一条后备取证手段。 |
 | 6 | 端到端冒烟（F1→F5 真流程） | **【我】** | 仓库里已有 `scripts/run-wf-e2e.py`、`scripts/phase4-http-smoke.py`、`scripts/run-rehearsal.py`。⚠️ 注意 `phase4-http-smoke.py` 起的是**本地**端口、清掉了 `ZHIPU_API_KEY`，所以它验的是"路由与状态机"，**不是**"真模型能跑"（那要 P0-01/P0-03）。 |
 
-### 另一条渠道的真缺口：GitHub Pages 前端调不到 API（**【你】**，非阻断）
+### 另一条渠道：GitHub Pages 前端调不到 API（已修复，代码侧，2026-09-21）
 
-生产域名**既是页面也是 API**，从它打开是**同源**、CORS 不参与 —— 所以主渠道完全可用。
-但仓库里还有一个**跨源**前端（GitHub Pages），而 `public/js/pages-api-config.js` 存在的
-唯一理由就是给那个非 Vercel 宿主的页面找 API 地址。2026-09-21 实测：
+生产域名**既是页面也是 API**，从它打开是**同源**、CORS 不参与 —— 所以主渠道一直可用。
+但仓库里还有一个**跨源**前端（GitHub Pages）：`https://zimo66067-wq.github.io/career-coach/`
+**实测在线**（200，`js/pages-api-config.js` 就在那儿），而那个文件存在的唯一理由
+就是给非 Vercel 宿主的页面找 API 地址。2026-09-21 实测它是坏的：
 
 ```
 预检 OPTIONS /api/wf01/consent  Origin=https://zimo66067-wq.github.io  code=204  ACAO=(无)
@@ -85,16 +89,29 @@ POST   /api/wf03/jd             Origin=https://zimo66067-wq.github.io  code=403 
 
 ⇒ 从 GitHub Pages 打开页面时，**浏览器会拦掉所有接口调用**，写操作还会被应用直接 403。
 
-**原因**：`api/http_layer.py:configured_origins()` 读 `DUMATE_ALLOWED_ORIGINS`，
-**未设置时默认就是那个 Pages 源**（`api/constants.py:PUBLIC_PAGES_ORIGIN`）。
-实测 Pages 源被拒 ⇒ 说明生产上**该变量已被设置、且不含 Pages 源**。
+**原因（是一个语义错，不是漏配）**：`api/http_layer.py` 的 `configured_origins()` 原来写的是
+"平台变量覆盖默认值"。默认值本身是对的（不设置时就是那个 Pages 源），但只要**设置了**这个变量
+（哪怕是为了别的源），默认值就被整体换掉 —— 于是"**忘了把第一方源也列进去**"成了比
+"根本没设置"更坏的配置。三处都看不见：仓库里（默认值是对的）、本地/CI（同源不经过 CORS）、
+门禁（没有判据探线上配置）。
 
-**修法（一分钟）**：Vercel → Settings → Environment Variables（**Production**）→
-把 `DUMATE_ALLOWED_ORIGINS` 设为包含 `https://zimo66067-wq.github.io`（多个源用逗号分隔）
-→ 重新部署。判据：`scripts/api-prod-probe.py` 第 3 节从"未放行"变成 `OK`。
+**修法（已在仓库里改掉，不用你动控制台）**：放行名单改成 **并集** ——
+`builtin_origins()`（= `PUBLIC_PAGES_ORIGIN`，**永远放行**）∪ `env_origins()`
+（平台变量 `DUMATE_ALLOWED_ORIGINS` 里**追加**的源）。于是"平台侧的省略"不再能关掉第一方渠道；
+真要禁掉它只能改代码，那会是一次 review 里看得见的 diff（**这是决定，不是遗漏**）。
+`DUMATE_ALLOWED_ORIGINS` 仍然有用，但语义变成"追加"，**不设也照样能用 Pages 渠道**。
 
-**要不要做由你定**：如果对外只发 omega-three 那一个链接，这个源可以不列（那就明确
-"不使用 Pages 渠道"）；如果要让 Pages 那个链接也能用，就必须列出。**两者都不是默认即可**。
+**验收判据（已升级为硬门）**：`scripts/api-prod-probe.py` 第 3 节现在探三件事 ——
+第一方源预检必须拿到 ACAO、写操作不得是 403、**敌对源（保留 TLD `*.invalid`）必须拿不到 ACAO**。
+第三条是反向控制：没有它，"把名单写成全放行"也会是绿的。
+
+**已做的本地验证**（不必等部署）：`work/verify-cors-fix.py` 起两个本地 app 用同一个探针探 ——
+真实现退出 0；把 `origin_allowed` 换成无条件放行后退出 1，且失败项正是反向控制那条。
+单元层面 `tests/test_api_boundary.py::test_cors_builtin_pages_origin_survives_env_override`
+即是那个语义的反向控制（改回"替换"语义立刻变红）。
+
+**部署后你来确认这一步**：【你】把这次改动推上主干后，Vercel 会自动建生产部署；
+之后跑一次 `python scripts/api-prod-probe.py`，第 3 节三行都应是 `OK`。
 
 **一个已知的非阻断现象**：`career-coach-<hash>-zimo66067.vercel.app` 这类**部署 URL** 会 302 到 Vercel 登录
 （Deployment Protection），但**生产别名**是公开可达的。所以"部署 URL 打不开"不等于线上不可用；

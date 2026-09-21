@@ -207,7 +207,7 @@ CareerProfile        TargetJob                InterviewSession        Action
 | 11 Interview 按 Gap 定向 | ✅ Phase 3：`targetJobId` → 缺口按 P0→P1→P2 排序出题，返回 `questionPlan` | ✅ **已达成**（Phase 3，后端） |
 | 12 Interview 新事实需用户确认 | ✅ **Phase 4 端到端打通**：D9=A 落地，`wf04/end` 一次性抽取；模型路径与降级路径都由 `candidate_evidence()` 收口，只产 pending（9 项测试锁死） | ✅ **已达成**（Phase 4） |
 | 13 Service 不反向依赖 API | ✅ **Phase 5 达成**：两处倒置已修（`diagnosis_service` / `interview_service` 不再 import api，模型工厂收敛为 `tools.providers.model` 唯一归属地）；新增静态门禁 `tests/test_layering.py`（8 项，进 pytest，含判据自检） | ✅ **已达成**（Phase 5）。`tools/` 归并进 domain+providers 属 Phase 7 |
-| 14 .env 无重复/废弃 | ✅ **Phase 7a 达成**：模板重写为 **29 个变量、无重复、每行合法**（旧版有一行未注释的 `====` 分隔符，`DUMATE_CONSENT_SECRET` / `_MAX_AGE_SECONDS` 各出现 3 次），删掉 0 消费者的 `LOG_LEVEL` / `ENV`，**并补上 13 个代码在读但模板漏掉的变量**（含服务端游客会话密钥 `DUMATE_GUEST_SECRET`）。新增判据 `scripts/env-example-check.py` 双向强制（模板 ⊆ 代码、代码 ⊆ 模板，例外须写理由） | ✅ **已达成**（Phase 7a，见 §19） |
+| 14 .env 无重复/废弃 | ✅ **Phase 7a 达成**：模板重写为 **29 个变量、无重复、每行合法**（旧版有一行未注释的 `====` 分隔符，`DUMATE_CONSENT_SECRET` / `_MAX_AGE_SECONDS` 各出现 3 次），删掉 0 消费者的 `LOG_LEVEL` / `ENV`，**并补上 13 个代码在读但模板漏掉的变量**（含服务端游客会话密钥 `DUMATE_GUEST_SECRET`）。新增判据 `scripts/env-example-check.py` 双向强制（模板 ⊆ 代码、代码 ⊆ 模板，例外须写理由） | ✅ **已达成**（Phase 7a，见 §19）。2026-09-21 给该判据补第 5 条：**反引号里的路径引用必须存在** —— 此前只判变量名，于是那几行"用途"里指向 `tools/` 的陈旧路径没人看，实测攒了 12 处 |
 | 15 前端只有一套 canonical | ✅ **Phase 6a 达成**：`ui/prototype`（陈旧分叉）+ `ui/assets`（与 `public/assets` 逐字节重复）**整树已删**；`public/` 定为唯一 canonical，`docs/` 为发布镜像，非 `.md` 文件由 `tests/test_publish_mirror.js` 强制集合相同 + 逐字节相同（含判据自检） | ✅ **已达成**（Phase 6a）。`.md` 的公开范围属产品/隐私决策，未擅自增删 |
 | 16-18 Coverage 85/90/75 | Python 79%（Phase 0 基线）；JS 未测 | Phase 15（须在 CI 的 Python 3.11 上重测） |
 | 19 CI 全绿 | ✅ pytest **457** passed + node 36/36 | 已达成 |
@@ -891,6 +891,13 @@ Phase 1 已删的路由，两个数字也从未实测过（写 40/48，实测 49
 第 3 类最危险：**模板短了不会红。** 重写为 29 个变量、无重复、每行合法，新增
 `scripts/env-example-check.py` 双向判，并给白名单加"必须写理由 + 名单里的键必须仍被读取"
 两条自检（防止名单腐烂成护身符）。
+
+**2026-09-21 追加第 5 条（反引号里的路径引用必须存在）**：前四条只判**变量名**，于是
+"用途"那几行里写的路径没人看 —— 而它是个空洞：第 10 步的活文档判据观察面是 `.md`
+（逐条登记在 `contracts/living-docs.json`），`.env.example` 不是 md，两边都没它的份。
+实测它攒了 **12 处**陈旧路径（10 处指向 Phase 7d 已消失的 `tools/`，2 处把常量指到
+`api/index.py` —— 7c 拆分后常量在 `api/constants.py`、游客令牌签发在 `api/security.py`）。
+边界写在同一处：只判"路径存在"，**不判散文断言的正确性**（"那个常量在那个文件里"判不了）。
 
 ### 19.5 `HANDOFF.md` 退役为薄指针（含勘误）
 

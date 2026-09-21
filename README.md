@@ -75,11 +75,13 @@ ZHIPU_API_KEY=...
 DUMATE_MODEL=glm-4.7-flash
 # 可选：ZHIPU_FALLBACK_MODEL=...（备用智谱 Chat 模型）
 DUMATE_CONSENT_SECRET=...          # 同意令牌签名密钥（生产必需）
-# 只需列**跨源**的前端。Vercel 自己托管的页面是同源，origin_allowed() 直接放行
-# （api/http_layer.py 里 `normalized == request.host_url` 那一条），不必登记。
-# 因此这里只有 GitHub Pages 的源；不要在名单里写已经下线的 Vercel 域名 —— 它会被
+# **追加**放行的跨源前端，逗号分隔 —— 它**不是**"允许来源的全部"。第一方的
+# GitHub Pages 源（`api/constants.py` 的 PUBLIC_PAGES_ORIGIN）由
+# `api/http_layer.py` 的 `builtin_origins()` 内置、**永远放行**，写在这里只是重复；
+# Vercel 自托管的页面与 API 同源，`origin_allowed()` 第一条就直接放行，也不必登记。
+# 留空 = 只有第一方源 + 同源。不要在名单里写已经下线的 Vercel 域名 —— 它会被
 # 当成"这个源能用"的证据留下来，而真正要问的是它还在不在。
-DUMATE_ALLOWED_ORIGINS=https://zimo66067-wq.github.io
+DUMATE_ALLOWED_ORIGINS=
 APP_ENV=production
 DATABASE_URL=...              # 生产必需：Neon Postgres 连接串（账号/历史持久化）
 SESSION_TTL_DAYS=30           # 可选：登录会话有效期（1-90 天）
