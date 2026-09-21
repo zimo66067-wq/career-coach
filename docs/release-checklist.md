@@ -6,18 +6,18 @@
 标注：**【你】** = 只有账号持有人能做的（控制台、凭据、真人、业务决策）；**【我】** = 仓库内可代做的。
 完成一条就把它的状态改成 ✅（附实测证据），不要凭印象勾。
 
-> **当前状态（2026-09-21 晚）**：**路由渠道通了，但 AI 没通。**
-> 生产 `/api/health` = 200、其余接口都由应用应答、静态资源与 HEAD 逐字节相同 ——
-> 这些仍然成立。但同日实测发现：**生产上每一次简历诊断都没有走模型**
-> （`POST /api/wf02/diagnose` 返回 `diagnosis_mode='rule_fallback'`），
-> 而响应是 **HTTP 200 + 一份看起来正常的规则分数**。见 §一之二。
-> **这是一条上线阻断项，需要你在 Vercel 控制台改一个环境变量的值。**
+> **当前状态（2026-09-21 晚，Redeploy 后）**：**路由渠道通了，AI 渠道也通了。**
+> 两份判据在同一时刻各自退出 0：
+> · `scripts/api-prod-probe.py` —— 静态 = HEAD、`/api/health` = 200、其余接口都由应用应答；
+> · `work/prod-ai-path-probe.py` —— `POST /api/wf02/diagnose` 返回 `diagnosis_mode = 'model'`。
 >
-> §一记录的是入口阻断的根因与修法（留着是因为下一次同类症状会以同样的样子出现）；
-> §一之二记录的是同一天发现的第二个阻断项。**需要你做的都在 §一之二、§二、§三。**
+> §一、§一之二记的是**同一天发现的两个阻断项，均已解除**，根因都留着 ——
+> 因为下一次同类症状会以同样的样子出现（一个是“平台挑错了 WSGI 入口”，
+> 一个是“环境变量按部署绑定，改完不重新部署就不生效”）。
+> **两个坑的教训都不是“某个值填错了”，而是“原有判据根本看不见这一层”。**
 >
-> GitHub Pages 那条跨源渠道已于同日在代码侧修掉（放行名单改成并集），
-> 且部署后探针第 3 节三行都是 `OK` —— 这一条**已收口，不用再管**。
+> GitHub Pages 那条跨源渠道同日已在代码侧修掉（放行名单改并集），探针第 3 节三行全 `OK` —— **已收口**。
+> **需要你做的**现在只剩 §二（G8 真人验证、仓库可见性口径）与 §三（F5 / D3 业务决策）。
 
 ---
 
@@ -75,7 +75,7 @@ setuptools 自动发现报 `Multiple top-level packages discovered`。本地可�
 | # | 事项 | 谁 | 怎么做 / 判据 |
 |---|---|---|---|
 | 1 | 核对 Vercel 项目构建设置 | **【你】** | Settings → Build and Deployment：**Root Directory 留空**（= 仓库根 ✅ 已确认）、**Framework Preset 保持 `Flask`**、**Output Directory 留 `N/A`**（Flask 预设自己管静态根 —— 线上 `/capability_matrix.md` 正是从 `public/` 取的，说明它对）。**⚠️ 不要改成 `Other`**：那会切回"`api/` 下每个 `.py` 各自是函数"的约定，而本目录有 25 个 `.py`，其中 23 个不导出任何 handler。 |
-| 2 | 补齐生产环境变量 | **【你】** | Settings → Environment Variables（Production）：`ZHIPU_API_KEY`、`DUMATE_MODEL`、`DUMATE_CONSENT_SECRET`、`DATABASE_URL`、`APP_ENV=production`。缺 `DUMATE_CONSENT_SECRET` 会让同意令牌直接失败。`DUMATE_ALLOWED_ORIGINS` 属**追加**项（2026-09-21 起语义是并集，见 §一末）：**不设也照样能用 GitHub Pages 渠道**，只有要额外放行别的跨源前端时才需要填。 |
+| 2 | 补齐生产环境变量 | **【你】** | Settings → Environment Variables（Production）：`ZHIPU_API_KEY`、`DUMATE_MODEL`、`DUMATE_CONSENT_SECRET`、`DATABASE_URL`、`APP_ENV=production`。缺 `DUMATE_CONSENT_SECRET` 会让同意令牌直接失败。`DUMATE_ALLOWED_ORIGINS` 属**追加**项（2026-09-21 起语义是并集，见 §一末）：**不设也照样能用 GitHub Pages 渠道**，只有要额外放行别的跨源前端时才需要填。✅ **2026-09-21 已核对**：`DUMATE_MODEL` 原为「秘密」类型（值不可读、无法改类型），已删掉重建为「配置」，值 `glm-4-flash-250414`、只勾 Production；`ZHIPU_API_KEY` 保持秘密。 |
 | 3 | ~~入口修复进主干后点 Redeploy~~ | — | ✅ **已完成**（2026-09-21）：修复（`ec1ce27`）推上主干后 Vercel 自己建了生产部署，**状态 success**，不用手点。 |
 | 4 | ~~复跑探针确认阻断解除~~ | **【我】** | ✅ **已完成**：`scripts/api-prod-probe.py` **退出码 0** —— 静态 = HEAD、`/api/health` = **200**、其余接口都是应用在应答（415 / 428 / 404 带 `no-store`）。 |
 | 5 | ~~取 Functions 列表与 Build Logs~~ | — | ✅ **不需要了**（定案靠本地隔离 import 对照，没用到平台日志）。保留此行的理由：万一以后又出现同类症状，这是最后一条后备取证手段。 |
@@ -141,7 +141,7 @@ GitHub Deployments API 显示 **`0242a89` 的 Production 部署 = success**（`g
 
 ---
 
-## 一之二、**当前阻断项**：生产真模型链路是坏的（2026-09-21 实测）
+## 一之二、原阻断项（**2026-09-21 晚 Redeploy 后已解除**）：生产真模型链路是坏的
 
 **症状**：生产上用户提交简历后能拿到一份诊断，`score_R` 有值、五个子分数齐全、
 **HTTP 200** —— 但里面**没有一个字来自模型**，全是规则打分。
@@ -201,6 +201,36 @@ diagnose: HTTP 200，耗时 51573 ms
 且打印 `diagnosis_mode = 'model'`。
 ⚠️ 注意 `python scripts/api-prod-probe.py` **看不出这件事** —— 它判的是静态与路由。
 两份判据都过，才算两条路都通。
+
+**实测结果（2026-09-21 晚，控制台改值 + Redeploy 之后，连测两次）**：
+
+```
+health: model_configured=True database=postgres
+diagnose: HTTP 200，耗时 22983 / 23129 ms（两次）
+  diagnosis_mode   = 'model'          ← 硬门通过
+  score_R          = 83.5
+  model_trace_id   = 1789991162579_1s285iki
+  diagnosis_notice = (空)              ← 没有任何降级提示
+  subscores        = {"achievement_evidence": 80, "ats_readability": 90,
+                      "clarity": 85, "skill_evidence": 75, "structure": 90}
+```
+
+**这一段里踩到的第二个坑，比模型名本身更值钱**：**环境变量改完不等于生效。**
+在控制台把 `DUMATE_MODEL` 改成正确值并保存之后，复测**仍然是红的**
+（`rule_fallback`，51,858 ms，与此前 51,573 / 51,930 几无差别）——
+因为 **Vercel 的环境变量是“按部署绑定”的**：值改了，**正在跑的那个部署里的快照不会变**，
+必须**重新部署**（Redeploy，或推一个新提交）才生效。
+
+判“线上跑的到底是哪个构建”可以用**本次新增的响应字段**当版本探针
+（这轮用的是 `/api/health` 的 `model_ready`）：它比逐个比对静态文件快，也不受 CDN 缓存影响。
+另一条经验：**手动 Redeploy 不会在 GitHub Deployments API 里留记录** ——
+我当时正是在等部署列表刷新，却什么也没等到，于是差点把“没生效”归因错。
+**真值是直接打线上接口，不是看平台的部署列表。**
+
+顺带一条事实：那个变量原来被建成了 **「秘密」类型**，而秘密类型**值是只写的**
+（界面恒显空值，且**不允许**把类型改回「配置」）。要换值只能**删掉重建**。
+模型名本来就不是密钥 —— 设成秘密除了让下次改不动、让自己查不到现值之外没有任何好处。
+这轮已删掉重建为「配置」类型，`ZHIPU_API_KEY` 保持秘密。
 
 **本轮顺手补的观察面空洞**：`/api/health` 的 `model_configured` 只报"有没有
 `ZHIPU_API_KEY`"，而 `build_model_router()` 要求**key 与模型名都在**。
