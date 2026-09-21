@@ -110,8 +110,19 @@ POST   /api/wf03/jd             Origin=https://zimo66067-wq.github.io  code=403 
 单元层面 `tests/test_api_boundary.py::test_cors_builtin_pages_origin_survives_env_override`
 即是那个语义的反向控制（改回"替换"语义立刻变红）。
 
-**部署后你来确认这一步**：【你】把这次改动推上主干后，Vercel 会自动建生产部署；
-之后跑一次 `python scripts/api-prod-probe.py`，第 3 节三行都应是 `OK`。
+**部署后确认（已做完，2026-09-21 12:0x）**：这两笔改动推上主干（`404e656..0242a89`）后，
+GitHub Deployments API 显示 **`0242a89` 的 Production 部署 = success**（`github-pages` 同 SHA 也 success），
+随后 `python scripts/api-prod-probe.py` **退出码 0**，第 3 节三行全是 `OK`：
+
+```
+预检 OPTIONS /api/wf01/consent  Origin=https://zimo66067-wq.github.io  code=204  ACAO=它自己
+写操作 POST /api/wf03/jd        Origin=https://zimo66067-wq.github.io  code=428（不是 403）
+反向控制 同一路径                Origin=https://probe-hostile-origin.invalid  code=204  ACAO=(无)
+```
+
+⇒ **GitHub Pages 那条渠道现在真的能调 API 了**，而且没有变成"全放行"。日志留档：
+`work/probe-after-cors-fix.log`。**这一步不需要你做什么**（原来挂着的"要不要支持这个渠道"
+已由你在 2026-09-21 决定为"支持"，修法落到了代码里，不用动控制台）。
 
 **一个已知的非阻断现象**：`career-coach-<hash>-zimo66067.vercel.app` 这类**部署 URL** 会 302 到 Vercel 登录
 （Deployment Protection），但**生产别名**是公开可达的。所以"部署 URL 打不开"不等于线上不可用；

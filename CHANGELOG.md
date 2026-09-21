@@ -56,6 +56,11 @@ values = os.environ.get("DUMATE_ALLOWED_ORIGINS", PUBLIC_PAGES_ORIGIN)   # 覆�
   游客令牌签发在 `api/security.py`）。全部改成现在真正所在的位置。新判据带正/反两组探针
   与"少于 5 个引用即视为空判"的防线；边界写在该脚本文档字符串里：**只判"路径存在"，
   不判散文断言的正确性**（"那个常量在那个文件里"判不了，不假装有判据）。
+- **线上验收（2026-09-21，改动推上主干后）**：GitHub Deployments API 显示 `0242a89` 的
+  **Production 部署 = success**（`github-pages` 同 SHA 也 success）；
+  `scripts/api-prod-probe.py` **退出码 0** —— 静态三个探针 = HEAD、`/api/health` = 200、
+  预检 `ACAO=https://zimo66067-wq.github.io`、写操作 428（不再是 403）、
+  敌对源 `ACAO=(无)`。⇒ 那条渠道**真的能用了**，且没有变成"全放行"。
 - 语义变更同步到 `README.md`、`.env.example`、`docs/release-checklist.md`
   （§一末那条"真缺口"改为已修复，并写明**不需要动控制台**）与 `docs/product-scope.md`。
 - **踩到一次自家判据**：给 `scripts/env-example-check.py` 写的新 docstring 里出现了
