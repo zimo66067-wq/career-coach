@@ -1,0 +1,19 @@
+# 这个文件只做一件事：**显式声明 WSGI 入口**，不让 Vercel 去猜。
+#
+# 为什么必须显式声明（2026-09-21 实测）：
+# 本仓库有两个"名为 app 的 Flask 实例"可以当入口 ——
+#   * `api/app.py`   只建对象：`app = Flask(__name__)`，**零路由、零中间件**；
+#   * `api/index.py` 真入口：注册 50 条路由、装 HTTP 层，`app` 是从 api.app
+#                    再导入的**同一个对象**（`api.app.app is api.index.app` 为 True）。
+# Vercel 的 Flask 预设是按**文件名**找入口的，候选名第一顺位就是 `app.py`。
+# 线上正在服务的正是 `api/app.py` 那个裸 app：任何路径都返回 Werkzeug 默认 404
+# （207 B、无 `Cache-Control: no-store`），而本地同一个 app 对
+# `/api?_route=health` 返回 200（591 B）。静态资源是最新的、CI 全绿，
+# 所以只有"接口全 404"这一个症状，很难指到入口这一层。
+#
+# `tool.vercel.entrypoint` 是 Vercel 官方文档给出的显式入口声明方式
+# （Deploy a Flask app on Vercel / Using the Python Runtime）。
+# 注意它同时也是 `vercel.json` 里 `functions` 的 key —— 两处指向同一个文件，
+# 不是巧合，是"这就是被构建成单个 Function 的那个文件"。
+[tool.vercel]
+entrypoint = "api.index:app"
