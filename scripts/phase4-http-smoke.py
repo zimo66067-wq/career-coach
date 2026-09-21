@@ -88,6 +88,15 @@ def main():
     env.pop("ZHIPU_API_KEY", None)
     env.pop("MODEL_PROVIDER", None)
     env.pop("DATABASE_URL", None)
+    # 本地冒烟**不该依赖出口代理**。这些变量会被服务子进程继承，而无 key 的降级路径
+    # 仍会尝试一次外呼（`POST /api/target-jobs/<id>/analyse` 就卡在这里）。
+    # 沙箱/公司网络里的 `http_proxy` 对某些目标是**挂住不回**、而不是快速失败，
+    # 于是请求一直等到客户端 20s 超时 —— 表现为门禁第 8 步"无故变红"，
+    # 而同一份代码一个小时前还是绿的（2026-09-21 实测）。这是**冒烟环境**问题，
+    # 不是产品问题；清掉它们，冒烟才只反映仓库本身。
+    for name in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY",
+                 "all_proxy", "ALL_PROXY", "no_proxy", "NO_PROXY"):
+        env.pop(name, None)
 
     boot = (
         "import sys; sys.path.insert(0, %r);"

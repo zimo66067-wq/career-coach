@@ -6,9 +6,13 @@
 标注：**【你】** = 只有账号持有人能做的（控制台、凭据、真人、业务决策）；**【我】** = 仓库内可代做的。
 完成一条就把它的状态改成 ✅（附实测证据），不要凭印象勾。
 
+> **当前状态（2026-09-21）**：**线上主渠道已经通了** —— 生产 `/api/health` = 200，
+> 其余接口都由应用应答，静态资源与 HEAD 逐字节相同。§一记录的是那个阻断的根因与修法
+> （留着是因为下一次同类症状会以同样的样子出现）；**现在需要你做的都在 §一末与 §二、§三**。
+
 ---
 
-## 一、阻断项：现在的真实状态是"用户点进去走不通"
+## 一、原阻断项（2026-09-21 已解除）与根因记录
 
 判据不是"首页能不能打开"，而是 **`/api/*` 有没有被应用接住**。
 一条命令给出现状（它自己按前端字面量找探测源，不写死域名）：
@@ -63,10 +67,34 @@ setuptools 自动发现报 `Multiple top-level packages discovered`。本地可�
 |---|---|---|---|
 | 1 | 核对 Vercel 项目构建设置 | **【你】** | Settings → Build and Deployment：**Root Directory 留空**（= 仓库根 ✅ 已确认）、**Framework Preset 保持 `Flask`**、**Output Directory 留 `N/A`**（Flask 预设自己管静态根 —— 线上 `/capability_matrix.md` 正是从 `public/` 取的，说明它对）。**⚠️ 不要改成 `Other`**：那会切回"`api/` 下每个 `.py` 各自是函数"的约定，而本目录有 25 个 `.py`，其中 23 个不导出任何 handler。 |
 | 2 | 补齐生产环境变量 | **【你】** | Settings → Environment Variables（Production）：`ZHIPU_API_KEY`、`DUMATE_MODEL`、`DUMATE_CONSENT_SECRET`、`DATABASE_URL`、`APP_ENV=production`、`DUMATE_ALLOWED_ORIGINS`。缺 `DUMATE_CONSENT_SECRET` 会让同意令牌直接失败。 |
-| 3 | **入口修复进主干后点 Redeploy** | **【你】** | 顺序不能反：Redeploy 重建的是 GitHub 上**当前那个提交**，修复没推上去就白点。 |
-| 4 | 复跑探针确认阻断解除 | **【我】** | 期望 `OK GET /api/health code=200`，其余接口"已由应用应答"。**这套修法唯一的判据在线上 —— 仓库内全绿不能说明什么。** |
-| 5 | （**仅当**第 4 项仍 404 才需要）取 **Functions 列表** 与 **Build Logs** | **【你】** | Deployments → 最新 Production：Functions 里有没有 `api/index.py`、日志里 resolved entrypoint 是哪个文件。有这两样我能直接定案；第 4 项 OK 就跳过。 |
-| 6 | 端到端冒烟（F1→F5 真流程） | **【我】** | 仓库里已有 `scripts/run-wf-e2e.py`、`scripts/phase4-http-smoke.py`、`scripts/run-rehearsal.py`；接口通了以后对着生产域名跑一遍。 |
+| 3 | ~~入口修复进主干后点 Redeploy~~ | — | ✅ **已完成**（2026-09-21）：修复（`ec1ce27`）推上主干后 Vercel 自己建了生产部署，**状态 success**，不用手点。 |
+| 4 | ~~复跑探针确认阻断解除~~ | **【我】** | ✅ **已完成**：`scripts/api-prod-probe.py` **退出码 0** —— 静态 = HEAD、`/api/health` = **200**、其余接口都是应用在应答（415 / 428 / 404 带 `no-store`）。 |
+| 5 | ~~取 Functions 列表与 Build Logs~~ | — | ✅ **不需要了**（定案靠本地隔离 import 对照，没用到平台日志）。保留此行的理由：万一以后又出现同类症状，这是最后一条后备取证手段。 |
+| 6 | 端到端冒烟（F1→F5 真流程） | **【我】** | 仓库里已有 `scripts/run-wf-e2e.py`、`scripts/phase4-http-smoke.py`、`scripts/run-rehearsal.py`。⚠️ 注意 `phase4-http-smoke.py` 起的是**本地**端口、清掉了 `ZHIPU_API_KEY`，所以它验的是"路由与状态机"，**不是**"真模型能跑"（那要 P0-01/P0-03）。 |
+
+### 另一条渠道的真缺口：GitHub Pages 前端调不到 API（**【你】**，非阻断）
+
+生产域名**既是页面也是 API**，从它打开是**同源**、CORS 不参与 —— 所以主渠道完全可用。
+但仓库里还有一个**跨源**前端（GitHub Pages），而 `public/js/pages-api-config.js` 存在的
+唯一理由就是给那个非 Vercel 宿主的页面找 API 地址。2026-09-21 实测：
+
+```
+预检 OPTIONS /api/wf01/consent  Origin=https://zimo66067-wq.github.io  code=204  ACAO=(无)
+POST   /api/wf03/jd             Origin=https://zimo66067-wq.github.io  code=403  「请求来源未获授权」
+```
+
+⇒ 从 GitHub Pages 打开页面时，**浏览器会拦掉所有接口调用**，写操作还会被应用直接 403。
+
+**原因**：`api/http_layer.py:configured_origins()` 读 `DUMATE_ALLOWED_ORIGINS`，
+**未设置时默认就是那个 Pages 源**（`api/constants.py:PUBLIC_PAGES_ORIGIN`）。
+实测 Pages 源被拒 ⇒ 说明生产上**该变量已被设置、且不含 Pages 源**。
+
+**修法（一分钟）**：Vercel → Settings → Environment Variables（**Production**）→
+把 `DUMATE_ALLOWED_ORIGINS` 设为包含 `https://zimo66067-wq.github.io`（多个源用逗号分隔）
+→ 重新部署。判据：`scripts/api-prod-probe.py` 第 3 节从"未放行"变成 `OK`。
+
+**要不要做由你定**：如果对外只发 omega-three 那一个链接，这个源可以不列（那就明确
+"不使用 Pages 渠道"）；如果要让 Pages 那个链接也能用，就必须列出。**两者都不是默认即可**。
 
 **一个已知的非阻断现象**：`career-coach-<hash>-zimo66067.vercel.app` 这类**部署 URL** 会 302 到 Vercel 登录
 （Deployment Protection），但**生产别名**是公开可达的。所以"部署 URL 打不开"不等于线上不可用；

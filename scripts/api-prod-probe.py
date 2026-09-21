@@ -9,10 +9,15 @@
 * `scripts/p0-05-link-check.py` 只判链接**可达**，不判接口**可用**。
 * `scripts/phase4-http-smoke.py` 起的是**本地**端口，不是生产域名。
 
-三者可以同时全绿，而真实用户点进去一个流程都走不通。2026-09-20 就是这个状态：
-线上静态资源是最新的、CI 全绿，但 `/api/*` 的**每一个**路径都返回同一个 404
-（连 `/api/handlers/health` 这种「函数只要构建了就一定存在的路径」也是）——
-说明那次部署**一个 Serverless Function 都没有**，线上只有静态文件。
+三者可以同时全绿，而真实用户点进去一个流程都走不通。2026-09-20~21 就是这个状态：
+线上静态资源是最新的、CI 全绿，但 `/api/*` 的**每一个**路径都返回同一个
+**Werkzeug 默认 404**（207 B、不带应用无条件设置的 `Cache-Control: no-store`）。
+
+真因（2026-09-21 由本地隔离 import 复现定案）：平台的 **Flask 预设按文件名挑入口**
+（`app.py` / `index.py` / `server.py` / `main.py` / `wsgi.py` / `asgi.py`），
+而仓库里有一个**只建 Flask 对象、不注册路由**的叶子模块名叫 `app.py` ——
+平台 import 的就是它，于是任何路径都是默认 404。
+修法见 `docs/release-checklist.md`；本地判据是 `scripts/entrypoint-resolution-check.py`。
 
 三个判据（都是"线上 ≠ 本地"才能看见的）：
 
@@ -22,10 +27,20 @@
 2. **静态新鲜度**：取最近一次改动 `public/` 的提交里**真的变过**的文件，比线上字节与
    `git cat-file -s HEAD:<path>`（**不是** `wc -c` —— 工作树含 CRLF，会虚高）。
    线上等于 HEAD 才能说"线上是当前版本"，否则连版本都不对，谈接口没意义。
-3. **响应是谁产生的**：本应用对**每一个**响应都加 `Cache-Control: no-store`
-   （`api/http_layer.py` 的 `after_request`）与 JSON 错误体。所以
-   「不带 `no-store` + HTML 404」= 这个响应不是本应用产生的。
-   把业务接口的响应与"绝对不存在的路径"的响应逐字节比一次，这条就有实证。
+3. **响应是谁产生的**：本应用装好 HTTP 层之后会对**每一个**响应都加
+   `Cache-Control: no-store`（`api/http_layer.py` 的 `after_request`）。
+   于是**"带不带 no-store"直接区分了"是谁在回答"**：
+   · 带上 → 路由已注册、HTTP 层已挂载，是**本应用**在回答；
+   · 不带 → 是平台或一个**没注册路由的裸 app** 在回答。
+   （这条判据的来历见 `docs/release-checklist.md`：坏的那一刻，线上每个响应都缺它。）
+   对照组 `/__probe_definitely_missing__` 用来给"平台/裸 app 的 404 长什么样"定标 ——
+   注意应用是 catch-all 时**它也会带 no-store**，那是正常形态，见下。
+
+4. **跨源渠道能不能用**：生产域名既是前端也是 API，从它打开页面是**同源**；
+   但仓库里还有一个跨源前端（GitHub Pages）。那个源能不能调到 API，只取决于平台上的
+   `DUMATE_ALLOWED_ORIGINS` —— **仓库里看不出来**，只有探线上才知道。
+   这一条刻意记为**警告**而不是硬门（同源是主渠道且可用，不让次要渠道淹没主结论），
+   但它是**真缺口**，不是"已决定不做"。
 
 判据的严格程度分两档（刻意不同）：
 
@@ -58,14 +73,21 @@ LITERAL_SOURCES = ("public/js/pages-api-config.js", "public/js/account.js")
 
 _LITERAL_RE = re.compile(r"https://[A-Za-z0-9.-]+\.vercel\.app")
 
+#: GitHub Pages 那个**跨源**前端的地址。同样不写死值，只写死"去哪读"：
+#: 它是 `api/constants.py` 里 `PUBLIC_PAGES_ORIGIN` 的字面量，也是 `DUMATE_ALLOWED_ORIGINS`
+#: 未设置时 `api/http_layer.py` 用的默认值。
+PAGES_ORIGIN_SOURCE = "api/constants.py"
+_PAGES_ORIGIN_RE = re.compile(r'PUBLIC_PAGES_ORIGIN\s*=\s*"(https://[^"]+)"')
+
 #: 业务接口探针。第一条是硬门（必须 200）；其余只要求"是应用回的"。
 API_PROBES = (
     ("GET", "/api/health", True),
     ("POST", "/api/wf01/consent", False),
     ("POST", "/api/wf03/jd", False),
     ("GET", "/api/profile", False),
-    # 只要函数构建了，这个路径必然存在（api/handlers/health.py → /api/handlers/health）。
-    # 它 404 就等于"线上一个函数都没有"，与"路由映射写错了"是两种不同的病。
+    # 一条"任何架构下都该由应用回答"的路径。它 404 是正常的（没有这条路由），
+    # 但**必须带 no-store** —— 不带就说明回答者不是本应用。它与硬门的区别：
+    # 硬门查"路由通不通"，它查"回答者是谁"。
     ("GET", "/api/handlers/health", False),
 )
 
@@ -80,9 +102,9 @@ def _opener():
     return urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
-def _fetch(opener, url, method="GET", timeout=30):
+def _fetch(opener, url, method="GET", timeout=30, extra_headers=None):
     """返回 (状态码, 响应体, 响应头小写 dict)；网络层失败返回 (None, 异常串, {})。"""
-    request = urllib.request.Request(url, method=method)
+    request = urllib.request.Request(url, method=method, headers=extra_headers or {})
     try:
         with opener.open(request, timeout=timeout) as response:
             body = response.read()
@@ -182,14 +204,19 @@ def check_api(opener, origin, failures):
     control_no_store = "no-store" in control_headers.get("cache-control", "")
     print("  对照（应 404）%-34s code=%s md5=%s no-store=%s"
           % (CONTROL_PATH, control_status, control_digest[:12], control_no_store))
+    # 对照组带不带 no-store，决定"谁是回答者"这条判据怎么用 —— 两种都是可能出现的情形，
+    # 不把任何一种当成异常：
+    #   · 带 → 应用是 catch-all（框架预设的正常形态：任意路径都送进 Flask）。
+    #         此时"与对照逐字节相同"只说明"两个都进了应用"，不再能说明"没被路由接住"。
+    #   · 不带 → 平台自己回了对照路径。此时"与对照逐字节相同 + 缺 no-store"就是
+    #         "这个接口没被应用接住"的实证。
     if control_no_store:
-        failures.append(
-            "对照组 %s 竟然带了 no-store —— 说明有 catch-all 路由把任意路径都送进了应用；"
-            "这时『与对照 404 相同』不再能证明接口没被接住，本探针的判据失效。"
-            % CONTROL_PATH)
+        print("        应用是 catch-all（正常形态）⇒ 逐字节比对不作判据，改用 no-store 判回答者。")
+    else:
+        print("        平台自己回了对照路径 ⇒ 逐字节比对 + 缺 no-store 可判『没被应用接住』。")
     print()
 
-    static_404 = []
+    unrouted = []
     for method, path, hard_gate in API_PROBES:
         status, body, headers = _fetch(opener, origin + path, method=method)
         if status is None:
@@ -199,18 +226,21 @@ def check_api(opener, origin, failures):
         digest = hashlib.md5(body).hexdigest()
         no_store = "no-store" in headers.get("cache-control", "")
         flags = []
-        served_by_app = True
-        if digest == control_digest:
-            flags.append("与对照 404 逐字节相同")
-            served_by_app = False
-        if not no_store:
-            # 应用无条件设 no-store；没有它 => 这个响应不是本应用产生的
-            flags.append("响应缺 no-store（非本应用产生）")
-            served_by_app = False
+        # 谁在回答：应用只要装载了 HTTP 层，就必然给每个响应加 no-store。
+        served_by_app = no_store or status == 200
+        if not served_by_app:
+            flags.append("响应缺 no-store（回答者不是本应用）")
+        # 只有在"平台回了对照路径"这一种情形下，逐字节相同才是有效证据。
+        if not control_no_store and digest == control_digest:
+            flags.append("与对照 404 逐字节相同（未被路由接住）")
         if hard_gate and status != 200:
             flags.append("硬门未过（要求 200）")
+            # 硬门必须**真的**记进 failures。只打个 `!! ` 是不够的 ——
+            # 那样 `/api/health` 回 500 时，全部 flags 里没有一条"不算失败"，
+            # 行标是 `!! `，但退出码仍是 0：一个"看得见红、判成绿"的洞。
+            failures.append("硬门 %s %s 返回 %s（要求 200）" % (method, path, status))
         if not served_by_app:
-            static_404.append(path)
+            unrouted.append(path)
         elif not hard_gate:
             flags.append("已由应用应答（非 200 不算失败）")
         mark = "OK " if not flags or all("不算失败" in f for f in flags) else "!! "
@@ -218,16 +248,74 @@ def check_api(opener, origin, failures):
               % (mark, method, path, status, digest[:12], "；".join(flags)))
 
     print()
-    if static_404:
+    if unrouted:
         failures.append(
-            "%d 个路径返回的都是同一份静态 404（连 `/api/handlers/health` 也在内）⇒ 那次部署"
-            "**没有构建出任何 Serverless Function**，线上只有静态文件。"
-            "去 Vercel 看该次部署的 Functions 列表与构建日志；重点核对 Project Settings 里的"
-            "**Root Directory / Output Directory / Framework Preset** —— 函数没被构建时，"
-            "`vercel.json` 里那些 `/api/xxx -> /api?_route=xxx` 重写全部落空，"
-            "而静态资源照样是最新的，所以 CI 与『站点可达性』都会给你绿灯。"
-            % len(static_404))
+            "%d 个路径的回答者不是应用（响应缺 no-store）⇒ 线上被服务的是一个"
+            "**没有注册路由、也没挂载 HTTP 层**的 app。本项目实测过这种病：平台的 Flask 预设"
+            "**按文件名挑入口**（`app.py`/`index.py`/`server.py`/`main.py`/`wsgi.py`/`asgi.py`），"
+            "而仓库里有个只建对象、不注册路由的叶子模块恰好叫 `app.py`。"
+            "本地判据 `scripts/entrypoint-resolution-check.py` 逐个候选入口复算这件事，"
+            "先跑它；修法见 `docs/release-checklist.md`。" % len(unrouted))
     return True
+
+
+def pages_origin():
+    """返回仓库里声明的那个**跨源**前端地址（GitHub Pages），读不到返回 None。"""
+    path = REPO_ROOT / PAGES_ORIGIN_SOURCE
+    if not path.exists():
+        return None
+    match = _PAGES_ORIGIN_RE.search(path.read_text(encoding="utf-8"))
+    return match.group(1) if match else None
+
+
+def check_cross_origin(opener, origin, origin_reported, warnings, failures):
+    """跨源渠道能不能用 —— 这条与"同一个源"是两件事，必须分开看。
+
+    生产域名既是前端也是 API，所以从它打开页面是**同源**，CORS 不参与。
+    但仓库里还有一个跨源前端（GitHub Pages，`public/js/pages-api-config.js` 就是为它写的）。
+    从那个源打开页面时：
+      · 预检应答若无 `Access-Control-Allow-Origin` ⇒ 浏览器会拦掉**所有**接口调用；
+      · `api/http_layer.py:reject_cross_site_writes()` 还会让**写操作回 403**
+        （"请求来源未获授权"）。
+    两件事都只取决于平台上的 `DUMATE_ALLOWED_ORIGINS`，**仓库里看不出来**，
+    所以只有探线上才能发现。2026-09-21 实测：生产确实**没有**放行这个源。
+
+    **刻意记为警告而不是硬门**：同源入口是主渠道且完全可用，跨源是副渠道；
+    把它当硬门会让"主渠道通了"这件事被一个次要渠道的配置问题淹没。
+    但它是**真实缺口**，不是"已决定不做" —— 决定权在 `docs/release-checklist.md` 里挂着。
+    """
+    print("== 3. 跨源渠道（GitHub Pages 前端能不能调到 API）==")
+    if not origin_reported:
+        print("  跳过：读不到 %s 里的 PUBLIC_PAGES_ORIGIN" % PAGES_ORIGIN_SOURCE)
+        print()
+        return
+    status, _, headers = _fetch(
+        opener, origin + "/api/wf01/consent", method="OPTIONS",
+        extra_headers={
+            "Origin": origin_reported,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        })
+    if status is None:
+        print("  取不到（%s）" % headers)
+        print()
+        return
+    allow = headers.get("access-control-allow-origin", "")
+    print("  预检 OPTIONS /api/wf01/consent  Origin=%s  code=%s  ACAO=%s"
+          % (origin_reported, status, allow or "(无)"))
+    if allow:
+        print("  OK 该源被放行：从 GitHub Pages 打开时浏览器会允许接口调用。")
+    else:
+        print("  !! 该源**未**被放行 —— 从 GitHub Pages 打开时浏览器会拦掉所有接口调用，")
+        print("     写操作还会被应用以 403「请求来源未获授权」直接拒掉。")
+        print("     原因只能是平台上的 `DUMATE_ALLOWED_ORIGINS`（生产默认值是仓库里那个 Pages 源，")
+        print("     实测却不是它 ⇒ 该变量已被设置且**不含** Pages 源）。")
+        print("     修法：Vercel → Settings → Environment Variables（Production）把它设为包含")
+        print("     `%s`（多个源用逗号分隔），然后重新部署。见 docs/release-checklist.md。" % origin_reported)
+        warnings.append(
+            "跨源前端 %s 未被放行（预检无 ACAO）—— GitHub Pages 那条渠道的接口调用会被浏览器拦掉。"
+            % origin_reported)
+    print()
 
 
 def main():
@@ -261,6 +349,7 @@ def main():
 
     opener = _opener()
     failures = []
+    warnings = []
 
     if not args.skip_freshness:
         check_freshness(opener, origin, freshness_probes(), failures)
@@ -270,12 +359,18 @@ def main():
         print("网络不可用，本次不给出产品结论。")
         return 2
 
+    check_cross_origin(opener, origin, pages_origin(), warnings, failures)
+
     print("== 结论 ==")
+    for item in warnings:
+        print("  警告（不影响主渠道，但它是真缺口）：%s" % item)
     if failures:
         for item in failures:
             print("  阻断：%s" % item)
         return 1
     print("  线上静态 = HEAD，业务接口都已被应用接住（/api/health = 200）。")
+    if warnings:
+        print("  同源入口可用；上面那条警告说的是另一个渠道（见 docs/release-checklist.md）。")
     return 0
 
 

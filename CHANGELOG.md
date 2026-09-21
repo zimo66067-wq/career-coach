@@ -4,6 +4,61 @@
 
 ## [Unreleased]
 
+### Fixed - 2026-09-21 线上每个接口都 404：平台自己挑错了入口
+
+> 提交：`9b86eb8`（补判据的观察面，4 文件）+ `3b497d5`（第一次修法，4 文件）
+> + `ec1ce27`（定案与根治，16 文件）+ 本条所在的提交（判据检修，含 `scripts/api-prod-probe.py`
+> 与 `scripts/phase4-http-smoke.py`）。
+> 相对 `46411ae`、**截至 `ec1ce27`** 合计 **18 文件 / +773 −39**。
+> （不含本条与回填自身的几行 —— 声明的是"截至哪个提交"，不是"本阶段总计"。）
+> 门禁：`work/gate8.sh` 扩到 **18 步（0~17）**。
+
+线上静态资源是最新的、CI 全绿、首页 200，而 `/api/*` 的**每一个**路径都返回
+同一份 **Werkzeug 默认 404**（207 B、不带应用无条件设置的 `Cache-Control: no-store`）。
+
+**根因**：平台的 Flask 预设**按文件名**挑 WSGI 入口（`app.py` / `index.py` / `server.py` /
+`main.py` / `wsgi.py` / `asgi.py`；根目录优先，实测 `api/` 也会被搜到），而 `api/` 下有个
+名叫 `app.py` 的**叶子模块** —— Phase 7c 为消除循环 import 把 app 对象下沉成的，
+只 `Flask(__name__)`、不注册任何路由。平台 import 的就是它。
+定案靠**本地隔离 import 对照**：只 import 那个叶子模块时，`/api/health` 返回的响应与线上
+**逐字节相同**（404 / 207 B / md5 全等 / 无 `no-store`）；import 真入口时同一路径是
+**200 / 591 B / 带 `no-store`**。`api.app.app is api.index.app` 为 True **不构成反证** ——
+平台只 import 入口那一个模块，"import 它时有没有顺带注册路由"才是决定线上行为的那件事。
+
+- 修法一（`3b497d5`，**失败并已撤回**）：按文档用 `pyproject.toml` 的
+  `[tool.vercel] entrypoint` 显式声明入口。它确实能声明入口，但
+  **`pyproject.toml` 一存在就改变了依赖来源**，平台改以本仓库为 Python 项目安装；
+  本仓库是 flat layout、多个顶层包，setuptools 报 `Multiple top-level packages discovered`
+  ⇒ **构建直接失败**（部署 `dpl_5C4T1VTqfAibMjrHDXetHndVJcnd`）。
+  本地 30 秒可复现：`python -m pip install --dry-run --no-deps .`
+- 修法二（`ec1ce27`，成功）：**让每个候选入口都正确**，不赌解析顺序 ——
+  `api/app.py` → `api/app_instance.py`（8 处 import 跟着改，错的名字从此不在候选名单里），
+  外加根目录 `app.py` 导出同一个 app。两个候选指向同一个带路由的 app，
+  于是**顺序无论怎么变，线上行为都一样**。`pyproject.toml` 与 `installCommand` 一并撤掉。
+- **新增 `scripts/entrypoint-resolution-check.py`（门禁第 17 步）**：对每个候选入口
+  **在全新子进程里** import，要求"规则数 > 1 且 `/api/health` = 200"。
+  这类 bug 之前**没有任何判据看得见** —— `tests/` 与 `scripts/` 全都显式
+  `from api.index import app`，走的是直连路径。两个必须做对的点：**每个候选必须起新子进程**
+  （本进程 import 过一次真入口，路由就注册到同一批 app 对象上，判据会绿着失效）；
+  **必须带反向控制**（同一段测量代码要能把裸 app 判成无路由），否则分不清"没抓到"与"没能力抓"。
+- `scripts/api-prod-probe.py` 三处：判据改为**分两种形态**（对照组带 `no-store`
+  ⇒ 应用是 catch-all，框架预设的正常形态，逐字节比对不作判据，改用"响应带不带
+  `no-store`"判回答者）；新增**第 3 节跨源渠道**检查；修掉它自己的一个真漏洞 ——
+  硬门（`/api/health` 必须 200）失败时只打印 `!! ` 而**不记进 failures**，
+  即 `/api/health` 回 500 时行标是红的、**退出码却是 0**。
+- `scripts/phase4-http-smoke.py`：从服务子进程的 env 里清掉 `*_proxy`。无 key 的降级路径
+  仍会尝试一次外呼，而沙箱/公司网络的代理对某些目标是**挂住不回**（不是快速失败），
+  于是请求等到 20s 超时 —— 表现为**门禁第 8 步无故变红**，同一份代码一小时前还是绿的。
+  这是冒烟**环境**问题，不是产品问题。
+- 线上验收（探针退出码 0）：静态 = HEAD；`/api/health` = 200；`/api/wf01/consent` 415、
+  `/api/wf03/jd` 428、`/api/profile` 428 —— 都是**应用在应答**。
+  `/api/health` 自报 `database=postgres`、3 条迁移全 applied、`model_configured=true`、
+  10 个工作流 available。7 个页面 + `css/main.css` 与 HEAD blob **逐字节相同**。
+- **同时发现一个非阻断的真缺口**：GitHub Pages 那条跨源渠道**未被放行**
+  （预检无 `Access-Control-Allow-Origin`，写操作回 403），因为生产上的
+  `DUMATE_ALLOWED_ORIGINS` 不含该源。主渠道（同源）不受影响；修法与决策见
+  `docs/release-checklist.md`。
+
 ### Changed - 2026-09-20 观察面扩面与死链归零（Phase 8）
 
 > 提交：`5d6b27d`（判据改造 + 死链归零，32 文件）+ `2e17c02`（报告与决策记录，4 文件）。
