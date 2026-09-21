@@ -30,7 +30,7 @@ from domain.optimizer import rewrite_suggestion
 from providers import model as model_provider
 from api.trace import trace_id
 
-from api.app import app
+from api.app_instance import app
 from api.http_layer import api_response, require_json_object
 from api.security import enforce_usage, ensure_session_access, require_consent
 from api.sentinel import UNHANDLED

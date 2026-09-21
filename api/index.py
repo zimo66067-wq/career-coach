@@ -32,7 +32,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from flask import request  # noqa: E402
 
-from api.app import app  # noqa: E402
+from api.app_instance import app  # noqa: E402
 from api.dispatch import dispatch  # noqa: E402
 from api.http_layer import register_http_layer  # noqa: E402
 from api.routing import handle_options, request_route  # noqa: E402

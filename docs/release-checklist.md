@@ -20,19 +20,44 @@
 2026-09-20 实测：线上静态资源 = HEAD（3 个新鲜度探针全 OK），
 但 `/api/*` 的**每一个**路径都返回同一个 404，且不带应用无条件设置的 `Cache-Control: no-store`。
 
-**2026-09-21 定案**（同一条里原先写的"没有构建出任何 Serverless Function"**是错的**，已改）：
-线上返回的是 **Werkzeug 的默认 404**（207 B）；而同一个 app 在**本地**对同一路径返回
-105 B、带 `Cache-Control: no-store`、且 `/api?_route=health` 是 **200**。
-⇒ **线上被服务的是另一个 app 对象** —— 既不是"路由写错了"，也不是"没构建函数"。
+### 根因（2026-09-21 由**本地复现**定案，不是推断）
 
-根因：**Vercel 的 Flask 预设按文件名挑入口**，候选名第一顺位就是 `app.py`，
-而本仓库有一个 `api/app.py` —— 那是 Phase 7c 为消除循环 import 把 app 对象下沉成的
-**叶子模块**（只 `Flask(__name__)`，不注册任何路由）。预设只 import 了这个叶子模块，
-于是**任何路径**都是默认 404。静态资源与输出根不受影响 ⇒ CI 全绿、首页 200、
-只有接口全 404，仓库内所有判据都看不见。
+线上返回的是 **Werkzeug 默认 404**（207 B、md5 `e46c4e5e1fbc`）。
+在本地，**只 import `api/app_instance.py`**（当时叫 `api/app.py`）时，
+`/api/health` 返回的正是 **404 / 207 B / md5 `e46c4e5e1fbc` / 无 `no-store`** —— 与线上逐字节相同；
+而 **import `api/index.py`** 时同一路径返回 **200 / 591 B / 带 `no-store`**。
 
-修法**在仓库里**（不需要改预设）：`pyproject.toml` 的 `[tool.vercel] entrypoint = "api.index:app"`
-显式声明入口，外加根目录 `app.py` 把同一个对象再绑定一次以覆盖"按文件名解析"那条路径。
+⇒ **Vercel 的 Flask 预设按文件名挑入口**（文档给的候选名：`app.py` / `index.py` / `server.py` /
+`main.py` / `wsgi.py` / `asgi.py`，位置是仓库根，以及 `src/`、`app/`；实测 `api/` 也会被搜到），
+而 `app.py` 排第一顺位。仓库里当时恰好有一个 `api/app.py`（现已改名）—— 那是 Phase 7c 为消除循环 import 把
+app 对象下沉成的**叶子模块**（只 `Flask(__name__)`，不注册任何路由）。预设 import 的就是它。
+
+一个**看起来像反证、其实不是**的点：`api.app_instance.app is api.index.app` 为真。
+平台只 import 入口那一个模块，**是不是同一个对象无所谓**，"import 它的时候有没有顺带把路由注册上去"才决定线上行为。
+
+### 修法（都在仓库里，不需要改预设）
+
+1. **把原来是 `api/app.py` 的叶子模块改名 `api/app_instance.py`**（旧路径已修，勿再引用）—— 把错的候选名从名单里拿掉。改名后 `api/` 下
+   与入口有关的候选只剩 `index.py`（正确的那个），**解析顺序不再是变量**。
+2. **根目录 `app.py`** —— 把**同一个** app 对象绑定在根目录的候选名上。文档说根目录优先，
+   所以这是"第一顺位"的那条路径；即使顺序与文档不符，第 1 条也已经兜住了。
+3. **新增 `scripts/entrypoint-resolution-check.py`** —— 逐个候选名在**全新子进程**里 import，
+   要求每个都解析出"规则数 > 1 且 `/api/health` = 200"。**这是唯一能在本地抓住这类 bug 的判据**：
+   `tests/` 全都显式 `from api.index import app`，走的直连路径，从来看不见"按文件名会解析到谁"。
+
+### 一次失败的尝试（别再走一遍）
+
+先试的是 `pyproject.toml` + `[tool.vercel] entrypoint = "api.index:app"`（这是官方文档给的
+另一个显式声明方式）。**结果构建直接失败**（部署 `dpl_5C4T1VTqfAibMjrHDXetHndVJcnd`）：
+**`pyproject.toml` 一存在，平台就改用它作为依赖来源**，以本仓库为 Python 项目去安装；
+而本仓库是 flat layout、有多个顶层包（`api`/`domain`/`providers`/`repositories`/`services` …），
+setuptools 自动发现报 `Multiple top-level packages discovered`。本地可复现：
+
+```bash
+.venv-audit/Scripts/python.exe -m pip install --dry-run --no-deps .
+```
+
+所以 `pyproject.toml` **已被删除**，依赖仍走 `requirements.txt`；入口用"文件名"这条路径声明。
 
 | # | 事项 | 谁 | 怎么做 / 判据 |
 |---|---|---|---|
@@ -82,4 +107,7 @@
 | `scripts/api-prod-probe.py` | 只有它同时看「线上静态是否 = HEAD」与「接口是否真的被应用接住」。原有的 `scripts/vercel-dead-routes.py` 只看配置、`scripts/p0-05-link-check.py` 只判链接可达、`scripts/phase4-http-smoke.py` 打的是本地端口 —— 三者可以全绿而线上一个流程都走不通。探测源从 `public/js/pages-api-config.js` 的字面量推导，避免此处再抄一份会漂移的域名。 |
 | `scripts/vercel-dead-routes.py`（新增方向 B） | 原来只判「重写 → 处理分支」。新增「本地路由 → 重写覆盖」：`api/index.py` 里新增一条 `/api/xxx` 却忘了在 `vercel.json` 加 `source` 时，本地全绿、线上静态 404。判据自带反向控制探针（抽掉一条重写必须变红），防止它"绿着失效"。 |
 | `docs/release-checklist.md`（本文） | 把"还差什么"从散落的对话与报告里收成一份带责任人的台账，并登记进 `contracts/living-docs.json` 的观察面。 |
-| `pyproject.toml` + 根目录 `app.py` | 显式声明 WSGI 入口（`[tool.vercel] entrypoint = "api.index:app"`），并在根目录把**同一个对象**再绑定一次，覆盖平台"按文件名解析入口"那条路径 —— 不让目录里一个同名叶子模块决定线上跑哪个 app。配套在 `vercel.json` 写死 `installCommand`（`pyproject.toml` 可能改变依赖来源）。**刻意不写 `buildCommand`**：它会覆盖框架自身的构建。 |
+| `scripts/entrypoint-resolution-check.py` | **唯一能看见"平台会解析到哪个入口"的判据**。它对每个候选入口名在**全新子进程**里 import，要求都能得到"带路由的 app"。缺了它，`tests/`（全都显式 import `api.index`）与 CI 可以全绿，而线上跑的是另一个模块。自带反向控制：同一段测量代码必须能把裸 app 判成无路由、把带路由 app 判成有路由，否则报红。 |
+| `api/app_instance.py`（原来的 `api/app.py` 已修，此为其新名） | 把"错的候选名"从 Vercel 的入口名单里彻底拿掉。名字从此是**部署契约的一部分**，模块注释里写明了原因与实测指纹。 |
+| 根目录 `app.py` | 把**同一个** app 对象绑定在根目录的候选名上（文档说根目录优先）。它与 `api/index.py` 两个候选指向同一个带路由的 app —— 于是**解析顺序无论怎么变，结果都一样**。 |
+| `pyproject.toml`（**已删除，勿再加**） | 曾用它声明 `[tool.vercel] entrypoint`，会让平台改以本仓库为 Python 项目安装依赖 ⇒ flat layout 下 setuptools 报错 ⇒ **构建失败**。见上文"一次失败的尝试"。 |

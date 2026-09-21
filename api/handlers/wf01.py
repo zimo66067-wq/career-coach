@@ -18,7 +18,7 @@ from repositories.database import save_resume
 from domain.deidentify import deidentify
 from api.trace import trace_id
 
-from api.app import app
+from api.app_instance import app
 from api.http_layer import api_response
 from api.security import (
     _client_rate_key,

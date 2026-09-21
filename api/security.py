@@ -37,7 +37,7 @@ from repositories.database import (
     transfer_owner_data,
 )
 
-from api.app import app
+from api.app_instance import app
 from api.constants import (
     CONSENT_TOKEN_SALT,
     DEFAULT_CONSENT_MAX_AGE_SECONDS,

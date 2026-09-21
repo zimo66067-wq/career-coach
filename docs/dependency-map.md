@@ -145,10 +145,15 @@ api/index.py
 ```
 
 > **Phase 7c 后**：上图是 Phase 0 快照，`api/index.py` 这一个节点现已摊成 24 个模块
-> （`api/app.py`、`api/routing.py`、`api/dispatch.py`、`api/handlers/*` …）。
+> （`api/app_instance.py`、`api/routing.py`、`api/dispatch.py`、`api/handlers/*` …）。
 > **箭头集合一字未变** —— 分支体是逐行搬的，`work/verify-verbatim.py` 证明 831 个非空行
 > 两边逐行相等含重数。图中两处 `✗ … (§3.1 违规)` 已于 Phase 5 修掉，保留原文以见历史。
 > 现状见文件头「Phase 7c 更新」。
+>
+> 上句里的 `api/app_instance.py` 原名 `api/app.py`，2026-09-21 改名 —— 原因不是分层，
+> 是**部署契约**：`app.py` 是 Vercel Flask 预设的入口候选名第一顺位，而它只建 app 对象、
+> 不注册路由，平台按文件名解析到它就把一个"零路由的 app"推上了生产。
+> 详见 `api/app_instance.py` 的模块注释与 `docs/release-checklist.md`。
 
 ### 2.2 `tools/` 内部
 

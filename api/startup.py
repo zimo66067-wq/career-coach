@@ -21,7 +21,7 @@
 `tests/test_migrations.py` 会把它重置为 `None` 再调 `migration_status()`，验证"失败照实
 上报、不假装 ok、不被重试掩盖"。所以它不能挪进函数局部或变成只读常量。
 """
-from api.app import app
+from api.app_instance import app
 
 # ---- Phase 2：领域收敛迁移 ----------------------------------------------------
 # 建表本身是加法（CREATE TABLE IF NOT EXISTS），但"历史数据要落到新模型"必须显式迁移。

@@ -17,7 +17,7 @@ from flask import request
 from domain.internal.api_errors import ApiError
 from repositories.database import delete_session_data
 
-from api.app import app
+from api.app_instance import app
 from api.http_layer import api_response
 from api.security import _task_owner_key, ensure_session_access, require_consent
 from api.sentinel import UNHANDLED

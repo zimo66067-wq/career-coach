@@ -33,7 +33,7 @@ from services.target_job_service import TargetJobError
 from domain.internal.api_errors import ApiError
 from api.trace import trace_id
 
-from api.app import app
+from api.app_instance import app
 from api.constants import PUBLIC_PAGES_ORIGIN
 
 
