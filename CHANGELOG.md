@@ -4,6 +4,50 @@
 
 ## [Unreleased]
 
+### Fixed - 2026-09-21 生产上"每次诊断都没走模型"，而接口仍旧返回 200
+
+> 提交：`56b411c`（就绪判据 + 文档默认值 + P0-03 产物，7 文件）+ `<docs-sha>`（台账与本条）。
+> 相对 `c23c7de`、**截至 `56b411c`** 合计 **7 文件 / +162 −7**。
+> （不含本条与回填自身的几行 —— 声明的是"截至哪个提交"，不是"本阶段总计"。）
+> 门禁：`work/gate8.sh` **18 步（0~17）全部 PASS，退出码 0** —— 步数与判据条数均未变。
+
+**症状**：生产 `POST /api/wf02/diagnose` 返回 **HTTP 200**、`score_R` 有值、五个子分数齐全，
+但 `diagnosis_mode` 是 `'rule_fallback'` —— **没有一个字来自模型**。用户看不出异常。
+
+**为什么三份现有判据都没抓到**：它们各有盲区，可以**同时全绿**而线上一次模型都没调起来。
+- `scripts/api-prod-probe.py`（本轮实测仍然 **exit 0**）判静态与路由，**不碰模型**；
+- `scripts/phase4-http-smoke.py` 起本地端口时**清掉 `ZHIPU_API_KEY`**，验的是降级路径；
+- `/api/health` 的 `model_configured` 只回答"有没有 key"。
+
+**归因（实测，不是推断）**：上游调用**超时**，不是配置缺失。
+1. `rule_fallback_diagnosis()` 对**任何**原因都返回同一句用户可见文案，真实原因码只打到
+   stdout（平台日志，外部读不到）。但 `diagnose_resume` 的两条降级路径用的 trace **不同**：
+   配置缺失走**调用方传入**的 trace、调用失败走 **router 自己生成**的 trace ⇒ 往请求里塞一个
+   合法 `X-Trace-Id` 看是否被回显，就能把两者分开。实测**未被回显** ⇒ 路由被构造了、
+   真的发了上游请求。
+2. 耗时 **51.6s**，几乎正好是 `MODEL_PARAMS["resume_diagnosis"].timeout` 的 **50s**。
+   替代假设"模型名不存在"已**证伪**：打一个不存在的模型名，**210 ms** 就返回
+   `HTTP 400 code 1211`。另 `vercel.json` 的 `maxDuration=60` 排在路由器的 50s 之后，
+   所以是"优雅降级成 200"而不是 504 —— 这正是它一直没被发现的原因。
+3. 本地同一份代码只改环境变量即可复现：`glm-4-flash` → **51.1s / rule_fallback**（与线上逐项吻合）；
+   `glm-4-flash-250414` → **21.2s / mode=model / 探针退 0**。
+
+- **文档里的默认模型换掉**：`.env.example` 与 `README.md` 的 `DUMATE_MODEL` 从
+  `glm-4.7-flash`（实测 `HTTP 429`「该模型当前访问量过大」）改为 `glm-4-flash-250414`
+  （实测 20.6s），并写明这个值是**性能约束**、不只是个名字。
+- **补观察面**：`providers/model.py::model_config_status()` 与 `/api/health` 的
+  `model_ready` / `model_reason`，与 `build_model_router()` **同口径**（key 与模型名缺一不可）。
+  `model_configured` 的语义**保持不动** —— 它在 `tests/test_api.py` 被断言，改它会静默改变既有契约。
+  反向控制：`test_health_reports_zhipu_configuration` 里"只给 key 时 `model_ready` 必须为假、
+  `model_reason` 必须是 `model_name_missing`"。
+- **刻意没有放宽冻结超时**：`MODEL_PARAMS` 文件头声明"不可运行时修改"。为了让复测变绿去放宽
+  超时，是把判据改成迎合现状，属产品决策，不在本次范围。
+- **P0-03 的"21/21 成功"含水，但历史文档一字不改**：`docs/test-report.md` 是 **historical**
+  （冻结快照），更正写进活的 `docs/release-checklist.md`。6/21 是模型**拒答**，根因是脚本给
+  `resume_report` / `jd_match_explain` 喂的是**字面占位符**（`"同上简历文本"` / `"简历同上，JD同上"`）
+  且**没有内容断言** ⇒ 拒答被计成 success；而这两个任务类型在本仓库**没有调用方**
+  （`docs/architecture.md:300/302` 的"调用方"栏就是「无」），属 DuMate 侧（`workflows/wf-02` / `wf-03`）。
+
 ### Fixed - 2026-09-21 第一方跨源前端被一条平台配置"静默关掉"
 
 > 提交：`06f289c`（并集语义 + 两条反向控制，5 文件）+ `a521477`（`.env.example` 的路径引用进判据，2 文件）
