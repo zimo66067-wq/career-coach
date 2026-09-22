@@ -67,7 +67,9 @@
     {"path": "prompts/interview/evidence.md", "why": "活的提示词"},
     {"path": "prompts/interview/interviewer.md", "why": "活的提示词"},
     {"path": "prompts/interview/review.md", "why": "活的提示词"},
-    {"path": "prompts/plan/seven-day.md", "why": "活的提示词"}
+    {"path": "prompts/plan/seven-day.md", "why": "活的提示词"},
+
+    {"path": "docs/runbook-handoff.md", "why": "交接与复跑手册：§2.4 列的是【现在】该存在哪些脚本、§4.4 列的是【现在】该跑哪些判据，脚本改名或门禁增删步骤就必须同步改它 —— 通篇是现状断言，不是某次测量的快照"}
   ],
 
   "historical": [
