@@ -133,14 +133,21 @@ F1/F2 采用规则评分与 BM25 兜底，不依赖 Embedding 密钥也可完整
 
 Vercel 现已通过 `vercel.json` 重写同时托管静态前端（`/`→`/public/index.html`、`/pages/*`、`/js/*`）与 API；GitHub Pages 仍从 `docs/` 发布同一前端。部署完成后，将 Vercel 的 HTTPS 生产地址写入 `docs/js/pages-api-config.js` 的 `window.DUMATE_API_BASE`，并确保该脚本在 `data-bridge.js` 之前加载。API 会仅对 `DUMATE_ALLOWED_ORIGINS` 白名单来源返回 CORS 响应；文件原件只写入请求临时目录并在响应前删除。
 
-**跑测试**（Windows）：
+**跑测试**（Windows；Linux/macOS 把 `.venv-audit\Scripts\python.exe` 换成 `.venv-audit/bin/python`）：
 
 ```bat
 cd /d <本仓库目录>
-set PY=C:\Users\Administrator\.workbuddy\binaries\python\envs\default\Scripts\python.exe
-%PY% -m pip install -r tools\requirements.txt
-%PY% -m pytest tests\ -v
+python -m venv .venv-audit
+.venv-audit\Scripts\python.exe -m pip install -r requirements.txt
+.venv-audit\Scripts\python.exe -m pytest tests\ -q --tb=short
+node --test "tests/*.js"
 ```
+
+> 依赖清单是仓库根的 `requirements.txt`（**不是** `tools\requirements.txt` —— `tools/` 整层已在 Phase 7 删除，
+> 由门禁第 15 步保证"零残留"）。前端契约必须写成 `node --test "tests/*.js"`：传目录
+> （`node --test tests/`）在 Node 20+ 上会得到 `1 failed`，因为默认匹配模式命中不了 `tests/test_*.js`。
+>
+> **完整的环境要求、18 步门禁的等价命令、差异排查与验收 Checklist 见 `docs/runbook-handoff.md`。**
 
 ## 双 Agent 分工与文件所有权
 
