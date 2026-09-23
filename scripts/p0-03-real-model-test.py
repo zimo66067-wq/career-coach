@@ -184,9 +184,12 @@ def output_to_text(output):
 def judge_output(task, output):
     """判**内容**是否有效，返回 (ok, reason)。reason 为 None 表示有效。
 
-    只收能确定的判据：空输出、命中拒答标记、长文任务过短。
+    只收能确定的判据：空输出（含空容器）、命中拒答标记、长文过短。
     刻意不对结构化任务做键名断言 —— 那要靠猜返回结构，猜错就是制造假红。
     """
+    # json.dumps({}) / str([]) 都是非空字符串，但没有任何生成内容。
+    if isinstance(output, (dict, list, tuple, set)) and not output:
+        return False, "empty_output"
     text = output_to_text(output)
     if not text.strip():
         return False, "empty_output"
@@ -355,7 +358,7 @@ def main():
             "degraded_count": total_degraded,
             "failed_count": total_failed,
             "content_assertion": (
-                "success 必须同时通过内容断言：空输出 / 命中拒答标记 / 长文过短 都记为 "
+                "success 必须同时通过内容断言：空输出（含空容器）/ 命中拒答标记 / 长文过短 都记为 "
                 "INVALID（不计入 success）。2026-09-23 之前只判 HTTP 层 status，"
                 "模型拒答被计成 success。"
             ),
