@@ -25,6 +25,13 @@ ANSWERS = [
 ]
 
 
+def production_ready(health):
+    """Configuration/persistence gate, not proof of successful model inference."""
+    return (health.get("status") == "ok" and health.get("database") == "postgres"
+            and health.get("model_ready") is True
+            and (health.get("migrations") or {}).get("ok") is True)
+
+
 class Acceptance:
     def __init__(self, base, request_fn=None):
         self.base = base.rstrip("/")
@@ -199,7 +206,7 @@ def main():
     completed = 0
     try:
         health = run.request("GET", "/api/health")
-        run.check("production database and model configuration ready", health.get("status") == "ok" and health.get("model_ready") is True and (health.get("migrations") or {}).get("ok") is True)
+        run.check("production database and model configuration ready", production_ready(health))
         for index in range(1, args.repeat + 1):
             run.journey(index)
             completed += 1

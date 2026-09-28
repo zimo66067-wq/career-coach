@@ -11,6 +11,13 @@ from providers import model as model_provider
 from providers.model_router import ModelRouter
 from services.diagnosis_service import diagnose_resume
 from tests.test_core_release import core  # fixture with isolated DB and no network
+from tests.test_core_release import acceptance
+
+
+@pytest.mark.parametrize("database,model_ready,expected", [("sqlite", True, False), ("postgres", False, False), ("postgres", True, True)])
+def test_release_requires_persistent_database_and_model_configuration(database, model_ready, expected):
+    assert acceptance.production_ready({"status": "ok", "database": database,
+                                        "model_ready": model_ready, "migrations": {"ok": True}}) is expected
 
 
 @pytest.mark.parametrize("output", [{}, [], {"subscores": {}}, {"unrelated": "text"}])

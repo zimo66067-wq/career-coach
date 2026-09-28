@@ -22,10 +22,12 @@
 - 工作分支：`codex/core-release-20260928`；首个修复提交 `9629b4c`，已推送；[PR #8](https://github.com/zimo66067-wq/career-coach/pull/8) 保持草稿，未合并 main。
 - 该提交 [CI](https://github.com/zimo66067-wq/career-coach/actions/runs/36391505509) 成功。Vercel Preview `dpl_Htw8E61AYSmvfjvYfTqEACJfvZx1` 构建 READY，指向同一 SHA；这不是生产部署。
 - 通过 Vercel 认证读取 Preview 健康接口：`database=sqlite`、`model_ready=false`、`model_reason=model_name_missing`。普通未认证抓取会重定向为登录 HTML，不能把 HTTP 200 当 API 成功。
-- 预览修复所需：在 Preview 配置模型名与可用模型密钥，并连接**独立测试 PostgreSQL**，不能直接复用生产数据库。密钥应在平台 Secret 中配置，不能粘贴进聊天或仓库。
+- **后续已修模型名范围**：通过平台 UI 将现有非敏感 `DUMATE_MODEL=glm-4-flash-250414` 从 Production 扩为 Production + Preview，没有读取或变更任何密钥、没有改动生产模型值。对 `6d6a0c8` 重新部署生成 `dpl_7rEzB17mEaLNfU66BaoCrWW22Sc7`；认证健康检查确认 `model_ready=true`、迁移正常，但仍为 `database=sqlite`。
+- 预览剩余所需：连接**独立测试 PostgreSQL**，不能直接复用生产数据库。随后验证已有模型密钥真实调用是否成功（配置就绪不等于密钥有效）。密钥应在平台 Secret 中配置，不能粘贴进聊天或仓库。缺独立数据库时，核心验收脚本应在环境门禁失败，不继续依赖链。
 - 本地真实 HTTP 冒烟 70/70；依赖安全扫描无已知漏洞；前端镜像、活文档路径、公开范围、敏感信息扫描通过。
 - 生产探针的 HTTP 与 CORS 检查通过，但使用了 `--skip-freshness`，因此没有确认线上静态与当前分支相同。本轮发现它在跳过版本检查后仍输出“线上静态 = HEAD”，已修正文案并添加正反回归测试。
-- 发布停在 Preview 运行环境门禁。当前生产仍为前述回滚基线，**本轮业务/安全修复尚未上线**。预览环境补齐后，应先复跑三轮核心用例与真实模型来源检查，再决定是否转为可合并并发布。
+- 补充提交 `6d6a0c8` 已推送且 [CI](https://github.com/zimo66067-wq/career-coach/actions/runs/36391932975) 成功。后续仅文档/验收门禁变更须继续核对对应 SHA 的 CI，不能用早先绿灯替代。
+- 发布停在 Preview 持久化环境门禁。当前生产仍为前述回滚基线，**本轮业务/安全修复尚未上线**。预览环境补齐后，应先复跑三轮核心用例与真实模型来源检查，再决定是否转为可合并并发布。独立测试库需要用户选择已有测试库或授权创建免费隔离库；不默认开通付费资源。
 
 ### 当前真实模型调用范围
 
