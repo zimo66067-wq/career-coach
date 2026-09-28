@@ -14,6 +14,34 @@ from tests.test_core_release import core  # fixture with isolated DB and no netw
 from tests.test_core_release import acceptance
 
 
+@pytest.mark.parametrize("url", ["http://preview.invalid/?_vercel_share=synthetic",
+                                "https://other.invalid/?_vercel_share=synthetic",
+                                "https://user:synthetic@preview.invalid/",
+                                "https://preview.invalid/#synthetic"])
+def test_temporary_access_rejects_wrong_or_unsafe_origin(url):
+    with pytest.raises(ValueError, match="exact preview host"):
+        acceptance.protected_opener("https://preview.invalid", url)
+
+
+def test_temporary_access_uses_memory_cookie_jar(monkeypatch):
+    calls = []
+    class Response:
+        url = "https://preview.invalid/"
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+    class Opener:
+        def open(self, url, timeout):
+            calls.append(timeout)
+            return Response()
+    fake = Opener()
+    def build(handler):
+        assert type(handler.cookiejar) is acceptance.http.cookiejar.CookieJar
+        return fake
+    monkeypatch.setattr(acceptance, "build_opener", build)
+    assert acceptance.protected_opener("https://preview.invalid", "https://preview.invalid/?_vercel_share=synthetic") is fake
+    assert calls == [30]
+
+
 @pytest.mark.parametrize("database,model_ready,expected", [("sqlite", True, False), ("postgres", False, False), ("postgres", True, True)])
 def test_release_requires_persistent_database_and_model_configuration(database, model_ready, expected):
     assert acceptance.production_ready({"status": "ok", "database": database,

@@ -5,6 +5,8 @@ assertions and timing, not credentials, cookies, bodies or model output.
 Stops the dependent journey on its first failure; cleanup still runs.
 """
 import argparse
+import getpass
+import http.cookiejar
 import json
 import re
 import time
@@ -13,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request, urlopen, build_opener, HTTPCookieProcessor
 
 ROOT = Path(__file__).resolve().parents[1]
 RESUME = (ROOT / "tests/fixtures-synthetic/resumes/resume-01-swe.txt").read_text(encoding="utf-8")
@@ -32,10 +34,24 @@ def production_ready(health):
             and (health.get("migrations") or {}).get("ok") is True)
 
 
+def protected_opener(base, access_url):
+    """Exchange approved temporary access in memory; never persist URL/cookies."""
+    target, access = urlsplit(base), urlsplit(access_url)
+    if (access.scheme != "https" or access.netloc != target.netloc
+            or access.username or access.password or access.fragment):
+        raise ValueError("Temporary access must belong to the exact preview host")
+    opener = build_opener(HTTPCookieProcessor(http.cookiejar.CookieJar()))
+    with opener.open(access_url, timeout=30) as response:
+        if urlsplit(response.url).netloc != target.netloc:
+            raise ValueError("Preview authentication did not complete")
+    return opener
+
+
 class Acceptance:
-    def __init__(self, base, request_fn=None):
+    def __init__(self, base, request_fn=None, opener=None):
         self.base = base.rstrip("/")
         self.request_fn = request_fn
+        self.opener = opener
         self.events = []
         self.checks = []
         self.observations = []
@@ -51,7 +67,7 @@ class Acceptance:
             req = Request(self.base + path, method=method, headers=headers,
                           data=None if body is None else json.dumps(body).encode("utf-8"))
             try:
-                response = urlopen(req, timeout=70)
+                response = (self.opener.open if self.opener else urlopen)(req, timeout=70)
             except HTTPError as error:
                 response = error
             with response:
@@ -193,6 +209,8 @@ def main():
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--repeat", type=int, choices=(1, 2, 3), default=3)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--protected-access-prompt", action="store_true",
+                        help="Read approved temporary preview access via hidden prompt; never save it")
     args = parser.parse_args()
     if Path(args.out).exists():
         parser.error("Report exists; choose a new output path to preserve evidence")
@@ -205,6 +223,10 @@ def main():
     failure = None
     completed = 0
     try:
+        if args.protected_access_prompt:
+            access_url = getpass.getpass("Temporary preview access (hidden): ")
+            run.opener = protected_opener(args.base_url, access_url)
+            access_url = None
         health = run.request("GET", "/api/health")
         run.check("production database and model configuration ready", production_ready(health))
         for index in range(1, args.repeat + 1):

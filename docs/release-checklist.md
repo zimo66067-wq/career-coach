@@ -23,11 +23,15 @@
 - 该提交 [CI](https://github.com/zimo66067-wq/career-coach/actions/runs/36391505509) 成功。Vercel Preview `dpl_Htw8E61AYSmvfjvYfTqEACJfvZx1` 构建 READY，指向同一 SHA；这不是生产部署。
 - 通过 Vercel 认证读取 Preview 健康接口：`database=sqlite`、`model_ready=false`、`model_reason=model_name_missing`。普通未认证抓取会重定向为登录 HTML，不能把 HTTP 200 当 API 成功。
 - **后续已修模型名范围**：通过平台 UI 将现有非敏感 `DUMATE_MODEL=glm-4-flash-250414` 从 Production 扩为 Production + Preview，没有读取或变更任何密钥、没有改动生产模型值。对 `6d6a0c8` 重新部署生成 `dpl_7rEzB17mEaLNfU66BaoCrWW22Sc7`；认证健康检查确认 `model_ready=true`、迁移正常，但仍为 `database=sqlite`。
-- 预览剩余所需：连接**独立测试 PostgreSQL**，不能直接复用生产数据库。随后验证已有模型密钥真实调用是否成功（配置就绪不等于密钥有效）。密钥应在平台 Secret 中配置，不能粘贴进聊天或仓库。缺独立数据库时，核心验收脚本应在环境门禁失败，不继续依赖链。
+- **2026-09-28 独立测试库已完成**：用户授权创建免费隔离库后，通过 Vercel 已有 Neon 集成新建 `career-coach-preview-20260928`，资源 ID `restless-cherry-16010088`。平台显示 Free，无需信用卡，0.5 GB / 100 CU-hours 每项目；关闭额外 Neon Auth。项目连接页确认仅 Preview，Production 未连接；平台自动注入敏感环境变量，没有读取或导出连接串，没有复制生产数据。
+- 基于 `8e1ceb6e6f10c22fe1611c9e4a7de9648546b7f8` 重新部署 Preview：`dpl_AxvDZ6WYhMDwmM6M1zs2ajJRYXqh`，地址 `https://career-coach-gebl4xyrz-zimo66067.vercel.app`。认证健康检查返回 HTTP 200、`database=postgres`、`migrations.ok=true`、`model_ready=true`。这证明配置及迁移就绪，不证明真实模型推理或完整业务通过。该 SHA 的 [CI](https://github.com/zimo66067-wq/career-coach/actions/runs/36392337959) 成功。
+- 用户已授权仅本次测试使用的 23 小时临时访问凭据，已创建并通过隐藏输入交给验收进程。访问 URL 和 Cookie 仅在内存处理，未写入报告或仓库，未关闭预览保护。脚本新增 `--protected-access-prompt`，校验凭据 URL 与目标同源；相关核心/安全测试 23/23 通过，敏感扫描通过。
+- **正式 Preview 复测失败证据**：`deliverables/core-acceptance-20260928-preview.json`，健康检查与 PostgreSQL/模型配置门禁通过，但 `POST /api/wf01/consent` 返回 503；0/3 完整轮次，未提交简历或调用后续模型流程。平台环境变量页面确认 `DUMATE_CONSENT_SECRET` 仅 Production，Preview 缺失；代码在此配置缺失时返回 503，与实测一致。尚未采集该响应的具体错误码，不把推断写作完整错误响应证据。
+- 当前需用户在平台新增同名、仅 Preview 的独立随机签名 Secret（不改原 Production 项，不复用生产值，不发聊天），再重新部署 Preview 并重跑。浏览器创建认证凭据需用户完成输入和保存，不能以开发环境默认签名或关闭保护绕过。生产恢复/告警与完整业务验收仍未完成。
 - 本地真实 HTTP 冒烟 70/70；依赖安全扫描无已知漏洞；前端镜像、活文档路径、公开范围、敏感信息扫描通过。
 - 生产探针的 HTTP 与 CORS 检查通过，但使用了 `--skip-freshness`，因此没有确认线上静态与当前分支相同。本轮发现它在跳过版本检查后仍输出“线上静态 = HEAD”，已修正文案并添加正反回归测试。
 - 补充提交 `6d6a0c8` 已推送且 [CI](https://github.com/zimo66067-wq/career-coach/actions/runs/36391932975) 成功。后续仅文档/验收门禁变更须继续核对对应 SHA 的 CI，不能用早先绿灯替代。
-- 发布停在 Preview 持久化环境门禁。当前生产仍为前述回滚基线，**本轮业务/安全修复尚未上线**。预览环境补齐后，应先复跑三轮核心用例与真实模型来源检查，再决定是否转为可合并并发布。独立测试库需要用户选择已有测试库或授权创建免费隔离库；不默认开通付费资源。
+- Preview 持久化环境门禁现已通过，完整业务验收仍未通过。当前生产仍为前述回滚基线，**本轮业务/安全修复尚未上线**。应先补齐 Preview 独立签名密钥及三轮业务复测，再决定是否转为可合并并发布；不默认开通付费资源。
 
 ### 当前真实模型调用范围
 
