@@ -118,7 +118,7 @@ def handle_wf02(route):
                     resume_text=cleaned_text[:100000],
                 )
             except Exception:
-                app.logger.exception("DB save resume failed")
+                app.logger.error("DB save resume failed; exception details suppressed")
         # trace 由 web 层解析（透传 X-Trace-Id）后注入：服务层不再碰请求上下文（Phase 5）
         profile, score_r, model_trace_id, diagnosis_mode, diagnosis_notice = diagnose_resume(
             resume_text, trace=trace_id()
@@ -133,7 +133,7 @@ def handle_wf02(route):
                 diagnosis_json=json.dumps(profile, ensure_ascii=False)[:500000],
             )
         except Exception:
-            app.logger.exception("DB save diagnosis failed")
+            app.logger.error("DB save diagnosis failed; exception details suppressed")
         return api_response({
             "resumeProfile": profile,
             "score_R": score_r,

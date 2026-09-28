@@ -47,8 +47,8 @@ def bootstrap():
     try:
         _migrations.ensure_applied()
     except Exception as exc:  # pragma: no cover - 故障路径由 /api/health 上报
-        _MIGRATION_ERROR = "%s: %s" % (type(exc).__name__, exc)
-        app.logger.exception("phase-2 domain migration failed")
+        _MIGRATION_ERROR = type(exc).__name__
+        app.logger.error("phase-2 domain migration failed category=%s", _MIGRATION_ERROR)
     return _MIGRATION_ERROR
 
 
@@ -63,13 +63,13 @@ def migration_status():
         try:
             _migrations.ensure_applied()
         except Exception as exc:  # pragma: no cover - 故障路径
-            error = "%s: %s" % (type(exc).__name__, exc)
+            error = type(exc).__name__
     applied = []
     try:
         applied = sorted(_migrations.applied_versions())
     except Exception as exc:  # pragma: no cover - 故障路径
         if error is None:
-            error = "%s: %s" % (type(exc).__name__, exc)
+            error = type(exc).__name__
     return {
         "ok": error is None and all(version in applied for version in expected),
         "applied": applied,

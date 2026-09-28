@@ -39,12 +39,15 @@ def handle_wf06(route):
         try:
             deleted = delete_session_data(session_id, owner_key=owner_key)
         except Exception:
-            app.logger.exception("DB delete session failed")
+            app.logger.error("DB delete session failed; exception details suppressed")
             raise ApiError("delete_failed", "数据删除失败，请稍后重试。", 500)
         if not deleted:
             raise ApiError("session_not_found", "会话不存在或无权访问。", 404)
         return api_response({
             "status": "DELETED",
+            "scope": "workflow_session",
+            "retained": ["career_profile", "career_evidence", "target_jobs", "account", "usage_metadata"],
+            "message": "已删除本次工作流会话数据；职业档案、证据、目标岗位及账号仍保留。这不是账号注销。",
             "deleted_at": __import__("datetime").datetime.now().isoformat(),
             "session_id": session_id,
         })

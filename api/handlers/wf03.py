@@ -66,7 +66,7 @@ def handle_wf03(route):
         try:
             save_match(session_id, match, match.get("score_M"))
         except Exception:
-            app.logger.exception("DB save match failed")
+            app.logger.error("DB save match failed; exception details suppressed")
         return api_response(dict(match, session_id=session_id))
 
     return UNHANDLED

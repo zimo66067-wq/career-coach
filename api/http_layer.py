@@ -195,11 +195,14 @@ def handle_http_error(error):
 
 def handle_unexpected_error(error):
     # Do not return provider details, local paths, or user material to browsers.
-    app.logger.exception("Unhandled API error: %s", type(error).__name__)
+    # Exception text/tracebacks can contain provider keys, DSNs and user material.
+    # Keep a correlatable category, never the exception payload or traceback.
+    incident = trace_id()
+    app.logger.error("Unhandled API error category=%s trace_id=%s", type(error).__name__, incident)
     return jsonify({
         "error": "internal_error",
         "message": "诊断服务暂时不可用，请稍后重试。",
-        "trace_id": trace_id(),
+        "trace_id": incident,
     }), 500
 
 

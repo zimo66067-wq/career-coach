@@ -346,7 +346,9 @@ def diagnose_resume(resume_text, trace=None):
             cleaned_text, "router_exception:%s" % type(error).__name__, trace
         )
 
-    if not isinstance(result, dict) or result.get("status") != "success" or not isinstance(result.get("output"), dict):
+    if (not isinstance(result, dict) or result.get("status") != "success"
+            or not isinstance(result.get("output"), dict)
+            or not result["output"].get("subscores")):
         result_trace = result.get("trace_id") if isinstance(result, dict) else None
         return rule_fallback_diagnosis(cleaned_text, "model_unavailable", result_trace or trace)
 

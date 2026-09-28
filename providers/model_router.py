@@ -221,7 +221,7 @@ class ModelRouter:
                 err_type = type(e).__name__
                 self._log_call(trace_id, task_type, self.primary_model,
                                latency_ms, "failed", err_type, input_hash)
-                logger.warning("[router] primary_model failed: %s: %s", err_type, e)
+                logger.warning("[router] primary_model failed: %s", err_type)
 
         # ---- 备用模型 ---- #
         if self.fallback_model:
@@ -243,7 +243,7 @@ class ModelRouter:
                 err_type = type(e).__name__
                 self._log_call(trace_id, task_type, self.fallback_model,
                                latency_ms, "failed", err_type, input_hash)
-                logger.warning("[router] fallback_model failed: %s: %s", err_type, e)
+                logger.warning("[router] fallback_model failed: %s", err_type)
 
         # ---- 规则降级 ---- #
         degraded_output = self._degrade(task_type, context)

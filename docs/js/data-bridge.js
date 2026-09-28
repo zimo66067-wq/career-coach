@@ -880,7 +880,10 @@
 
     if (!res.error) {
       markDeleted();
-      return { status: 'DELETED', deleted_at: res.deleted_at || new Date().toISOString(), trace_id: res.trace_id || traceId };
+      return { status: 'DELETED', scope: res.scope || 'workflow_session',
+        message: res.message || '已删除本次会话；职业档案、证据、目标岗位及账号仍保留。',
+        retained: res.retained || ['career_profile', 'career_evidence', 'target_jobs', 'account', 'usage_metadata'],
+        deleted_at: res.deleted_at || new Date().toISOString(), trace_id: res.trace_id || traceId };
     }
 
     // 没有可删除的服务端存储时，不能把浏览器缓存清除表述为服务端删除。
@@ -891,7 +894,7 @@
       deleted_at: new Date().toISOString(),
       degraded: true,
       degraded_reason: 'server_delete_unavailable',
-      message: '已清除当前浏览器会话；服务端删除功能尚未配置。',
+      message: '仅清除当前浏览器缓存；服务端删除未成功，服务端资料可能仍保留，请重试。',
       trace_id: traceId
     };
   }

@@ -97,7 +97,7 @@ def handle_target_jobs(route):
                     raise ApiError("resume_required", "请先上传并完成简历诊断。", 422)
                 ensure_session_access(session_id)
                 detail = get_resume_detail(session_id)
-                resume_text = str((detail or {}).get("resume_text") or "")
+                resume_text = str(((detail or {}).get("resume") or {}).get("resume_text") or "")
             if not resume_text:
                 raise ApiError("resume_required", "请先上传并完成简历诊断。", 422)
             if len(resume_text) > MAX_TEXT_CHARS:

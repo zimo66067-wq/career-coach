@@ -368,7 +368,8 @@ def test_health_reports_a_failed_migration_instead_of_pretending_ok(tmp_path, mo
     assert state["expected"] == ["2099-01-01-broken"]
     assert state["applied"] == []
     assert "RuntimeError" in state["error"]
-    assert "migration exploded" in state["error"]
+    assert state["error"] == "RuntimeError"
+    assert "migration exploded" not in str(state)
 
 
 def test_health_endpoint_exposes_migration_state(tmp_path, monkeypatch):

@@ -1,0 +1,102 @@
+{
+  "date": "2026-09-28T03:02:37.277396+00:00",
+  "scope": "core-only",
+  "synthetic": true,
+  "human_participants": 0,
+  "base_url": "https://career-coach-omega-three.vercel.app",
+  "requested_rounds": 3,
+  "completed_rounds": 0,
+  "passed": false,
+  "failure_category": "AssertionError",
+  "checks": [
+    {
+      "name": "HTTP GET /api/health",
+      "passed": true
+    },
+    {
+      "name": "production database and model configuration ready",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf01/consent",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/diagnose",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis has structured subscores",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis has actionable suggestions",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis is model, not fallback",
+      "passed": false
+    },
+    {
+      "name": "HTTP GET /api/profile",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf06/delete",
+      "passed": true
+    },
+    {
+      "name": "TC05 workflow session deleted",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/optimize",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "http": 200,
+      "ms": 1500
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf01/consent",
+      "http": 200,
+      "ms": 1531
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/diagnose",
+      "http": 200,
+      "ms": 51922
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile",
+      "http": 200,
+      "ms": 1437
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf06/delete",
+      "http": 200,
+      "ms": 1328
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/optimize",
+      "http": 404,
+      "ms": 1641
+    }
+  ],
+  "observations": [
+    {
+      "round": 1,
+      "cleanup_errors": 0,
+      "residual": "empty owner profile and quota metadata may remain; not an account erasure test"
+    }
+  ]
+}

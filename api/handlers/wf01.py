@@ -54,7 +54,7 @@ def handle_wf01(route):
                 resume_text=cleaned_text[:100000],
             )
         except Exception:
-            app.logger.exception("DB save resume failed")
+            app.logger.error("DB save resume failed; exception details suppressed")
         return api_response({
             "resumeText": cleaned_text,
             "resumeProfile": None,

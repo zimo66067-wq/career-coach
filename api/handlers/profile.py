@@ -40,7 +40,7 @@ def handle_profile(route):
         session_id = str(body.get("session_id") or "")
         ensure_session_access(session_id)
         detail = get_resume_detail(session_id)
-        resume_text = str((detail or {}).get("resume_text") or "")
+        resume_text = str(((detail or {}).get("resume") or {}).get("resume_text") or "")
         if not resume_text:
             raise ApiError("resume_required", "请先上传并完成简历诊断。", 422)
         resume_profile = body.get("resumeProfile")
