@@ -67,3 +67,24 @@ def test_export_refuses_repository_and_overwrite(tmp_path):
         module.export_destination(str(existing))
     assert existing.read_text() == "unchanged"
     assert module.export_destination(str(tmp_path / "new.json")) == tmp_path / "new.json"
+
+
+@pytest.mark.parametrize("skip", [True, False])
+def test_production_probe_does_not_claim_a_skipped_version_check(monkeypatch, capsys, skip):
+    import sys
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location("truthful_probe", root / "scripts/api-prod-probe.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(sys, "argv", ["probe", "--origin", "https://synthetic.invalid"] + (["--skip-freshness"] if skip else []))
+    monkeypatch.setattr(module, "_git", lambda *args: "synthetic")
+    monkeypatch.setattr(module, "check_api", lambda *args: True)
+    monkeypatch.setattr(module, "check_cross_origin", lambda *args: None)
+    called = []
+    monkeypatch.setattr(module, "check_freshness", lambda *args: called.append(True))
+    monkeypatch.setattr(module, "freshness_probes", lambda: [])
+    assert module.main() == 0
+    output = capsys.readouterr().out
+    assert bool(called) is not skip
+    assert ("静态新鲜度检查已通过" in output) is not skip
+    assert ("已跳过静态版本比对" in output) is skip

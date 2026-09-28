@@ -17,6 +17,16 @@
 | 真人试用 | 已生成并执行合成用例，实际真人参与数 0 | 仍未完成，不用自动化冒充 |
 | 生产恢复与告警 | 本地 SQLite 合成库完整性与逐表恢复通过；没有生产 PostgreSQL 管理凭据或恢复证明、告警接收验证 | **生产部分未验证** |
 
+### 本轮提交与远端验证
+
+- 工作分支：`codex/core-release-20260928`；首个修复提交 `9629b4c`，已推送；[PR #8](https://github.com/zimo66067-wq/career-coach/pull/8) 保持草稿，未合并 main。
+- 该提交 [CI](https://github.com/zimo66067-wq/career-coach/actions/runs/36391505509) 成功。Vercel Preview `dpl_Htw8E61AYSmvfjvYfTqEACJfvZx1` 构建 READY，指向同一 SHA；这不是生产部署。
+- 通过 Vercel 认证读取 Preview 健康接口：`database=sqlite`、`model_ready=false`、`model_reason=model_name_missing`。普通未认证抓取会重定向为登录 HTML，不能把 HTTP 200 当 API 成功。
+- 预览修复所需：在 Preview 配置模型名与可用模型密钥，并连接**独立测试 PostgreSQL**，不能直接复用生产数据库。密钥应在平台 Secret 中配置，不能粘贴进聊天或仓库。
+- 本地真实 HTTP 冒烟 70/70；依赖安全扫描无已知漏洞；前端镜像、活文档路径、公开范围、敏感信息扫描通过。
+- 生产探针的 HTTP 与 CORS 检查通过，但使用了 `--skip-freshness`，因此没有确认线上静态与当前分支相同。本轮发现它在跳过版本检查后仍输出“线上静态 = HEAD”，已修正文案并添加正反回归测试。
+- 发布停在 Preview 运行环境门禁。当前生产仍为前述回滚基线，**本轮业务/安全修复尚未上线**。预览环境补齐后，应先复跑三轮核心用例与真实模型来源检查，再决定是否转为可合并并发布。
+
 ### 当前真实模型调用范围
 
 核心调用点为 `resume_diagnosis`、`resume_rewrite`、`interview_question`、`interview_evidence`、`cover_letter`。JD 解析、匹配决策、面试评分/复盘与行动计划主要走当前规则实现。旧脚本中的 `resume_report`、`jd_match_explain`、`jd_extract`、`interview_review`、`seven_day_plan` 不能直接当作当前页面实际模型调用；外部 DuMate 工作流另行验收。面试追问既有模型路径，也有引用回答的规则路径，不能仅凭题目非空宣称模型成功。

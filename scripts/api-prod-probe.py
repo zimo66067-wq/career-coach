@@ -408,7 +408,11 @@ def main():
         for item in failures:
             print("  阻断：%s" % item)
         return 1
-    print("  线上静态 = HEAD；业务接口都已被应用接住（/api/health = 200）；")
+    if args.skip_freshness:
+        print("  已跳过静态版本比对；不能据此认定线上静态 = HEAD。")
+    else:
+        print("  线上静态 = HEAD（静态新鲜度检查已通过）。")
+    print("  业务接口都已被应用接住（/api/health = 200）；不代表真实模型或完整业务验收通过。")
     print("  第一方跨源前端 %s 已放行，且敌对源 %s 仍被拒。" % (pages, HOSTILE_ORIGIN))
     return 0
 
