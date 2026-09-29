@@ -162,6 +162,14 @@ class Acceptance:
             current = self.request("GET", "/api/profile", token=token)
             self.check("TC03 extracted interview facts remain pending", all(x.get("status") == "pending" for x in current.get("pending", []) if x.get("source_type") == "interview"))
 
+            # WF-05 must consume the same F2 target-job match and F3 interview
+            # session. A 3/3 progress indicator alone does not prove a report.
+            ability = self.request("POST", "/api/wf05/ability", {"session_id": sid}, token)
+            report = ability.get("ability") or {}
+            self.check("TC04 ability baseline is numeric", isinstance(report.get("baseline"), (int, float)))
+            self.check("TC04 ability has six dimensions", len(report.get("dimensions") or []) == 6)
+            self.check("TC04 ability has seven-day plan", len(report.get("plan") or []) == 7)
+
             # TC04: grounded cover letter -> application -> genuine state transition.
             letter = self.request("POST", "/api/wf07/cover-letter",
                                   {"session_id": sid, "targetJobId": target_id, "company": "合成验收单位", "position": "后端开发"}, token)

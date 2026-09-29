@@ -56,12 +56,13 @@
 .degraded-banner h3 { color: var(--zy-degraded); font-size: 14px; margin-bottom: 3px; }
 .degraded-banner p { font-size: 13px; color: #6d440a; max-width: 68ch; }
 
-/* 状态容器切换：默认只显示 success（契约不变） */
+/* 状态容器切换：面试完成后也必须显示 report。 */
 [data-state-view] { display: none; }
 body[data-state="empty"] [data-state-view="empty"],
 body[data-state="confirmation"] [data-state-view="confirmation"],
 body[data-state="processing"] [data-state-view="processing"],
 body[data-state="success"] [data-state-view="success"],
+body[data-state="report"] [data-state-view="report"],
 body[data-state="error"] [data-state-view="error"],
 body[data-state="degraded"] [data-state-view="degraded"] { display: block; }
 

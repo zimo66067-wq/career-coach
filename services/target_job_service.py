@@ -49,6 +49,11 @@ JD_HEADING_WORDS = frozenset({
     "常用技术栈", "技术栈", "技能要求", "必备技能", "加分条件", "我们提供",
 })
 
+# 测试/演示用 JD 的来源声明不是任职条件。它若进入要求表，会污染匹配、
+# 行动优先级与面试问题；只排除明确以 JD 为主语的独立声明行。
+JD_SOURCE_NOTICE_PREFIXES = ("本JD", "本 JD", "此JD", "此 JD", "该JD", "该 JD")
+JD_SOURCE_NOTICE_MARKERS = ("合成测试材料", "仅供测试", "仅供演示", "非真实招聘")
+
 #: 要求式动词/名词 —— 用来区分"一句要求"与"一个职位名"。
 #: 刻意**不含** 开发/设计/维护 这类会出现在职位名里的词（「后端开发工程师」）。
 STRONG_REQUIREMENT_SIGNALS = (
@@ -91,6 +96,10 @@ def looks_like_requirement(text, is_first_line=False, profile_has_title=False):
     if len(body) < MIN_REQUIREMENT_CHARS:
         return False
     if body.rstrip("：:。. ") in JD_HEADING_WORDS:
+        return False
+    if body.startswith(JD_SOURCE_NOTICE_PREFIXES) and any(
+        marker in body for marker in JD_SOURCE_NOTICE_MARKERS
+    ):
         return False
     if is_first_line and not profile_has_title and looks_like_title_line(body):
         return False
@@ -297,7 +306,17 @@ def analyse(target_job_id, owner_key, resume_text):
 
     from services.match_service import match_job_profile
 
-    match = match_job_profile(resume_text, profile)
+    # Only persisted JobRequirement rows are eligible for matching and scoring.
+    # The raw profile remains unchanged for provenance, but headings, job titles
+    # and source notices must never affect M or the downstream ability report.
+    allowed_keys = {row["req_key"] for row in requirements}
+    effective_profile = {
+        **profile,
+        "requirements": [
+            item for item in profile["requirements"] if item.get("id") in allowed_keys
+        ],
+    }
+    match = match_job_profile(resume_text, effective_profile)
     match_by_key = {item["id"]: item for item in match.get("requirements") or []}
 
     # 1) 命中的整句 → 候选证据（pending），拿到 requirement_id ↔ evidence_id 映射
@@ -387,6 +406,12 @@ def analyse(target_job_id, owner_key, resume_text):
     decision_record = repo.create_decision(
         domain_decide(target_job_id, verdict, citations, rationale=_rationale(verdict), gaps=all_gaps)
     )
+
+    # WF-05 aggregates R/M/I from the same session. The target-job route is
+    # the current F2 path, so persist its verified match in the shared store.
+    session_id = target.get("session_id")
+    if session_id:
+        database.save_match(session_id, match, match.get("score_M"))
 
     return {
         "target_job": get_target_job(target_job_id, owner_key),

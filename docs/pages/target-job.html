@@ -79,6 +79,16 @@
       <button class="btn ghost" id="tjPlanActions" type="button">把缺口铺成行动</button>
     </div>
     <p class="tj-msg" id="tjMsg">粘贴 JD 后点「建立岗位」；分析需要先用 <a href="resume-evidence.html">简历诊断</a> 提交过简历。</p>
+    <div class="tj-card zy-hidden" id="tjConsentRenew" role="group" aria-labelledby="tjConsentTitle">
+      <h3 id="tjConsentTitle">重新确认数据处理同意</h3>
+      <p>同意记录已过期。确认后只会重新加载岗位列表；未完成的建岗或分析操作不会自动重发。</p>
+      <label class="data-consent" for="tjConsentCheck">
+        <input id="tjConsentCheck" type="checkbox">
+        <span>我同意为当前求职辅助操作处理我提交的简历与岗位内容。</span>
+      </label>
+      <button class="btn" id="tjConsentSubmit" type="button">确认并重新加载</button>
+      <p id="tjConsentStatus" role="status"></p>
+    </div>
     <p class="tj-dropped zy-hidden" id="tjDropped"></p>
   </section>
 

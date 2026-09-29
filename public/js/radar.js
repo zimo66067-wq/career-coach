@@ -15,8 +15,13 @@
   }
 
   function renderTable(container, dims, baseline) {
+    function esc(value) {
+      return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+      });
+    }
     var rows = dims.map(function (d) {
-      return "<tr><td>" + d.name + "</td><td>" + d.score.toFixed(1) + "</td></tr>";
+      return "<tr><td>" + esc(d.name) + "</td><td>" + Number(d.score).toFixed(1) + "</td></tr>";
     }).join("");
     container.innerHTML =
       '<table class="dim"><thead><tr><th>维度</th><th>得分</th></tr></thead><tbody>' + rows +

@@ -273,6 +273,39 @@ def test_unparseable_jd_is_rejected_instead_of_producing_a_fake_job(client):
     assert response.json["error"] == "no_requirements"
 
 
+def test_jd_source_notice_is_not_a_requirement(client):
+    from services.target_job_service import looks_like_requirement
+
+    assert not looks_like_requirement("本 JD 为合成测试材料，非真实招聘。")
+    assert looks_like_requirement("参与合成数据测试与后端接口开发。")
+
+    response = client.post("/api/target-jobs", json={
+        "jdText": "后端开发工程师\n任职要求\n1. 熟悉 Python 后端开发。\n本 JD 为合成测试材料，非真实招聘。",
+    })
+    assert response.status_code == 201
+    assert [item["text"] for item in response.json["requirements"]] == ["熟悉 Python 后端开发。"]
+    assert any("非真实招聘" in item for item in response.json["droppedNonRequirements"])
+
+
+def test_target_analysis_persists_only_effective_requirements_for_ability(client):
+    from repositories import database
+    from services import target_job_service
+
+    session_id = "synthetic-target-ability"
+    record = target_job_service.create_target_job(
+        _owner_key(client), session_id,
+        jd_text=JD_SWE + "\n本 JD 为合成测试材料，非真实招聘。",
+    )
+    analysis = target_job_service.analyse(record["id"], _owner_key(client), RESUME)
+    stored = database.load_match(session_id)
+
+    assert stored is not None
+    assert stored["score_M"] == analysis["analysis"]["score_M"]
+    expected_keys = {row["req_key"] for row in target_job_service.requirements_of(record["id"])}
+    assert {row["id"] for row in stored["requirements"]} == expected_keys
+    assert not any("非真实招聘" in row["text"] for row in stored["requirements"])
+
+
 def test_target_job_requires_jd_or_profile(client):
     response = client.post("/api/target-jobs", json={})
     assert response.status_code == 422

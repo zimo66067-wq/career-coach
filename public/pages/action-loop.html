@@ -80,13 +80,15 @@
       </div>
     </div>
     <p class="journey-description" id="journeyDescription">正在读取本次浏览器会话的完成记录。</p>
+    <button class="btn primary" id="alGenerateAbilityBtn" type="button" disabled>生成能力报告</button>
+    <p class="al-msg" id="alAbilityMsg" role="status"></p>
   </section>
 
   <div data-state-view="empty">
     <div class="card empty-state">
       <div class="art"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-6m4 6V7m4 10v-3M5 21h14a1 1 0 001-1V4a1 1 0 00-1-1H5a1 1 0 00-1 1v16a1 1 0 001 1z"/></svg></div>
       <h3>还没有可聚合的数据</h3>
-      <p>完成简历诊断、目标岗位分析和一轮模拟面试后，这里会生成你的能力报告</p>
+      <p>完成简历诊断、目标岗位分析和一轮模拟面试后，点击上方按钮生成能力报告。</p>
       <span class="btn">先去诊断简历</span>
     </div>
   </div>
@@ -109,9 +111,9 @@
   <div data-state-view="success">
     <div class="card" style="display:flex;gap:32px;align-items:center;flex-wrap:wrap">
       <div>
-        <div class="big-num" id="c0num">68.27</div>
+        <div class="big-num" id="c0num">—</div>
         <div style="color:var(--zy-ink-2);font-size:13px">C0 综合基线（证据覆盖指数，非录用概率）</div>
-        <div style="font-size:13px;margin-top:8px;color:var(--zy-ink-2)">R 73.00 × 0.25 ＋ M 60.00 × 0.35 ＋ I 72.55 × 0.40</div>
+        <div style="font-size:13px;margin-top:8px;color:var(--zy-ink-2)">R <span id="alScoreR">—</span> × 0.25 ＋ M <span id="alScoreM">—</span> × 0.35 ＋ I <span id="alScoreI">—</span> × 0.40</div>
       </div>
       <div style="flex:1;min-width:280px">
         <h3 style="margin-bottom:10px">怎么读这份报告</h3>
@@ -135,7 +137,7 @@
       <div class="icon">⚠️</div>
       <div>
         <h3>报告生成被阻断</h3>
-        <p>七天行动计划未通过合同校验（条数/时长/成果物约束），或检测到未在输入中出现的数字，已按事实锁阻断发布。</p>
+        <p>报告未能生成。请查看上方具体提示，确认前三步已有真实结果后重试。</p>
         <span class="btn">重新生成</span>
       </div>
     </div>
@@ -157,6 +159,7 @@
       <h3>七天行动计划</h3>
       <div class="plan-grid" id="planGridDegraded"></div>
     </div>
+  </div>
   <section class="card" id="actionLoopCard" aria-labelledby="actionLoopTitle">
     <h2 id="actionLoopTitle" style="margin-bottom:8px">行动闭环 · 缺口 → 行动 → 复测</h2>
     <p class="al-target" id="alTargetLine">正在读取当前目标岗位…</p>
@@ -170,7 +173,6 @@
     <p class="al-foot">行动「已完成」不等于缺口「已解决」：缺口只有在<b>重新分析</b>被新证据覆盖后
       才会变成「已覆盖」。没有可验证成果物的缺口不会开单，也不会被静默丢掉。</p>
   </section>
-  </div>
 </div>
 
 <!-- 侧边栏：个人账号 + 历史记录（演示原型，数据存 localStorage） -->
@@ -183,17 +185,36 @@
 <script src="../js/auth-gate.js"></script>
 <script>
 function renderPlan(elId, plan) {
+  function esc(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
   document.getElementById(elId).innerHTML = plan.map(function (p) {
-    return '<div class="plan-day"><div class="d">第 ' + p.day + " 天</div><div style=\"font-size:14px\">" + p.focus + '</div><div class="m">⏱ ' + p.minutes + " 分钟 ｜ 成果物：" + p.artifact + "</div></div>";
+    return '<div class="plan-day"><div class="d">第 ' + esc(p.day) + " 天</div><div style=\"font-size:14px\">" + esc(p.focus) + '</div><div class="m">⏱ ' + esc(p.minutes) + " 分钟 ｜ 成果物：" + esc(p.artifact) + "</div></div>";
   }).join("");
 }
 function updateJourneyProgress() {
   var cache = window.DataBridge && window.DataBridge._cache;
+  function validScore(score) {
+    return score !== null && score !== undefined && score !== "" && Number.isFinite(Number(score));
+  }
   function hasResult(key) {
     if (!cache || typeof cache.get !== "function") return false;
     try {
       var value = cache.get(key);
-      return value !== null && value !== undefined;
+      if (!value || typeof value !== "object" || Array.isArray(value) || value.error || value.demo_data) return false;
+      if (key === "diagnoseResult") {
+        return !!value.resumeProfile && validScore(value.score_R);
+      }
+      if (key === "targetJobAnalysis") {
+        return !!value.decision && !!value.analysis && validScore(value.analysis.score_M);
+      }
+      if (key === "interviewReport") {
+        return typeof value.report === "string" && value.report.trim().length > 0 &&
+          validScore(value.score_I) && Array.isArray(value.turns) && value.turns.length > 0;
+      }
+      return false;
     } catch (err) {
       return false;
     }
@@ -225,6 +246,8 @@ function updateJourneyProgress() {
   if (count) count.textContent = completeCount;
   if (hub) hub.classList.toggle("is-ready", allComplete);
   if (hubState) hubState.textContent = allComplete ? "可生成" : "待解锁";
+  var generateButton = document.getElementById("alGenerateAbilityBtn");
+  if (generateButton) generateButton.disabled = !allComplete;
   if (description) {
     description.textContent = window.APP && window.APP.isDemoMode()
       ? "演示数据不会计入进度；完成状态仅依据本浏览器会话中的真实结果。"

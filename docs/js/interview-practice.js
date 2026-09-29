@@ -224,20 +224,17 @@
     streamFollowUp(turn);
   }
 
-  function ensureConsent(DB) {
-    if (consentToken() || !DB || typeof DB.submitConsent !== "function") return Promise.resolve();
-    return DB.submitConsent().then(function (r) {
-      if (!r || r.error) console.warn("[F3] 自动同意未成功，继续尝试开始面试:", r && r.message);
-    }).catch(function (err) {
-      console.warn("[F3] 自动同意失败，继续尝试开始面试:", err);
-    });
-  }
-
   function startInterview() {
     var DB = window.DataBridge;
     if (!DB || typeof DB.startInterview !== "function") return;
+    if (!consentToken()) {
+      setView("error");
+      var consentMsg = $("f3ErrorMsg");
+      if (consentMsg) consentMsg.textContent = "请先在简历证据页明确确认数据处理同意，再开始面试。";
+      return;
+    }
     setView("processing");
-    ensureConsent(DB).then(function () {
+    Promise.resolve().then(function () {
       var resumeProfile = DB._cache ? DB._cache.get("resumeProfile") : null;
       var jobProfile = DB._cache ? DB._cache.get("jobProfile") : null;
       var matchResult = DB._cache ? DB._cache.get("matchResult") : null;

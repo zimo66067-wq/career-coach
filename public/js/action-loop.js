@@ -48,6 +48,48 @@
     if (window.APP && typeof window.APP.setState === "function") window.APP.setState(state);
   }
 
+  function generateAbility() {
+    var status = $("alAbilityMsg");
+    var sessionId = DB && DB._cache && DB._cache.get("sessionId");
+    if (!sessionId || !DB || typeof DB.getAbility !== "function") {
+      if (status) status.textContent = "缺少本次会话，请从简历证据开始完成前三步。";
+      return Promise.resolve();
+    }
+    if (status) status.textContent = "正在生成能力报告…";
+    setState("processing");
+    return DB.getAbility(sessionId).then(function (res) {
+      var ability = res && res.ability;
+      if (!ability || !Number.isFinite(Number(ability.baseline)) ||
+          !Array.isArray(ability.dimensions) || ability.dimensions.length !== 6 ||
+          !Array.isArray(ability.plan) || ability.plan.length !== 7 ||
+          [ability.resume_score, ability.match_score, ability.interview_score].some(function (v) {
+            return v === null || v === undefined || !Number.isFinite(Number(v));
+          })) {
+        if (status) status.textContent = (res && res.message) || "报告数据不完整，请检查前三步后重试。";
+        setState("error");
+        return;
+      }
+      if (res.degraded) {
+        window.RADAR.mount("radarFallback", ability, true);
+        window.renderPlan("planGridDegraded", ability.plan);
+        if (status) status.textContent = "当前显示缓存报告，并非本次实时复算；请稍后重试。";
+        setState("degraded");
+        return;
+      }
+      $("c0num").textContent = Number(ability.baseline).toFixed(2);
+      $("alScoreR").textContent = Number(ability.resume_score).toFixed(2);
+      $("alScoreM").textContent = Number(ability.match_score).toFixed(2);
+      $("alScoreI").textContent = Number(ability.interview_score).toFixed(2);
+      window.RADAR.mount("radar", ability, false);
+      window.renderPlan("planGrid", ability.plan);
+      if (status) status.textContent = "报告已生成；C0 是当前证据快照，不是录用概率。";
+      setState("success");
+    }).catch(function () {
+      if (status) status.textContent = "报告服务暂不可用，请稍后重试。";
+      setState("error");
+    });
+  }
+
   function ask(question) {
     if (typeof window.prompt !== "function") return "";
     var answer = window.prompt(question, "");
@@ -239,6 +281,8 @@
   }
 
   function wire() {
+    var abilityBtn = $("alGenerateAbilityBtn");
+    if (abilityBtn) abilityBtn.addEventListener("click", generateAbility);
     var planBtn = $("alPlanBtn");
     if (planBtn) planBtn.addEventListener("click", plan);
     var refreshBtn = $("alRefreshBtn");
@@ -247,7 +291,7 @@
     if (list) list.addEventListener("click", onListClick);
   }
 
-  window.ACTION_LOOP = { refresh: refresh, plan: plan, render: render };
+  window.ACTION_LOOP = { refresh: refresh, plan: plan, render: render, generateAbility: generateAbility };
 
   function boot() { wire(); refresh(); }
   if (document.readyState === "loading") {

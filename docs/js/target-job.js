@@ -45,11 +45,43 @@
     if (window.APP && typeof window.APP.setState === "function") window.APP.setState(state);
   }
 
-  function fail(message) {
+  function fail(message, errorCode) {
     var banner = $("tjErrorText");
     if (banner) banner.textContent = message || "操作失败，请稍后重试。";
     msg(message || "操作失败，请稍后重试。", "error");
+    if (errorCode === "consent_expired" || errorCode === "consent_required") {
+      var renew = $("tjConsentRenew");
+      if (renew) renew.classList.remove("zy-hidden");
+    }
     setState("error");
+  }
+
+  function renewConsent() {
+    var check = $("tjConsentCheck");
+    var status = $("tjConsentStatus");
+    if (!check || !check.checked) {
+      if (status) status.textContent = "请先阅读并勾选数据处理说明。";
+      return;
+    }
+    if (!DB || typeof DB.submitConsent !== "function") {
+      if (status) status.textContent = "同意记录服务暂不可用，请稍后重试。";
+      return;
+    }
+    if (status) status.textContent = "正在确认…";
+    DB.submitConsent("target_job").then(function (res) {
+      if (!res || res.error || res.status !== "ACCEPTED") {
+        if (status) status.textContent = (res && res.message) || "确认失败，请稍后重试。";
+        return;
+      }
+      var renew = $("tjConsentRenew");
+      if (renew) renew.classList.add("zy-hidden");
+      check.checked = false;
+      if (status) status.textContent = "确认成功。需要继续建岗或分析时，请再次点击原操作按钮。";
+      setState("empty");
+      load();
+    }).catch(function () {
+      if (status) status.textContent = "网络错误，确认未完成，请稍后重试。";
+    });
   }
 
   // ── 状态徽标 ──────────────────────────────────────────
@@ -166,9 +198,11 @@
     }
     var rationale = $("tjDecisionRationale");
     if (rationale) {
-      var text = decision.rationale && decision.rationale.text
-        ? decision.rationale.text
-        : (decision.rationale_json || "");
+      var detail = decision.rationale;
+      if (!detail && decision.rationale_json) {
+        try { detail = JSON.parse(decision.rationale_json); } catch (err) { detail = null; }
+      }
+      var text = detail && (detail.rationale || detail.text);
       rationale.textContent = typeof text === "string" ? text : "";
     }
     var score = $("tjScoreM");
@@ -196,7 +230,7 @@
   function load() {
     if (!DB || typeof DB.listTargetJobs !== "function") return;
     DB.listTargetJobs().then(function (res) {
-      if (res.error) { fail(res.message || "目标岗位列表加载失败。"); return; }
+      if (res.error) { fail(res.message || "目标岗位列表加载失败。", res.error); return; }
       renderJobs(res.targetJobs);
       if (!currentJobId && res.targetJobs && res.targetJobs.length) {
         currentJobId = res.targetJobs[0].id;
@@ -231,7 +265,7 @@
       company: companyEl ? companyEl.value.trim() : "",
       position: positionEl ? positionEl.value.trim() : ""
     }).then(function (res) {
-      if (res.error) { fail(res.message || "建岗失败：" + res.error); return; }
+      if (res.error) { fail(res.message || "建岗失败：" + res.error, res.error); return; }
       currentJobId = res.targetJob && res.targetJob.id;
       if (DB.setCurrentTargetJob) DB.setCurrentTargetJob(currentJobId);
       renderRequirements(res.requirements, null);
@@ -258,7 +292,7 @@
     DB.analyseTargetJob(currentJobId).then(function (res) {
       if (res.error) {
         // insufficient_grounds：依据不足 3 条，后端拒绝给结论。这不是故障，是口径。
-        fail(res.message || "分析失败：" + res.error);
+        fail(res.message || "分析失败：" + res.error, res.error);
         return;
       }
       lastAnalysis = res;
@@ -276,7 +310,7 @@
     if (!currentJobId) { msg("请先选中一个目标岗位。", "error"); return; }
     msg("正在把未解决缺口铺成行动…");
     DB.planActionsForTarget(currentJobId).then(function (res) {
-      if (res.error) { fail(res.message || "铺开行动失败。"); return; }
+      if (res.error) { fail(res.message || "铺开行动失败。", res.error); return; }
       var parts = [
         "新建 " + res.createdCount + " 条",
         "已存在 " + res.existingCount + " 条"
@@ -291,7 +325,7 @@
   function remove(id) {
     if (!DB || typeof DB.deleteTargetJob !== "function") return;
     DB.deleteTargetJob(id).then(function (res) {
-      if (res.error) { fail(res.message || "删除失败。"); return; }
+      if (res.error) { fail(res.message || "删除失败。", res.error); return; }
       if (String(currentJobId) === String(id)) {
         currentJobId = null;
         if (DB.setCurrentTargetJob) DB.setCurrentTargetJob(null);
@@ -318,6 +352,8 @@
     if (planBtn) planBtn.addEventListener("click", plan);
     var retryBtn = $("tjRetry");
     if (retryBtn) retryBtn.addEventListener("click", analyse);
+    var renewBtn = $("tjConsentSubmit");
+    if (renewBtn) renewBtn.addEventListener("click", renewConsent);
   }
 
   wire();
