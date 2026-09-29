@@ -90,6 +90,18 @@
     }
   }
 
+  function clearCache(keys) {
+    try {
+      keys.forEach(function (key) { sessionStorage.removeItem(CACHE_PREFIX + key); });
+    } catch (e) { /* cache is optional */ }
+  }
+
+  function clearDependentResults() {
+    clearCache(['diagnoseResult', 'targetJobAnalysis', 'interviewReport',
+      'ability', 'abilitySessionId', 'firstQuestion', 'matchResult', 'jobProfile']);
+    setCurrentTargetJob(null);
+  }
+
   // ── trace_id 生成 ─────────────────────────────────────
   function genTraceId() {
     return 't' + Date.now() + Math.random().toString(36).substr(2, 6);
@@ -274,6 +286,7 @@
 
     if (!res.error) {
       // 缓存结果
+      clearDependentResults();
       setCache('resumeText', res.resumeText);
       setCache('resumeProfile', res.resumeProfile);
       setCache('sessionId', res.session_id || traceId);
@@ -306,6 +319,8 @@
     });
 
     if (!res.error) {
+      clearCache(['targetJobAnalysis', 'interviewReport', 'ability', 'abilitySessionId',
+        'firstQuestion', 'matchResult']);
       var normalized = normalizeResumeProfile(res.resumeProfile);
       var normalizedResult = Object.assign({}, res, { resumeProfile: normalized });
       setCache('resumeProfile', normalized);
@@ -428,6 +443,7 @@
       { method: 'POST', body: body, _traceId: traceId }
     );
     if (res.error) return res;
+    clearCache(['interviewReport', 'ability', 'abilitySessionId']);
     setCurrentTargetJob(targetJobId);
     setCache('targetJobAnalysis', res);
     recordHistory(
@@ -599,6 +615,7 @@
     var traceId = genTraceId();
     var res = await uploadWithXhr(ENDPOINTS.uploadResume, file, onProgress, traceId);
     if (!res.error) {
+      clearDependentResults();
       setCache('resumeText', res.resumeText);
       setCache('resumeProfile', res.resumeProfile);
       setCache('sessionId', res.session_id || traceId);
@@ -650,6 +667,7 @@
     });
 
     if (!res.error) {
+      clearCache(['interviewReport', 'ability', 'abilitySessionId']);
       setCache('sessionId', res.session_id);
       setCache('firstQuestion', res.firstQuestion);
       if (res.targetJobId !== undefined) setCurrentTargetJob(res.targetJobId);
@@ -735,6 +753,7 @@
     });
 
     if (!res.error) {
+      clearCache(['ability', 'abilitySessionId']);
       setCache('interviewReport', res);
       recordHistory('F3', '模拟面试 · 已完成', sessionId || traceId, 'done');
       return {
@@ -788,8 +807,17 @@
       _traceId: traceId
     });
 
-    if (!res.error) {
+    function validScore(value) {
+      return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
+    }
+    if (!res.error && res.ability && typeof res.ability === 'object' &&
+        !Array.isArray(res.ability) && validScore(res.ability.baseline) &&
+        validScore(res.ability.resume_score) && validScore(res.ability.match_score) &&
+        validScore(res.ability.interview_score) &&
+        Array.isArray(res.ability.dimensions) && res.ability.dimensions.length === 6 &&
+        Array.isArray(res.ability.plan) && res.ability.plan.length === 7) {
       setCache('ability', res.ability);
+      setCache('abilitySessionId', sessionId);
       recordHistory(
         'F4',
         '能力报告 · C0=' + (res.ability && res.ability.baseline !== undefined ? res.ability.baseline : ''),
@@ -800,13 +828,14 @@
     }
 
     // 缓存
-    var cached = getCache('ability');
+    var cached = getCache('abilitySessionId') === sessionId ? getCache('ability') : null;
     if (cached) {
       console.warn('[DataBridge] 使用缓存数据: ability');
       recordHistory('F4', '能力报告（缓存）', sessionId || traceId, 'partial');
       return { ability: cached, degraded: true, degraded_reason: 'cached', trace_id: traceId };
     }
 
+    if (!res.error) return unavailable(traceId, 'invalid_ability_response');
     var demo = demoData('ability', traceId, res.error);
     if (demo.error) return demo;
     recordHistory('F4', '能力报告（演示模式）', sessionId || traceId, 'partial');

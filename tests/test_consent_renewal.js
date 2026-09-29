@@ -132,3 +132,42 @@ test('岗位结论展示可读理由，不把 rationale_json 原文显示给用�
   assert.match(js, /detail\.rationale \|\| detail\.text/);
   assert.doesNotMatch(js, /: \(decision\.rationale_json \|\| ""\)/);
 });
+
+test('能力报告缓存不得跨会话使用，空成功响应不得写历史', async () => {
+  const storage = new Map();
+  let payload = { ability: {} };
+  const history = [];
+  const context = {
+    window: { APP: { isDemoMode: () => false }, ZY_ACCOUNT: { addHistory: (entry) => history.push(entry) } },
+    sessionStorage: {
+      getItem: (key) => storage.get(key) || null,
+      setItem: (key, value) => storage.set(key, String(value)),
+      removeItem: (key) => storage.delete(key)
+    },
+    fetch: async () => ({ ok: true, json: async () => payload }),
+    FormData: class { append() {} }, AbortController: class { abort() {} },
+    setTimeout, clearTimeout, Date, Math, JSON, Promise, console
+  };
+  vm.createContext(context);
+  vm.runInContext(read('public/js/data-bridge.js'), context);
+  const bridge = context.window.DataBridge;
+  bridge._cache.set('ability', { baseline: 88 });
+  bridge._cache.set('abilitySessionId', 'old-session');
+  let result = await bridge.getAbility('new-session');
+  assert.equal(result.error, 'service_unavailable');
+  assert.equal(history.length, 0);
+  payload = { error: 'temporary_failure' };
+  result = await bridge.getAbility('new-session');
+  assert.equal(result.error, 'service_unavailable');
+  assert.equal(result.degraded_reason, 'temporary_failure');
+  assert.equal(history.length, 0);
+  result = await bridge.getAbility('old-session');
+  assert.equal(result.degraded_reason, 'cached');
+  bridge._cache.set('diagnoseResult', { score_R: 80 });
+  bridge._cache.set('interviewReport', { score_I: 80 });
+  payload = { resumeText: '新的合成简历', resumeProfile: {}, session_id: 'fresh-session' };
+  await bridge.uploadResume({});
+  assert.equal(bridge._cache.get('diagnoseResult'), null);
+  assert.equal(bridge._cache.get('interviewReport'), null);
+  assert.equal(bridge._cache.get('ability'), null);
+});
