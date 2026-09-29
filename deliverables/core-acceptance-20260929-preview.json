@@ -1,0 +1,143 @@
+{
+  "date": "2026-09-29T00:42:09.756231+00:00",
+  "scope": "core-only",
+  "synthetic": true,
+  "human_participants": 0,
+  "base_url": "https://career-coach-nw4jw50w8-zimo66067.vercel.app",
+  "requested_rounds": 3,
+  "completed_rounds": 0,
+  "passed": false,
+  "failure_category": "AssertionError",
+  "checks": [
+    {
+      "name": "HTTP GET /api/health actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "production database and model configuration ready",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf01/consent actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/diagnose actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis has structured subscores",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis has actionable suggestions",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis is model, not fallback",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/optimize actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC01 rewrite requires confirmation",
+      "passed": true
+    },
+    {
+      "name": "TC01 rewrite nonempty",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/profile/evidence/candidates actual=201 expected=(201,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 real evidence available",
+      "passed": false
+    },
+    {
+      "name": "HTTP GET /api/profile actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf06/delete actual=200 expected=(200, 404)",
+      "passed": true
+    },
+    {
+      "name": "TC05 workflow session deleted",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/optimize actual=404 expected=(404,)",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "http": 200,
+      "ms": 1375
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf01/consent",
+      "http": 200,
+      "ms": 1313
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/diagnose",
+      "http": 200,
+      "ms": 33906
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/optimize",
+      "http": 200,
+      "ms": 3250
+    },
+    {
+      "method": "POST",
+      "path": "/api/profile/evidence/candidates",
+      "http": 201,
+      "ms": 1422
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile",
+      "http": 200,
+      "ms": 1343
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf06/delete",
+      "http": 200,
+      "ms": 1282
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/optimize",
+      "http": 404,
+      "ms": 1437
+    }
+  ],
+  "observations": [
+    {
+      "round": 1,
+      "diagnosis_mode": "model"
+    },
+    {
+      "round": 1,
+      "diagnosis_mode": "model",
+      "rewrite_basis": "rule"
+    },
+    {
+      "round": 1,
+      "cleanup_errors": 0,
+      "residual": "empty owner profile and quota metadata may remain; not an account erasure test"
+    }
+  ]
+}

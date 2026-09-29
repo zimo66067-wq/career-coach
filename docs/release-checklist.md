@@ -1,5 +1,14 @@
 # 上线剩余步骤清单
 
+## 2026-09-29 Preview 签名配置修复后复测
+
+- 新部署 `dpl_5ubNiT3poMdRbAuBMjfpFtmAQq7u` 为 Preview、READY，代码 `998c91318c841d11df3b7ed4ffa7a0be73123196`，地址 `https://career-coach-nw4jw50w8-zimo66067.vercel.app`。对应 PR CI 与部署检查均通过。
+- `deliverables/core-acceptance-20260929-preview.json` 保存严格验收结果：健康/持久化门禁通过；同意接口 HTTP 200，原 503 阻断已解除；诊断 HTTP 200、`diagnosis_mode=model`，耗时 33.906 秒。
+- 改写接口 HTTP 200，待确认及非空断言通过，但 `rewrite_basis=rule`，不能称为真实模型改写成功。
+- 候选证据接口 HTTP 201，但 `created` 为空，`TC02 real evidence available` 失败。0/3 完整轮次，后续岗位/面试/行动环节未执行；合成会话清理成功，cleanup_errors=0。
+- 代码检查表明候选证据要求诊断的指定子项含 `source_spans`，且引文须为原文中的完整、实质性片段。当前报告没有保存原始模型响应，因此尚不能确定本次是引文缺失、被过滤，还是去重；不得降低证据校验或把空结果算通过。下一步应增加不含正文的拒绝原因/计数诊断并复现，再修复实际原因。
+- 尚未合并或发布核心修复。用户此前重新部署过旧生产代码 `295a8e9`，部署 ID 为 `dpl_FmLgoPHkZG5yiDDREhM5k234Tj1p`；本轮仅验证 Preview。
+
 ## 2026-09-28 核心版发布门禁（优先于下方历史阶段记录）
 
 用户已确认仅发布核心版，并授权在验证通过后提交、推送及部署修复。全国单位库、实时职位检索、竞赛提交包不属于本次发布门槛；仓库保持当前公开状态，不变更权限。

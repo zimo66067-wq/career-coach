@@ -116,6 +116,10 @@ class Acceptance:
             # TC02: source evidence is pending until confirmed; target -> decision -> action.
             candidates = self.request("POST", "/api/profile/evidence/candidates",
                                       {"session_id": sid, "resumeProfile": profile}, token, (201,))
+            self.observations.append({"round": index,
+                                      "candidate_created": candidates.get("createdCount"),
+                                      "candidate_considered": candidates.get("considered"),
+                                      "candidate_skipped_existing": candidates.get("skippedExisting")})
             for item in candidates.get("created", []):
                 self.check("TC02 extracted evidence pending", item.get("status") == "pending")
             self.check("TC02 real evidence available", bool(candidates.get("created")))

@@ -14,6 +14,21 @@ from tests.test_core_release import core  # fixture with isolated DB and no netw
 from tests.test_core_release import acceptance
 
 
+def test_exact_quote_survives_incorrect_model_offsets():
+    from services.diagnosis_service import normalize_source_spans
+    text = "项目经历\n负责接口性能优化，将响应时间从900毫秒降低至180毫秒。"
+    quote = text.split("\n")[1]
+    spans, invalid = normalize_source_spans([{"quote": quote, "start": 0, "end": 4}], text)
+    assert not invalid
+    assert spans == [{"doc": "resume", "quote": quote, "start": text.index(quote), "end": len(text)}]
+
+
+def test_nonexistent_quote_is_not_repaired_by_offsets():
+    from services.diagnosis_service import normalize_source_spans
+    spans, invalid = normalize_source_spans([{"quote": "编造的原文", "start": 0, "end": 4}], "真实项目经历")
+    assert invalid and spans == []
+
+
 @pytest.mark.parametrize("url", ["http://preview.invalid/?_vercel_share=synthetic",
                                 "https://other.invalid/?_vercel_share=synthetic",
                                 "https://user:synthetic@preview.invalid/",

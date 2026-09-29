@@ -84,10 +84,11 @@ def normalize_source_spans(raw_spans, resume_text):
         end = raw_span.get("end")
 
         if isinstance(quote, str) and quote:
-            if isinstance(start, int) and isinstance(end, int):
-                if start < 0 or end <= start or end > len(resume_text) or resume_text[start:end] != quote:
-                    return [], True
-            else:
+            # Exact source text is authoritative; model character arithmetic is not.
+            # Re-anchor only verbatim quotes, never approximate or invented text.
+            if not (isinstance(start, int) and isinstance(end, int)
+                    and 0 <= start < end <= len(resume_text)
+                    and resume_text[start:end] == quote):
                 start = resume_text.find(quote)
                 end = start + len(quote)
                 if start < 0:
