@@ -167,7 +167,8 @@ class Acceptance:
                                   {"session_id": sid, "targetJobId": target_id, "company": "合成验收单位", "position": "后端开发"}, token)
             self.check("TC04 letter grounded and pending", bool(letter.get("evidence")) and letter.get("pending_confirm") is True)
             self.check("TC04 letter nonempty", len(str(letter.get("candidate") or "").strip()) >= 20)
-            self.observations.append({"round": index, "cover_letter_basis": letter.get("basis"), "grounding": letter.get("grounding")})
+            self.observations.append({"round": index, "cover_letter_basis": letter.get("basis"), "grounding": letter.get("grounding"),
+                                      "cover_letter_fallback_reason": letter.get("fallback_reason")})
             created = self.request("POST", "/api/wf07/applications",
                                    {"session_id": sid, "company": "合成验收单位", "position": "后端开发", "cover_letter": letter["candidate"]}, token, (201,))
             app_id = created["application"]["id"]

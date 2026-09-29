@@ -203,7 +203,9 @@ def _grounded_letter(session_id, context):
 
     # 规则 1：没有已确认证据就不请模型写。空地会让模型替用户编经历。
     router = None
+    fallback_reason = "no_confirmed_evidence"
     if evidence:
+        fallback_reason = "model_not_configured"
         try:
             router = model_provider.build_model_router()
         except ApiError:
@@ -211,6 +213,7 @@ def _grounded_letter(session_id, context):
 
     if router is not None:
         try:
+            fallback_reason = "provider_unavailable"
             result = router.call(
                 "cover_letter", _grounded_prompt(company, position, requirements, evidence, gaps)
             )
@@ -218,6 +221,12 @@ def _grounded_letter(session_id, context):
                 candidate = _output_text(
                     result["output"], ("candidate", "cover_letter", "content", "text")
                 )
+                if not candidate:
+                    fallback_reason = "empty_candidate"
+                elif not (company in candidate or position in candidate):
+                    fallback_reason = "target_not_referenced"
+                else:
+                    fallback_reason = "evidence_validation_rejected"
                 if (candidate and (company in candidate or position in candidate)
                         and _grounded_in_evidence(candidate, quotes)):
                     payload.update({
@@ -228,11 +237,12 @@ def _grounded_letter(session_id, context):
                     })
                     return payload
         except Exception:  # noqa: BLE001 - 模型失败一律降级，不影响出信
-            pass
+            fallback_reason = "provider_exception"
 
     payload.update({
         "candidate": _grounded_template(company, position, evidence),
         "basis": "rule",
+        "fallback_reason": fallback_reason,
         "grounding": "target_job+evidence" if evidence else "target_job_no_evidence",
         "notice": _letter_notice(evidence, gaps),
     })

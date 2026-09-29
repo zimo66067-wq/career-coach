@@ -31,6 +31,38 @@ COMPANY = "示例科技"
 POSITION = "后端开发工程师"
 
 
+@pytest.mark.parametrize("output,reason", [
+    ("", "provider_unavailable"),
+    ({"candidate": "短"}, "empty_candidate"),
+    ({"candidate": "我负责接口性能优化并记录了详细验证过程，希望加入贵团队。"}, "target_not_referenced"),
+    ({"candidate": "我申请后端开发工程师职位，期待获得进一步沟通的机会，谢谢。"}, "evidence_validation_rejected"),
+])
+def test_letter_reports_safe_fallback_reason(monkeypatch, output, reason):
+    from services.apply_service import _grounded_letter
+    class Router:
+        def call(self, *args):
+            return {"status": "success", "output": output}
+    monkeypatch.setattr(model_provider, "build_model_router", lambda: Router())
+    context = {"company": COMPANY, "position": POSITION, "requirements": [], "gaps": [],
+               "evidence": [{"id": 1, "claim": "负责接口性能优化并记录验证过程", "quote": "负责接口性能优化并记录验证过程"}]}
+    result = _grounded_letter("synthetic", context)
+    assert result["basis"] == "rule"
+    assert result["fallback_reason"] == reason
+
+
+def test_letter_exception_details_not_exposed(monkeypatch):
+    from services.apply_service import _grounded_letter
+    class Router:
+        def call(self, *args):
+            raise RuntimeError("SYNTHETIC_PRIVATE_PROVIDER_PAYLOAD")
+    monkeypatch.setattr(model_provider, "build_model_router", lambda: Router())
+    context = {"company": COMPANY, "position": POSITION, "requirements": [], "gaps": [],
+               "evidence": [{"id": 1, "claim": "负责接口性能优化并记录验证过程", "quote": "负责接口性能优化并记录验证过程"}]}
+    result = _grounded_letter("synthetic", context)
+    assert result["fallback_reason"] == "provider_exception"
+    assert "SYNTHETIC_PRIVATE_PROVIDER_PAYLOAD" not in str(result)
+
+
 class ConsentedClient:
     def __init__(self, flask_client, token):
         self.raw = flask_client
