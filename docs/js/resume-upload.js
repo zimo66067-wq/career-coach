@@ -225,7 +225,7 @@
       reason.dataset.quote = encodeURIComponent(String(quote));
       reason.tabIndex = 0;
       reason.appendChild(element("b", "", scoreLabels[key] || key));
-      reason.appendChild(element("div", "reason-text", item.reason || item.suggestion || "已完成该维度评估。"));
+      reason.appendChild(element("div", "reason-text", item.rationale || item.reason || item.suggestion || "该维度暂无详细评估理由。"));
       if (item.suggestion) reason.appendChild(element("span", "tag", item.suggestion));
       list.appendChild(reason);
     });

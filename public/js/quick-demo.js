@@ -40,7 +40,7 @@
       el.className = 'demo-badge';
       document.body.appendChild(el);
     }
-    el.textContent = '演示数据 · 结果不写入你的历史记录';
+    el.textContent = '合成样例 · 通过真实接口诊断，登录后可能保存到当前账号历史';
     el.classList.add('show');
     document.body.setAttribute('data-demo', '1');
   }

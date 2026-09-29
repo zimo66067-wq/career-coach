@@ -157,6 +157,8 @@ def _grounded_prompt(company, position, requirements, evidence, gaps):
         "已确认的职业证据（这是**唯一**允许引用的事实）：\n%s\n\n"
         "尚未被证据覆盖的要求（**禁止**声称具备，也不要提及）：\n%s\n\n"
         "请写一封不超过 200 字的中文求职信正文，优先回应有证据支撑的要求。"
+        "正文必须逐字包含上方非空的目标公司名称或目标职位名称，"
+        "不能只用贵公司、贵团队或该岗位代替；至少引用一项已确认证据，禁止编造经历。"
         % (company, position, requirement_lines, evidence_lines, gap_lines)
     )
 

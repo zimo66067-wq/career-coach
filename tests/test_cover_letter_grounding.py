@@ -339,6 +339,8 @@ def test_model_prose_is_used_when_it_stays_grounded(client, monkeypatch):
     # 提示词里必须同时出现要求清单与证据清单
     prompt = stub.calls[0]["prompt"]
     assert claim in prompt
+    assert "正文必须逐字包含上方非空的目标公司名称或目标职位名称" in prompt
+    assert "禁止编造经历" in prompt
     assert body["requirements"][0]["text"] in prompt
 
 

@@ -50,6 +50,13 @@ test('quick-demo.js 暴露 QuickDemo.start 且必须标注演示数据', () => {
   assert.equal(typeof context.window.QuickDemo.startF1, 'function');
   assert.match(source, /演示数据/);
   assert.match(source, /showDemoBadge/);
+  assert.match(source, /合成样例.*可能保存到当前账号历史/);
+  assert.doesNotMatch(source, /结果不写入你的历史记录/);
+});
+
+test('真实诊断理由优先读取后端 rationale 字段', () => {
+  const source = read('public/js/resume-upload.js');
+  assert.match(source, /item\.rationale \|\| item\.reason/);
 });
 
 test('mock-data.js 提供样例 JD（jdText）', () => {

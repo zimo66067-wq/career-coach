@@ -1,0 +1,1623 @@
+{
+  "date": "2026-09-29T05:58:33.166487+00:00",
+  "scope": "core-only",
+  "synthetic": true,
+  "human_participants": 0,
+  "base_url": "https://career-coach-dw210j3st-zimo66067.vercel.app",
+  "requested_rounds": 3,
+  "completed_rounds": 3,
+  "passed": true,
+  "failure_category": null,
+  "checks": [
+    {
+      "name": "HTTP GET /api/health actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "production database and model configuration ready",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf01/consent actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/diagnose actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis has structured subscores",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis has actionable suggestions",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis is model, not fallback",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/optimize actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC01 rewrite requires confirmation",
+      "passed": true
+    },
+    {
+      "name": "TC01 rewrite nonempty",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/profile/evidence/candidates actual=201 expected=(201,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 extracted evidence pending",
+      "passed": true
+    },
+    {
+      "name": "TC02 extracted evidence pending",
+      "passed": true
+    },
+    {
+      "name": "TC02 extracted evidence pending",
+      "passed": true
+    },
+    {
+      "name": "TC02 extracted evidence pending",
+      "passed": true
+    },
+    {
+      "name": "TC02 real evidence available",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/profile/evidence/36/confirm actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 explicit evidence confirmation",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/target-jobs actual=201 expected=(201,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 JD has requirements",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/target-jobs/4/analyse actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/target-jobs/4/decision actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 deterministic decision",
+      "passed": true
+    },
+    {
+      "name": "TC02 gaps available for practice",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/actions actual=201 expected=(200, 201)",
+      "passed": true
+    },
+    {
+      "name": "TC02 actionable plan",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/actions actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 no duplicate actions",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/start actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 first question nonempty",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/answer actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question not repeated",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question references actual answer",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/answer actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question not repeated",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question references actual answer",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/answer actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question not repeated",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question references actual answer",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/end actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/profile actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 extracted interview facts remain pending",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf07/cover-letter actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC04 letter grounded and pending",
+      "passed": true
+    },
+    {
+      "name": "TC04 letter nonempty",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf07/applications actual=201 expected=(201,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf07/applications/4/outcome actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC04 outcome stored",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf01/consent actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/profile actual=428 expected=(428,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/target-jobs/4 actual=404 expected=(404,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf06/delete actual=404 expected=(404,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/target-jobs/4 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/target-jobs/4 actual=404 expected=(404,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/profile actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/48 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/47 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/46 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/45 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/44 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/43 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/42 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/41 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/40 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/39 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/38 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/37 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/36 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf06/delete actual=200 expected=(200, 404)",
+      "passed": true
+    },
+    {
+      "name": "TC05 workflow session deleted",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/optimize actual=404 expected=(404,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf01/consent actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/diagnose actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis has structured subscores",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis has actionable suggestions",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis is model, not fallback",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/optimize actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC01 rewrite requires confirmation",
+      "passed": true
+    },
+    {
+      "name": "TC01 rewrite nonempty",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/profile/evidence/candidates actual=201 expected=(201,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 extracted evidence pending",
+      "passed": true
+    },
+    {
+      "name": "TC02 real evidence available",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/profile/evidence/49/confirm actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 explicit evidence confirmation",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/target-jobs actual=201 expected=(201,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 JD has requirements",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/target-jobs/5/analyse actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/target-jobs/5/decision actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 deterministic decision",
+      "passed": true
+    },
+    {
+      "name": "TC02 gaps available for practice",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/actions actual=201 expected=(200, 201)",
+      "passed": true
+    },
+    {
+      "name": "TC02 actionable plan",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/actions actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 no duplicate actions",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/start actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 first question nonempty",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/answer actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question not repeated",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question references actual answer",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/answer actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question not repeated",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question references actual answer",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/answer actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question not repeated",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question references actual answer",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/end actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/profile actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 extracted interview facts remain pending",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf07/cover-letter actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC04 letter grounded and pending",
+      "passed": true
+    },
+    {
+      "name": "TC04 letter nonempty",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf07/applications actual=201 expected=(201,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf07/applications/5/outcome actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC04 outcome stored",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf01/consent actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/profile actual=428 expected=(428,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/target-jobs/5 actual=404 expected=(404,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf06/delete actual=404 expected=(404,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/target-jobs/5 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/target-jobs/5 actual=404 expected=(404,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/profile actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/59 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/58 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/57 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/56 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/55 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/54 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/53 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/52 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/51 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/50 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/49 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf06/delete actual=200 expected=(200, 404)",
+      "passed": true
+    },
+    {
+      "name": "TC05 workflow session deleted",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/optimize actual=404 expected=(404,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf01/consent actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/diagnose actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis has structured subscores",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis has actionable suggestions",
+      "passed": true
+    },
+    {
+      "name": "TC01 diagnosis is model, not fallback",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/optimize actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC01 rewrite requires confirmation",
+      "passed": true
+    },
+    {
+      "name": "TC01 rewrite nonempty",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/profile/evidence/candidates actual=201 expected=(201,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 extracted evidence pending",
+      "passed": true
+    },
+    {
+      "name": "TC02 real evidence available",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/profile/evidence/60/confirm actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 explicit evidence confirmation",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/target-jobs actual=201 expected=(201,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 JD has requirements",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/target-jobs/6/analyse actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/target-jobs/6/decision actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 deterministic decision",
+      "passed": true
+    },
+    {
+      "name": "TC02 gaps available for practice",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/actions actual=201 expected=(200, 201)",
+      "passed": true
+    },
+    {
+      "name": "TC02 actionable plan",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/actions actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC02 no duplicate actions",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/start actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 first question nonempty",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/answer actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question not repeated",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question references actual answer",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/answer actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question not repeated",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question references actual answer",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/answer actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question not repeated",
+      "passed": true
+    },
+    {
+      "name": "TC03 next question references actual answer",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf04/end actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/profile actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC03 extracted interview facts remain pending",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf07/cover-letter actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC04 letter grounded and pending",
+      "passed": true
+    },
+    {
+      "name": "TC04 letter nonempty",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf07/applications actual=201 expected=(201,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf07/applications/6/outcome actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "TC04 outcome stored",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf01/consent actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/profile actual=428 expected=(428,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/target-jobs/6 actual=404 expected=(404,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf06/delete actual=404 expected=(404,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/target-jobs/6 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/target-jobs/6 actual=404 expected=(404,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP GET /api/profile actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/70 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/69 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/68 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/67 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/66 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/65 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/64 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/63 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/62 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/61 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP DELETE /api/profile/evidence/60 actual=200 expected=(200,)",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf06/delete actual=200 expected=(200, 404)",
+      "passed": true
+    },
+    {
+      "name": "TC05 workflow session deleted",
+      "passed": true
+    },
+    {
+      "name": "HTTP POST /api/wf02/optimize actual=404 expected=(404,)",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "http": 200,
+      "ms": 1532
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf01/consent",
+      "http": 200,
+      "ms": 1343
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/diagnose",
+      "http": 200,
+      "ms": 27454
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/optimize",
+      "http": 200,
+      "ms": 4484
+    },
+    {
+      "method": "POST",
+      "path": "/api/profile/evidence/candidates",
+      "http": 201,
+      "ms": 1859
+    },
+    {
+      "method": "POST",
+      "path": "/api/profile/evidence/36/confirm",
+      "http": 200,
+      "ms": 1625
+    },
+    {
+      "method": "POST",
+      "path": "/api/target-jobs",
+      "http": 201,
+      "ms": 2094
+    },
+    {
+      "method": "POST",
+      "path": "/api/target-jobs/4/analyse",
+      "http": 200,
+      "ms": 5078
+    },
+    {
+      "method": "GET",
+      "path": "/api/target-jobs/4/decision",
+      "http": 200,
+      "ms": 1328
+    },
+    {
+      "method": "POST",
+      "path": "/api/actions",
+      "http": 201,
+      "ms": 1953
+    },
+    {
+      "method": "POST",
+      "path": "/api/actions",
+      "http": 200,
+      "ms": 1532
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/start",
+      "http": 200,
+      "ms": 2672
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/answer",
+      "http": 200,
+      "ms": 1468
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/answer",
+      "http": 200,
+      "ms": 3032
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/answer",
+      "http": 200,
+      "ms": 1437
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/end",
+      "http": 200,
+      "ms": 5422
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile",
+      "http": 200,
+      "ms": 1562
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf07/cover-letter",
+      "http": 200,
+      "ms": 3454
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf07/applications",
+      "http": 201,
+      "ms": 1265
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf07/applications/4/outcome",
+      "http": 200,
+      "ms": 1500
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf01/consent",
+      "http": 200,
+      "ms": 1250
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile",
+      "http": 428,
+      "ms": 1219
+    },
+    {
+      "method": "GET",
+      "path": "/api/target-jobs/4",
+      "http": 404,
+      "ms": 1750
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf06/delete",
+      "http": 404,
+      "ms": 1344
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/target-jobs/4",
+      "http": 200,
+      "ms": 1390
+    },
+    {
+      "method": "GET",
+      "path": "/api/target-jobs/4",
+      "http": 404,
+      "ms": 1485
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile",
+      "http": 200,
+      "ms": 1312
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/48",
+      "http": 200,
+      "ms": 1313
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/47",
+      "http": 200,
+      "ms": 1328
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/46",
+      "http": 200,
+      "ms": 1437
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/45",
+      "http": 200,
+      "ms": 1422
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/44",
+      "http": 200,
+      "ms": 1453
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/43",
+      "http": 200,
+      "ms": 1328
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/42",
+      "http": 200,
+      "ms": 1360
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/41",
+      "http": 200,
+      "ms": 1500
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/40",
+      "http": 200,
+      "ms": 1328
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/39",
+      "http": 200,
+      "ms": 1328
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/38",
+      "http": 200,
+      "ms": 3719
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/37",
+      "http": 200,
+      "ms": 1406
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/36",
+      "http": 200,
+      "ms": 1875
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf06/delete",
+      "http": 200,
+      "ms": 1313
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/optimize",
+      "http": 404,
+      "ms": 3765
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf01/consent",
+      "http": 200,
+      "ms": 1281
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/diagnose",
+      "http": 200,
+      "ms": 37032
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/optimize",
+      "http": 200,
+      "ms": 2656
+    },
+    {
+      "method": "POST",
+      "path": "/api/profile/evidence/candidates",
+      "http": 201,
+      "ms": 1641
+    },
+    {
+      "method": "POST",
+      "path": "/api/profile/evidence/49/confirm",
+      "http": 200,
+      "ms": 1343
+    },
+    {
+      "method": "POST",
+      "path": "/api/target-jobs",
+      "http": 201,
+      "ms": 2235
+    },
+    {
+      "method": "POST",
+      "path": "/api/target-jobs/5/analyse",
+      "http": 200,
+      "ms": 4203
+    },
+    {
+      "method": "GET",
+      "path": "/api/target-jobs/5/decision",
+      "http": 200,
+      "ms": 1234
+    },
+    {
+      "method": "POST",
+      "path": "/api/actions",
+      "http": 201,
+      "ms": 1860
+    },
+    {
+      "method": "POST",
+      "path": "/api/actions",
+      "http": 200,
+      "ms": 1515
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/start",
+      "http": 200,
+      "ms": 2860
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/answer",
+      "http": 200,
+      "ms": 1375
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/answer",
+      "http": 200,
+      "ms": 3546
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/answer",
+      "http": 200,
+      "ms": 1469
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/end",
+      "http": 200,
+      "ms": 5328
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile",
+      "http": 200,
+      "ms": 2250
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf07/cover-letter",
+      "http": 200,
+      "ms": 3782
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf07/applications",
+      "http": 201,
+      "ms": 1203
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf07/applications/5/outcome",
+      "http": 200,
+      "ms": 1468
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf01/consent",
+      "http": 200,
+      "ms": 2141
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile",
+      "http": 428,
+      "ms": 1219
+    },
+    {
+      "method": "GET",
+      "path": "/api/target-jobs/5",
+      "http": 404,
+      "ms": 1312
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf06/delete",
+      "http": 404,
+      "ms": 1672
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/target-jobs/5",
+      "http": 200,
+      "ms": 1500
+    },
+    {
+      "method": "GET",
+      "path": "/api/target-jobs/5",
+      "http": 404,
+      "ms": 1328
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile",
+      "http": 200,
+      "ms": 1360
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/59",
+      "http": 200,
+      "ms": 1203
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/58",
+      "http": 200,
+      "ms": 1234
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/57",
+      "http": 200,
+      "ms": 1219
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/56",
+      "http": 200,
+      "ms": 1266
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/55",
+      "http": 200,
+      "ms": 1296
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/54",
+      "http": 200,
+      "ms": 1344
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/53",
+      "http": 200,
+      "ms": 1313
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/52",
+      "http": 200,
+      "ms": 1234
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/51",
+      "http": 200,
+      "ms": 3422
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/50",
+      "http": 200,
+      "ms": 1531
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/49",
+      "http": 200,
+      "ms": 1297
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf06/delete",
+      "http": 200,
+      "ms": 1359
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/optimize",
+      "http": 404,
+      "ms": 1422
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf01/consent",
+      "http": 200,
+      "ms": 1250
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/diagnose",
+      "http": 200,
+      "ms": 42266
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/optimize",
+      "http": 200,
+      "ms": 2750
+    },
+    {
+      "method": "POST",
+      "path": "/api/profile/evidence/candidates",
+      "http": 201,
+      "ms": 2062
+    },
+    {
+      "method": "POST",
+      "path": "/api/profile/evidence/60/confirm",
+      "http": 200,
+      "ms": 1329
+    },
+    {
+      "method": "POST",
+      "path": "/api/target-jobs",
+      "http": 201,
+      "ms": 2250
+    },
+    {
+      "method": "POST",
+      "path": "/api/target-jobs/6/analyse",
+      "http": 200,
+      "ms": 4093
+    },
+    {
+      "method": "GET",
+      "path": "/api/target-jobs/6/decision",
+      "http": 200,
+      "ms": 1328
+    },
+    {
+      "method": "POST",
+      "path": "/api/actions",
+      "http": 201,
+      "ms": 2047
+    },
+    {
+      "method": "POST",
+      "path": "/api/actions",
+      "http": 200,
+      "ms": 1641
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/start",
+      "http": 200,
+      "ms": 2453
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/answer",
+      "http": 200,
+      "ms": 1734
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/answer",
+      "http": 200,
+      "ms": 4922
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/answer",
+      "http": 200,
+      "ms": 1469
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf04/end",
+      "http": 200,
+      "ms": 6313
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile",
+      "http": 200,
+      "ms": 3062
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf07/cover-letter",
+      "http": 200,
+      "ms": 3484
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf07/applications",
+      "http": 201,
+      "ms": 1329
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf07/applications/6/outcome",
+      "http": 200,
+      "ms": 1750
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf01/consent",
+      "http": 200,
+      "ms": 1234
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile",
+      "http": 428,
+      "ms": 2297
+    },
+    {
+      "method": "GET",
+      "path": "/api/target-jobs/6",
+      "http": 404,
+      "ms": 1281
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf06/delete",
+      "http": 404,
+      "ms": 1672
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/target-jobs/6",
+      "http": 200,
+      "ms": 1516
+    },
+    {
+      "method": "GET",
+      "path": "/api/target-jobs/6",
+      "http": 404,
+      "ms": 1359
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile",
+      "http": 200,
+      "ms": 1516
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/70",
+      "http": 200,
+      "ms": 1343
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/69",
+      "http": 200,
+      "ms": 3282
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/68",
+      "http": 200,
+      "ms": 1500
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/67",
+      "http": 200,
+      "ms": 1218
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/66",
+      "http": 200,
+      "ms": 1344
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/65",
+      "http": 200,
+      "ms": 1234
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/64",
+      "http": 200,
+      "ms": 1422
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/63",
+      "http": 200,
+      "ms": 1282
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/62",
+      "http": 200,
+      "ms": 2406
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/61",
+      "http": 200,
+      "ms": 1984
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/profile/evidence/60",
+      "http": 200,
+      "ms": 1297
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf06/delete",
+      "http": 200,
+      "ms": 1422
+    },
+    {
+      "method": "POST",
+      "path": "/api/wf02/optimize",
+      "http": 404,
+      "ms": 1437
+    }
+  ],
+  "observations": [
+    {
+      "round": 1,
+      "diagnosis_mode": "model"
+    },
+    {
+      "round": 1,
+      "diagnosis_mode": "model",
+      "rewrite_basis": "rule"
+    },
+    {
+      "round": 1,
+      "candidate_created": 4,
+      "candidate_considered": 4,
+      "candidate_skipped_existing": 0
+    },
+    {
+      "round": 1,
+      "interview_extraction_degraded": false
+    },
+    {
+      "round": 1,
+      "cover_letter_basis": "model",
+      "grounding": "target_job+evidence",
+      "cover_letter_fallback_reason": null
+    },
+    {
+      "round": 1,
+      "cleanup_errors": 0,
+      "residual": "empty owner profile and quota metadata may remain; not an account erasure test"
+    },
+    {
+      "round": 2,
+      "diagnosis_mode": "model"
+    },
+    {
+      "round": 2,
+      "diagnosis_mode": "model",
+      "rewrite_basis": "model"
+    },
+    {
+      "round": 2,
+      "candidate_created": 1,
+      "candidate_considered": 1,
+      "candidate_skipped_existing": 0
+    },
+    {
+      "round": 2,
+      "interview_extraction_degraded": false
+    },
+    {
+      "round": 2,
+      "cover_letter_basis": "rule",
+      "grounding": "target_job+evidence",
+      "cover_letter_fallback_reason": "target_not_referenced"
+    },
+    {
+      "round": 2,
+      "cleanup_errors": 0,
+      "residual": "empty owner profile and quota metadata may remain; not an account erasure test"
+    },
+    {
+      "round": 3,
+      "diagnosis_mode": "model"
+    },
+    {
+      "round": 3,
+      "diagnosis_mode": "model",
+      "rewrite_basis": "model"
+    },
+    {
+      "round": 3,
+      "candidate_created": 1,
+      "candidate_considered": 1,
+      "candidate_skipped_existing": 0
+    },
+    {
+      "round": 3,
+      "interview_extraction_degraded": false
+    },
+    {
+      "round": 3,
+      "cover_letter_basis": "rule",
+      "grounding": "target_job+evidence",
+      "cover_letter_fallback_reason": "target_not_referenced"
+    },
+    {
+      "round": 3,
+      "cleanup_errors": 0,
+      "residual": "empty owner profile and quota metadata may remain; not an account erasure test"
+    }
+  ]
+}
