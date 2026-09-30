@@ -170,6 +170,20 @@ def test_repeated_model_question_uses_answer_driven_fallback():
     assert third["basis"] in third["question"]
 
 
+def test_paraphrased_question_does_not_repeat_the_same_measured_detail():
+    engine = InterviewEngine()
+    prior = (
+        "你刚才提到「我用 EXPLAIN 分析 SQL 扫描行数」。"
+        "围绕岗位要求「熟悉 Go」，你提到「增加查询耗时埋点」，"
+        "能否具体说明你如何通过这些工具或方法来量化并追踪慢查询的改善效果？"
+    )
+    candidate = (
+        "你提到「我负责埋点和 SQL 分析」，能否具体说明你如何通过埋点和 SQL 分析"
+        "来量化并追踪慢查询的改善效果？"
+    )
+    assert engine._is_repeated_question({"turns": [{"question": prior}]}, candidate)
+
+
 def test_answer_context_is_deidentified_before_storage_and_model_use():
     router = CaptureRouter()
     engine = InterviewEngine(model_router=router)

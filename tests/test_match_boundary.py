@@ -178,6 +178,22 @@ def test_api_match_all_unknown_returns_insufficient():
     assert "不足" in result["match_notice"]
 
 
+def test_bm25_service_does_not_treat_documentation_as_unit_testing():
+    profile = {
+        "user_confirmed": True,
+        "requirements": [{
+            "id": "r1",
+            "type": "responsibility",
+            "text": "编写单元测试并排查线上问题",
+        }],
+    }
+    resume = "项目经历：编写接口文档并推动联调，与前端约定统一的错误码规范。"
+    result = api_module.match_job_profile(resume, profile)
+    item = result["requirements"][0]
+    assert item["status"] not in {"covered", "weak"}
+    assert item["evidence"] == ""
+
+
 def job_profile_for_analysis():
     return {
         "user_confirmed": True,

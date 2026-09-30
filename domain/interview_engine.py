@@ -589,9 +589,12 @@ class InterviewEngine:
     def _question_core(value):
         text = re.sub(r"\s+", "", str(value or ""))
         text = re.sub(r"^你刚才提到「.*?」。", "", text)
+        text = re.sub(r"^你提到「.*?」，", "", text)
         text = re.sub(r"^结合你上一轮的回答，", "", text)
         text = re.sub(r"^围绕岗位要求「.*?」，", "", text)
         text = re.sub(r"^沿着这一经历，", "", text)
+        # A quote in the middle is still an answer anchor, not a new topic.
+        text = re.sub(r"「[^」]*」", "", text)
         return re.sub(r"[，。！？；：,.!?;:]", "", text)
 
     def _is_repeated_question(self, session, candidate):
@@ -611,7 +614,15 @@ class InterviewEngine:
             # "具体" or changing punctuation.  Treat highly similar long
             # questions as repeats so the fallback can choose another angle.
             if min(len(core), len(prior)) >= 12:
-                if SequenceMatcher(None, core, prior).ratio() >= 0.88:
+                comparison = SequenceMatcher(None, core, prior)
+                if comparison.ratio() >= 0.88:
+                    return True
+                # Paraphrases can change the opening while asking for the
+                # same already-answered detail.  A long shared substantive
+                # span catches that without treating every job-specific
+                # question as a duplicate.
+                common = comparison.find_longest_match(0, len(core), 0, len(prior))
+                if common.size >= 14 and common.size / min(len(core), len(prior)) >= 0.36:
                     return True
         return False
 

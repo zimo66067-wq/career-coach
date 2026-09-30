@@ -12,6 +12,7 @@ from domain.match_requirements import (
     split_sentences,
     tokenize,
     unigrams,
+    verify_evidence,
 )
 
 
@@ -271,6 +272,15 @@ def match_job_profile(resume_text, job_profile):
         query_words = unigrams(requirement["text"])
         partial = bool(query_words & document_unigrams)
         status = judge(confidence, partial)
+        # BM25 ranks similar wording, not factual entailment.  In particular,
+        # "编写接口文档" must not prove "编写单元测试" merely because both
+        # sentences contain 编写/接口/开发.  Apply the same factual-overlap
+        # gate used by the embedding path before displaying any evidence.
+        if status in {"covered", "weak"} and (
+            sentence_index < 0
+            or not verify_evidence(requirement["text"], sentences[sentence_index])
+        ):
+            status = judge(0.0, partial)
         result = {
             "id": requirement["id"],
             "type": requirement["type"],

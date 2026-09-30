@@ -349,8 +349,8 @@ def test_certificate_requirement_blocks_only_until_it_appears(client):
 
 def test_fully_covered_requirements_are_apply(client):
     jd = ("任职要求：\n"
-          "负责交易系统的后端服务开发与维护，参与高并发场景下的性能优化。\n"
-          "熟悉 MySQL，了解索引优化和慢查询分析。\n")
+          "订单中心微服务开发，使用 Go 实现订单查询接口。\n"
+          "使用 MySQL 索引优化订单列表查询性能。\n")
     job = _make_target_job(client, jd=jd)
     result = _analyse(client, job["targetJob"]["id"])
     assert result["decision"]["decision"] == "APPLY"
@@ -364,8 +364,8 @@ def test_the_rule_reaches_all_three_verdicts(client):
         "pass": "任职要求：\n硕士研究生及以上学历，计算机相关专业；\n",
         "stretch": "任职要求：\n本科及以上学历，计算机相关专业；\n熟练掌握 TypeScript 和 React；\n",
         "apply": ("任职要求：\n"
-                  "负责交易系统的后端服务开发与维护，参与高并发场景下的性能优化。\n"
-                  "熟悉 MySQL，了解索引优化和慢查询分析。\n"),
+                  "订单中心微服务开发，使用 Go 实现订单查询接口。\n"
+                  "使用 MySQL 索引优化订单列表查询性能。\n"),
     }
     for key, jd in cases.items():
         job = _make_target_job(client, jd=jd)
