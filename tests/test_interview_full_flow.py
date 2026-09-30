@@ -77,6 +77,49 @@ def test_gaps_padded_from_requirements():
     assert len(session["match_gaps"]) == 5
 
 
+def test_stored_gap_and_requirement_with_same_text_are_not_asked_twice():
+    engine = InterviewEngine()
+    degree = "本科及以上学历，计算机相关专业"
+    session = make_session(
+        engine,
+        [{"id": "stored-1", "type": "hard", "text": degree, "status": "weak"}],
+        [
+            {"id": "req-1", "type": "hard", "text": degree},
+            {"id": "req-2", "type": "hard", "text": "熟悉 Go 开发"},
+        ],
+    )
+    assert [gap["text"] for gap in session["match_gaps"]].count(degree) == 1
+    session["used_gaps"] = [gap["id"] for gap in session["match_gaps"]]
+    assert engine._pick_gap(session) is None
+
+
+def test_credential_gap_rejects_unrelated_technical_model_question():
+    engine = InterviewEngine(model_router=CaptureRouter())
+    session = make_session(
+        engine,
+        [{"id": "degree", "type": "hard", "text": "本科及以上学历，计算机相关专业", "status": "weak"}],
+    )
+    question = engine.next_question(session)["question"]
+    assert "学历" in question
+    assert "技术取舍" not in question
+
+
+def test_team_collaboration_paraphrase_is_not_a_new_main_angle():
+    engine = InterviewEngine()
+    previous = "请说明项目的技术环境、团队协作方式，以及上线时间压力。"
+    candidate = "当时团队是如何协作处理这个突发问题的？"
+    assert engine._is_repeated_question({"turns": [{"question": previous}]}, candidate)
+
+
+def test_answer_anchor_removes_test_label_and_does_not_cut_redaction_marker():
+    engine = InterviewEngine()
+    answer = "【合成测试回答】我负责慢查询定位与复合索引，前端[REDACTED_TITLE]负责页面。"
+    anchor = engine._safe_answer_anchor(answer)
+    assert anchor == "我负责慢查询定位与复合索引"
+    assert anchor in answer
+    assert "[RE" not in anchor
+
+
 # ---------------------------------------------------------------- #
 # 状态机：主问题上限与上下文持久化
 # ---------------------------------------------------------------- #

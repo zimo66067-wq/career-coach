@@ -177,15 +177,21 @@ class InterviewEngine:
         """
         # 从 match_gaps 中提取 weakness/missing 项作为问题来源
         gaps = []
+        seen_texts = set()
         for g in (match_gaps or []):
             status = g.get("status", "")
             if status in ("missing", "weak"):
+                text_key = re.sub(r"[\s，。；;、]+", "", str(g.get("text", ""))).casefold()
+                if text_key and text_key in seen_texts:
+                    continue
                 gaps.append({
                     "id": g.get("id", ""),
                     "type": g.get("type", ""),
                     "text": g.get("text", ""),
                     "status": status,
                 })
+                if text_key:
+                    seen_texts.add(text_key)
 
         # 如果缺口不足 5 个，从 job_profile requirements 补充
         if len(gaps) < MAX_MAIN_QUESTIONS:
@@ -195,13 +201,17 @@ class InterviewEngine:
                 if len(gaps) >= MAX_MAIN_QUESTIONS:
                     break
                 rid = req.get("id", "")
-                if rid and rid not in existing_ids:
+                text_key = re.sub(r"[\s，。；;、]+", "", str(req.get("text", ""))).casefold()
+                if rid and rid not in existing_ids and (not text_key or text_key not in seen_texts):
                     gaps.append({
                         "id": rid,
                         "type": req.get("type", ""),
                         "text": req.get("text", ""),
                         "status": "weak",
                     })
+                    existing_ids.add(rid)
+                    if text_key:
+                        seen_texts.add(text_key)
 
         session = {
             "state": "SETUP",
@@ -279,6 +289,16 @@ class InterviewEngine:
             targets = []
             session["degraded"] = True
             session["unsafe_blocked"] = True
+
+        # A degree/credential gap cannot justify an unrelated technical
+        # question.  Reject that model output before an answer anchor or gap
+        # bridge can make it appear grounded.
+        if question_text and self._is_credential_gap(gap) and not re.search(
+            r"学历|学位|毕业|院校|专业|学籍|课程|证书|资质", question_text
+        ):
+            question_text = None
+            targets = []
+            session["degraded"] = True
 
         if question_text and self._is_repeated_question(session, question_text):
             question_text = None
@@ -538,11 +558,14 @@ class InterviewEngine:
         for gap in session["match_gaps"]:
             if gap["id"] not in session["used_gaps"]:
                 return gap
-        # 全部用完则循环复用
-        if session["match_gaps"]:
-            idx = session["current_main"] % len(session["match_gaps"])
-            return session["match_gaps"][idx]
+        # 五道题不意味着必须循环旧缺口；后续从最近回答继续深挖。
         return None
+
+    @staticmethod
+    def _is_credential_gap(gap):
+        return bool(gap and re.search(
+            r"学历|学位|毕业|院校|学籍|相关专业", str(gap.get("text", ""))
+        ))
 
     @staticmethod
     def _compact_text(value, limit=240):
@@ -608,6 +631,12 @@ class InterviewEngine:
         for prior in previous:
             if not prior:
                 continue
+            # Rewording "how did the team collaborate" after an earlier
+            # team-collaboration question is not a new interview angle.
+            coordination = r"团队.{0,10}协作|协作.{0,10}团队"
+            if (re.search(coordination, core) and re.search(coordination, prior)
+                    and not re.search(r"冲突|意见不一致", core)):
+                return True
             if core == prior:
                 return True
             # Exact comparison misses cosmetic rewrites such as adding
@@ -636,6 +665,14 @@ class InterviewEngine:
         if not quote or quote not in answer:
             quote = self._compact_text(self._extract_quote(answer), 80)
         quote = quote.strip("“”\"'「」《》 ")
+        # Synthetic acceptance labels are not part of the candidate fact.
+        quote = quote.removeprefix("【合成测试回答】")
+        # Never expose a chopped privacy placeholder such as "[RE" in a
+        # question.  Prefer a complete earlier clause from the same answer.
+        if "[REDACTED_" in quote:
+            before = quote.split("[REDACTED_", 1)[0]
+            clauses = [part.strip() for part in re.split(r"[，,。；;]", before) if len(part.strip()) >= 8]
+            quote = max(clauses, key=len) if clauses else ""
         # 危险 anchor（用户回答里自带注入语句）同样不得回显为题目
         if self._check_sensitive(quote) or self._check_unsafe_generated_question(quote):
             return ""
@@ -643,7 +680,11 @@ class InterviewEngine:
             # Keep the anchor a literal substring of the stored answer.  An
             # appended ellipsis would turn a display abbreviation into fake
             # verbatim evidence and break the answer-quote invariant.
-            quote = quote[:42].rstrip("，,。；;：: ")
+            shortened = quote[:42]
+            breaks = [shortened.rfind(char) for char in "，,。；;：:"]
+            last_break = max(breaks)
+            quote = shortened[:last_break] if last_break >= 12 else shortened
+            quote = quote.rstrip("，,。；;：: ")
         # 最终不变量：anchor 必须是原始回答的逐字子串
         if not quote or quote not in raw:
             return ""
@@ -721,6 +762,14 @@ class InterviewEngine:
             self._check_sensitive(str(gap.get("text", "")))
             or self._check_unsafe_generated_question(str(gap.get("text", "")))
         ):
+            safe_gap = None
+        if self._is_credential_gap(safe_gap):
+            candidate = (
+                prefix + "先核实岗位所需的学历与专业事实：你的最高学历、"
+                "专业背景及可核验的证明分别是什么？"
+            )
+            if not self._is_repeated_question(session, candidate):
+                return candidate, [safe_gap.get("id") or "credential"]
             safe_gap = None
         focus_templates = {
             "action": "其中由你亲自完成的关键动作是什么，为什么选择这种做法？",
@@ -967,6 +1016,13 @@ class InterviewEngine:
         gtype = gap.get("type", "generic")
         gtext = gap.get("text", "该要求")
         gid = gap.get("id", "unknown")
+
+        if self._is_credential_gap(gap):
+            return (
+                "请说明与你申请岗位相关的最高学历、专业背景，"
+                "以及可以核验的学历或专业证明。",
+                [gid] if gid != "unknown" else ["credential"],
+            )
 
         # status × type 二维模板表
         templates = {
