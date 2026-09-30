@@ -423,7 +423,10 @@ def test_reanalysis_preserves_gap_progress_and_does_not_duplicate(client):
 def test_reanalysis_clears_gaps_whose_requirement_is_now_covered(client):
     from repositories import target_job as repo
 
-    job = _make_target_job(client, jd="任职要求：\n熟悉 MySQL，了解索引优化和慢查询分析。\n")
+    # This fixture tests a gap that is genuinely closed by RESUME.  The old
+    # compound wording also required slow-query analysis, which RESUME never
+    # claimed; treating that as fully covered would hide a real gap.
+    job = _make_target_job(client, jd="任职要求：\n熟悉 MySQL 索引优化。\n")
     target_id = job["targetJob"]["id"]
 
     # 一份完全没有 SQL 的材料 → 该要求 missing → 产生缺口
