@@ -84,6 +84,27 @@ def verify_evidence(requirement, evidence):
     return len(shared) / len(req_toks) >= VERIFY_MIN_RATIO
 
 
+def evidence_clause_coverage(requirement, evidence):
+    """Fraction of independently required clauses supported by one evidence sentence.
+
+    A shared word in one half of a compound requirement must not establish the
+    other half.  This is deliberately conservative: partial support may be
+    shown as weak, but never as complete coverage.
+    """
+    if not verify_evidence(requirement, evidence):
+        return 0.0
+    parts = re.split(r"、|[，,]|和|并(?=排查|参与|负责|完成|开展|进行|维护|设计|编写|处理|输出|分析|解决|优化)", requirement)
+    evidence_terms = set(tokenize(evidence)) - VERIFY_STOP - VERIFY_GENERIC
+    meaningful = []
+    for part in parts:
+        terms = set(tokenize(part)) - VERIFY_STOP - VERIFY_GENERIC
+        if terms:
+            meaningful.append(terms)
+    if not meaningful:
+        return 0.0
+    return sum(bool(terms & evidence_terms) for terms in meaningful) / len(meaningful)
+
+
 # ---------------- 文本切分（中英文混合，优先 jieba，降级到 unigram+bigram） ----------------
 RE_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9+#.\-]*|[\u4e00-\u9fa5]")
 STOP = set("的了和是有在与我你他她它们这那也不都就及或着吧呢啊嘛么很还被把对于等以及一个我们你们他们".split())

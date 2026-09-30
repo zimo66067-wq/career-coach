@@ -8,6 +8,7 @@ from domain.deidentify import deidentify
 from domain.redflag import RE_NUMBER
 from domain.match_requirements import (
     Bm25Matcher,
+    evidence_clause_coverage,
     judge,
     split_sentences,
     tokenize,
@@ -281,6 +282,10 @@ def match_job_profile(resume_text, job_profile):
             or not verify_evidence(requirement["text"], sentences[sentence_index])
         ):
             status = judge(0.0, partial)
+        elif status == "covered" and evidence_clause_coverage(
+            requirement["text"], sentences[sentence_index]
+        ) < 1.0:
+            status = "weak"
         result = {
             "id": requirement["id"],
             "type": requirement["type"],

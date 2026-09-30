@@ -194,6 +194,34 @@ def test_bm25_service_does_not_treat_documentation_as_unit_testing():
     assert item["evidence"] == ""
 
 
+def test_compound_requirement_needs_both_parts_for_full_coverage():
+    profile = {
+        "user_confirmed": True,
+        "requirements": [
+            {"id": "r1", "type": "hard", "text": "具备沟通能力和文档习惯"},
+            {"id": "r2", "type": "responsibility", "text": "参与订单、库存核心链路接口开发"},
+        ],
+    }
+    resume = (
+        "学习能力强，习惯阅读官方文档和源码。"
+        "负责订单中心微服务开发，使用 Go 实现订单查询接口。"
+    )
+    result = api_module.match_job_profile(resume, profile)
+    assert all(item["status"] != "covered" for item in result["requirements"])
+
+
+def test_compound_requirement_can_be_covered_with_complete_evidence():
+    profile = {
+        "user_confirmed": True,
+        "requirements": [{"id": "r1", "type": "hard", "text": "具备沟通能力和文档习惯"}],
+    }
+    result = api_module.match_job_profile(
+        "在项目联调中主动与前端沟通需求和风险，编写接口文档并维护更新习惯。",
+        profile,
+    )
+    assert result["requirements"][0]["status"] == "covered"
+
+
 def job_profile_for_analysis():
     return {
         "user_confirmed": True,
