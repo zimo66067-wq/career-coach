@@ -110,7 +110,7 @@
     } else {
       avatar.textContent = '访';
       name.textContent = '未登录游客';
-      sub.textContent = '登录后历史可长期保存';
+      sub.textContent = '登录后可查看历史记录';
       if (loginBtn) loginBtn.classList.remove('zy-hidden');
       if (logoutBtn) logoutBtn.classList.add('zy-hidden');
     }
@@ -325,7 +325,7 @@
 
   function addHistory(item) {
     if (!currentUser) {
-      toast('注册登录后，检测记录可长期保存');
+      toast('注册登录后可查看检测记录');
       return Promise.resolve(false);
     }
     return api('/history', { method: 'POST', body: item }).then(function () {
