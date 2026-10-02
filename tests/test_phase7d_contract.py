@@ -245,12 +245,16 @@ def test_path_form_residue_is_confined_to_the_allowlist():
 # 4. 删掉的那份 requirements 确实是冗余的
 # ------------------------------------------------------------------ #
 
-def test_deleted_requirements_were_a_subset_of_the_root_ones():
+def test_deleted_requirements_remain_covered_by_root_manifest():
     root_reqs = (ROOT / "requirements.txt").read_text(encoding="utf-8")
     root_lines = {ln.strip() for ln in root_reqs.splitlines()
                   if ln.strip() and not ln.strip().startswith("#")}
     assert not (ROOT / "tools" / "requirements.txt").exists()
-    absent = [ln for ln in DELETED_REQUIREMENTS if ln not in root_lines]
+    # The archived list records the old pins; security updates may raise a pin
+    # without removing the dependency from the root manifest.
+    root_packages = {ln.split("==", 1)[0].lower() for ln in root_lines}
+    absent = [ln for ln in DELETED_REQUIREMENTS
+              if ln.split("==", 1)[0].lower() not in root_packages]
     assert absent == [], "删掉 tools/requirements.txt 会丢依赖（根清单里没有）：%s" % absent
 
 
