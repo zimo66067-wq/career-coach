@@ -28,6 +28,23 @@ def _owned_job_ids(conn, owner_key):
     ).fetchall()]
 
 
+def _assert_exclusive_session_ownership(conn, session_id, user_id, owner_key):
+    """Never erase shared session data when legacy rows disagree on ownership."""
+    checks = (
+        ("session_owners", "owner_key <> ?", (owner_key,)),
+        ("applications", "owner_key <> ?", (owner_key,)),
+        ("target_jobs", "owner_key <> ?", (owner_key,)),
+        ("history_events", "user_id <> ?", (user_id,)),
+    )
+    for table, condition, params in checks:
+        row = conn.execute(
+            "SELECT 1 FROM %s WHERE session_id = ? AND %s LIMIT 1" % (table, condition),
+            (session_id,) + params,
+        ).fetchone()
+        if row:
+            raise ValueError("Conflicting workflow ownership; erasure halted")
+
+
 def _delete(conn, table, where, params, counts):
     cursor = conn.execute("DELETE FROM %s WHERE %s" % (table, where), params)
     counts[table] = counts.get(table, 0) + max(cursor.rowcount, 0)
@@ -36,6 +53,8 @@ def _delete(conn, table, where, params, counts):
 def _erase_linked_rows(conn, user_id, owner_key, counts):
     session_ids = _owned_sessions(conn, user_id, owner_key)
     job_ids = _owned_job_ids(conn, owner_key)
+    for session_id in session_ids:
+        _assert_exclusive_session_ownership(conn, session_id, user_id, owner_key)
 
     # Delete children first.  Several relationships predate FK constraints,
     # so ON DELETE CASCADE alone cannot establish complete account erasure.

@@ -149,6 +149,26 @@ def test_erasure_rolls_back_if_any_step_fails(private_db, monkeypatch):
     assert set(_dependent_counts().values()) == {1}
 
 
+def test_conflicting_session_ownership_blocks_erasure(private_db):
+    victim = _seed(1)
+    survivor = _seed(2)
+    conn = database.connection()
+    try:
+        conn.execute(
+            "INSERT INTO history_events (user_id, session_id, event_type, title, status, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (victim[0], survivor[2], "F3", "inconsistent legacy row", "done", database.utc_iso()),
+        )
+    finally:
+        conn.close()
+
+    with pytest.raises(ValueError, match="Conflicting workflow ownership"):
+        account_privacy.erase_verified_user(victim[0], identity_verified=True)
+    assert all(_user_counts(*victim).values())
+    assert all(_user_counts(*survivor).values())
+    assert set(_dependent_counts().values()) == {2}
+
+
 def test_administrative_account_is_not_erased(private_db):
     admin_id = database.create_user("13800000004", "admin@example.invalid", "hash", "Admin", role="admin")
     with pytest.raises(PermissionError, match="Administrative"):
