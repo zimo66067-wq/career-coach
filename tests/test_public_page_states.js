@@ -110,6 +110,17 @@ async function run() {
   assert.strictEqual(requests[0].options.headers['X-Consent-Token'], undefined, 'consent request must not send a prior token');
   assert.strictEqual(requests[1].options.headers['X-Consent-Token'], 'signed-test-token', 'material requests must include the issued consent token');
 
+  for (const tree of ['public', 'docs']) {
+    for (const name of ['index.html', 'pages/action-loop.html', 'pages/interview-practice.html',
+      'pages/job-apply.html', 'pages/resume-evidence.html', 'pages/states.html', 'pages/target-job.html']) {
+      const html = fs.readFileSync(path.join(root, tree, name), 'utf8');
+      assert.ok(!html.includes('长期保存'), tree + '/' + name + ' must not promise indefinite retention');
+      assert.ok(html.includes('登录后可查看历史记录'), tree + '/' + name + ' must explain history access');
+    }
+    const account = fs.readFileSync(path.join(root, tree, 'js', 'account.js'), 'utf8');
+    assert.ok(!account.includes('长期保存'), tree + '/js/account.js must not promise indefinite retention');
+  }
+
   console.log('public page state checks passed');
 }
 
