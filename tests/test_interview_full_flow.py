@@ -109,6 +109,27 @@ def test_stored_gap_and_requirement_with_same_text_are_not_asked_twice():
     assert engine._pick_gap(session) is None
 
 
+def test_rule_star_detects_concrete_actions_and_recovery_outcomes():
+    engine = InterviewEngine()
+    assert "action" not in engine._detect_star_gaps(
+        "我用慢查询日志定位 SQL，建立复合索引并调整查询字段。"
+    )
+    assert "action" not in engine._detect_star_gaps(
+        "我与前端同步字段，在评审会上画成状态图，更新文档并通知测试。"
+    )
+    incident = engine._detect_star_gaps(
+        "我定位错误并回滚分支，补了单元测试，随后观察错误率恢复。"
+    )
+    assert "action" not in incident
+    assert "result" not in incident
+    assert "result" not in engine._detect_star_gaps(
+        "回滚后错误率从 4% 降回 0.1% 以下。"
+    )
+    assert "result" in engine._detect_star_gaps(
+        "我增加分页与超时控制，并用表驱动测试覆盖异常。"
+    )
+
+
 def test_credential_gap_rejects_unrelated_technical_model_question():
     engine = InterviewEngine(model_router=CaptureRouter())
     session = make_session(
