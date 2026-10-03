@@ -125,20 +125,29 @@ def test_rule_star_detects_concrete_actions_and_recovery_outcomes():
     assert "result" not in engine._detect_star_gaps(
         "回滚后错误率从 4% 降回 0.1% 以下。"
     )
+    assert "result" not in engine._detect_star_gaps(
+        "相同测试条件下，P95 延迟从 700 毫秒降到 280 毫秒。"
+    )
+    assert "metric" not in engine._detect_star_gaps(
+        "联调返工从两轮减少到一轮，提前发现三处歧义。"
+    )
+    assert "reflection" not in engine._detect_star_gaps(
+        "我的复盘是上线后继续观察写入成本。"
+    )
     assert "result" in engine._detect_star_gaps(
         "我增加分页与超时控制，并用表驱动测试覆盖异常。"
     )
 
 
-def test_credential_gap_rejects_unrelated_technical_model_question():
+def test_credential_gap_is_not_scored_as_a_star_interview_question():
     engine = InterviewEngine(model_router=CaptureRouter())
     session = make_session(
         engine,
         [{"id": "degree", "type": "hard", "text": "本科及以上学历，计算机相关专业", "status": "weak"}],
     )
-    question = engine.next_question(session)["question"]
-    assert "学历" in question
-    assert "技术取舍" not in question
+    question = engine.next_question(session)
+    assert question["targets"] == ["project_leadership"]
+    assert "学历" not in question["question"]
 
 
 def test_model_cannot_label_a_different_gap_as_the_current_target():
@@ -178,6 +187,30 @@ def test_followup_does_not_repeat_the_same_missing_dimension_across_questions():
     second_followup = engine.submit_answer(session, "我负责开发与优化，完成了目标。")
     assert second_followup["follow_up"]
     assert first_followup["follow_up"]["reason"] != second_followup["follow_up"]["reason"]
+
+
+def test_followup_evaluates_only_the_requested_detail():
+    from services.interview_service import build_turn_evaluation
+
+    engine = InterviewEngine()
+    session = make_session(engine, [
+        {"id": "docs", "type": "responsibility", "text": "接口文档协作", "status": "weak"},
+    ])
+    engine.next_question(session)
+    main = engine.submit_answer(
+        session,
+        "当时我负责接口文档协作，通过评审核对字段，结果减少返工，复盘后更新模板。",
+    )
+    assert main["follow_up"]["reason"].startswith("missing_metric:")
+    focus = session["_current_followup_focus"]
+    reply = engine.submit_followup_answer(
+        session, "虚构记录中发现三处字段歧义，返工由两轮降到一轮。"
+    )
+    assert reply["missing_elements"] == []
+    assert session["followup_turn_ids"] == [2]
+    feedback = build_turn_evaluation(reply, focus)
+    assert feedback["strengths"] == ["量化数据"]
+    assert feedback["weaknesses"] == []
 
 
 def test_five_main_questions_keep_distinct_planned_gap_targets():
@@ -261,7 +294,7 @@ def test_second_main_question_is_anchored_to_previous_answer_without_model():
     assert second["question"] != GENERIC_QUESTIONS[1]["question"]
 
 
-def test_model_receives_recent_answers_and_output_is_explicitly_anchored():
+def test_new_gap_receives_context_without_quoting_unrelated_answer():
     router = CaptureRouter()
     engine = InterviewEngine(model_router=router)
     session = make_session(
@@ -277,10 +310,13 @@ def test_model_receives_recent_answers_and_output_is_explicitly_anchored():
     second = engine.next_question(session)
 
     payload = router.inputs[-1]["user_input"]
-    assert "慢查询日志" in payload
-    assert '"must_reference_previous_answer":true' in payload
-    assert router.inputs[-1]["context"]["must_reference_previous_answer"] is True
-    assert second["basis"] in second["question"]
+    assert '"recent_turns":[]' in payload
+    assert "慢查询日志" not in payload
+    assert '"must_reference_previous_answer":false' in payload
+    assert router.inputs[-1]["context"]["must_reference_previous_answer"] is False
+    assert second["basis"] is None
+    assert "你刚才提到" not in second["question"]
+    assert second["targets"] == ["G2"]
 
 
 def test_repeated_model_question_uses_answer_driven_fallback():
@@ -337,8 +373,9 @@ def test_answer_context_is_deidentified_before_storage_and_model_use():
     )
     engine.next_question(session)
     assert "13800138000" not in session["turns"][0]["answer"]
+    assert "[REDACTED_PHONE]" in session["turns"][0]["answer"]
     assert "test@example.com" not in router.inputs[-1]["user_input"]
-    assert "[REDACTED_PHONE]" in router.inputs[-1]["user_input"]
+    assert '"recent_turns":[]' in router.inputs[-1]["user_input"]
 
 
 def test_followup_explicitly_references_the_answer():

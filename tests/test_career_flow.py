@@ -15,6 +15,7 @@ services, because the failure modes that matter here are cross-layer:
 The verdict distribution is asserted explicitly, because a rule that can only ever
 return one verdict is broken even though every individual assertion might pass.
 """
+import json
 from pathlib import Path
 
 import pytest
@@ -495,6 +496,56 @@ def test_target_job_ignores_stale_browser_gap_order(client):
     }).get_json()
     assert started["targets"] == ["gap-%s" % started["questionPlan"][0]["gap_id"]]
     assert "旧页面缺口" not in started["firstQuestion"]
+
+
+def test_interview_plan_skips_credential_and_stops_at_five_questions(client):
+    jd = (
+        "任职要求：\n本科及以上学历，计算机相关专业；\n"
+        "熟悉 Go 开发；\n熟悉 MySQL 索引优化；\n"
+        "负责接口文档协作；\n编写单元测试；\n"
+        "排查线上问题；\n参与订单和库存接口开发。\n"
+    )
+    target_id = _make_target_job(client, jd=jd)["targetJob"]["id"]
+    _analyse(client, target_id)
+    started = client.post("/api/wf04/start", json={"targetJobId": target_id}).get_json()
+
+    assert 1 <= len(started["questionPlan"]) <= 5
+    assert "学历" not in started["firstQuestion"]
+    assert started["targets"] == ["gap-%s" % started["questionPlan"][0]["gap_id"]]
+
+
+def test_interview_plan_caps_a_long_gap_list_at_five(monkeypatch):
+    from services import target_job_service
+
+    monkeypatch.setattr(target_job_service, "interview_gaps", lambda *_: [
+        {"gapId": index, "priority": "P0" if index < 4 else "P1"}
+        for index in range(1, 8)
+    ])
+    plan = target_job_service.question_plan(1, "synthetic-owner")
+    assert [item["gap_id"] for item in plan] == [1, 2, 3, 4, 5]
+
+
+def test_streamed_followup_feedback_only_rates_the_requested_detail(client):
+    started = client.post("/api/wf04/start", json={}).get_json()
+    session_id = started["session_id"]
+
+    def stream(answer):
+        response = client.post("/api/wf04/stream", json={
+            "session_id": session_id, "answer_text": answer,
+        })
+        assert response.status_code == 200
+        events = [
+            json.loads(line.removeprefix("data: "))
+            for line in response.data.decode("utf-8").splitlines()
+            if line.startswith("data: ")
+        ]
+        return events[-1]
+
+    main = stream("当时我负责接口文档，采用评审核对字段，结果减少返工，复盘后更新模板。")
+    assert main["followUp"]["reason"].startswith("missing_metric:")
+    reply = stream("虚构记录中发现三处字段歧义，返工由两轮降到一轮。")
+    assert reply["evaluation"]["strengths"] == ["量化数据"]
+    assert reply["evaluation"]["weaknesses"] == []
 
 
 def test_interview_without_a_target_job_is_unchanged(client):

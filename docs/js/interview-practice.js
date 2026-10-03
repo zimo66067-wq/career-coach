@@ -324,7 +324,7 @@
   function renderQuestionPlan(res) {
     var box = $("f3QuestionPlan");
     if (!box) return;
-    var plan = res && Array.isArray(res.questionPlan) ? res.questionPlan : null;
+    var plan = res && Array.isArray(res.questionPlan) ? res.questionPlan.slice(0, 5) : null;
     if (!plan || !plan.length) {
       box.hidden = true;
       box.innerHTML = "";
@@ -340,8 +340,8 @@
     box.innerHTML = '<div class="f3-plan-head">本次出题顺序：来自目标岗位的未解决缺口，P0 → P1' +
       (targetId ? "（岗位 #" + esc(String(targetId)) + "，缺口按优先级排序）" : "") + "</div>" +
       '<div class="f3-plan-chips">' + chips + "</div>" +
-      '<div class="f3-plan-note">顺序即优先级 —— 这就是「按缺口定向出题」，不是通用题库轮询。' +
-      "缺口全部解决后，题目会回落到证据验证与行为问题。</div>";
+      '<div class="f3-plan-note">本轮最多 5 题，按缺口优先级出题；学历、学位和证书请在简历证据与岗位匹配环节核验。' +
+      "没有新的可面试缺口时，将围绕前一回答继续深挖。</div>";
     box.hidden = false;
   }
 

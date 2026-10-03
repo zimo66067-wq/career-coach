@@ -86,10 +86,10 @@ STAR_KEYWORDS = {
     "task":       ["任务", "目标", "负责", "职责", "需要完成", "objective", "分工", "承担"],
     "action":     ["采取", "实施", "做了", "使用", "通过", "方法", "工具", "approach", "采用", "实现", "编写", "开发", "设计", "搭建", "重构", "优化", "引入",
                    "定位", "排查", "收集", "查看", "建立", "调整", "同步", "写进", "画出", "画成", "标注", "更新", "通知", "分配", "核对", "复现", "回滚", "补了", "补充", "观察", "验证"],
-    "result":     ["结果", "效果", "提升", "降低", "减少", "达到", "改善", "节省", "缩短", "提高", "恢复", "降回", "回落", "outcome", "上线", "交付", "部署"],
+    "result":     ["结果", "效果", "提升", "降低", "减少", "达到", "改善", "节省", "缩短", "提高", "恢复", "降回", "降到", "降至", "降为", "回落", "outcome", "上线", "交付", "部署"],
     "metric":     ["%", "百分比", "数字", "倍", "万", "次", "小时", "天",
-                   "ms", "分钟", "秒", r"\d", "百万", "亿", "千"],
-    "reflection": ["反思", "总结", "学到", "经验", "教训", "下次", "改进", "回顾", "体会", "收获"],
+                   "ms", "分钟", "秒", r"\d", r"[二三四五六七八九十两][一二三四五六七八九十两零]*(?:处|轮|个|次|项|人)", "百万", "亿", "千"],
+    "reflection": ["反思", "复盘", "总结", "学到", "经验", "教训", "下次", "改进", "回顾", "体会", "收获"],
 }
 
 # ------------------------------------------------------------------ #
@@ -223,6 +223,7 @@ class InterviewEngine:
             "current_followup_count": 0,
             "question_type_index": 0,
             "used_gaps": [],
+            "followup_turn_ids": [],
             "degraded": False,
             "unsafe_blocked": False,
             "router_error": None,
@@ -246,7 +247,9 @@ class InterviewEngine:
         gap = self._pick_gap(session)
         recent_turns = self._recent_turn_context(session)
         answer_anchor = self._latest_answer_anchor(session)
-        is_adaptive = bool(recent_turns)
+        # A new gap is a new topic. Quoting the previous answer in that
+        # question can make unrelated facts look like evidence for the gap.
+        is_adaptive = bool(recent_turns) and gap is None
 
         # 尝试动态生成
         question_text = None
@@ -442,6 +445,10 @@ class InterviewEngine:
                     follow_up["reason"].split(":", 1)[0].removeprefix("missing_")
                 )
         session["_current_followup"] = follow_up["question"] if follow_up else ""
+        session["_current_followup_focus"] = (
+            follow_up["reason"].split(":", 1)[0].removeprefix("missing_")
+            if follow_up else ""
+        )
 
         turn = {
             "turn_id": turn_id,
@@ -487,7 +494,12 @@ class InterviewEngine:
 
         turn_id = len(session["turns"]) + 1
         answer_quote = self._extract_quote(answer)
-        missing_elements = self._detect_star_gaps(answer)
+        # A follow-up asks for one missing detail. Do not require a fresh,
+        # complete STAR story in the reply to that narrow question.
+        focus = session.get("_current_followup_focus", "")
+        missing_elements = (
+            [focus] if focus in self._detect_star_gaps(answer) else []
+        ) if focus in STAR_KEYWORDS else self._detect_star_gaps(answer)
 
         # 追问回答的子分数: followup_adaptation 提升权重
         subscores = self._assess_subscores(answer, missing_elements, is_followup=True)
@@ -504,9 +516,11 @@ class InterviewEngine:
             "subscores": subscores,
         }
         session["turns"].append(turn)
+        session.setdefault("followup_turn_ids", []).append(turn_id)
         session["current_followup_count"] += 1
         # 追问已回答，清除待回答标记，下一轮输入视为新的主问题回答
         session["_current_followup"] = ""
+        session["_current_followup_focus"] = ""
 
         return {
             "turn_id": turn_id,
@@ -576,9 +590,9 @@ class InterviewEngine:
     # ================================================================ #
 
     def _pick_gap(self, session):
-        """从 match_gaps 中选取尚未使用过的缺口。"""
+        """选取可在经历题中核实的缺口；学历事实留给 F1/F2 核验。"""
         for gap in session["match_gaps"]:
-            if gap["id"] not in session["used_gaps"]:
+            if gap["id"] not in session["used_gaps"] and not self._is_credential_gap(gap):
                 return gap
         # 五道题不意味着必须循环旧缺口；后续从最近回答继续深挖。
         return None
@@ -880,8 +894,8 @@ class InterviewEngine:
             "target_gap": self._safe_gap_payload(gap),
             "question_type": qtype,
             "main_question_number": session.get("current_main", 0) + 1,
-            "recent_turns": self._recent_turn_context(session),
-            "must_reference_previous_answer": bool(session.get("turns")),
+            "recent_turns": self._recent_turn_context(session) if gap is None else [],
+            "must_reference_previous_answer": bool(session.get("turns")) and gap is None,
         }
         return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
@@ -900,7 +914,7 @@ class InterviewEngine:
         for element, keywords in STAR_KEYWORDS.items():
             found = False
             for kw in keywords:
-                if "." in kw or "\\" in kw:
+                if "." in kw or "\\" in kw or "[" in kw:
                     # 含正则元字符的模式
                     if re.search(kw, text):
                         found = True
@@ -1210,7 +1224,9 @@ class InterviewEngine:
         # 高频问题预备
         lines.append("## 3. High-Frequency Question Prep")
         all_missing = []
-        for t in turns:
+        followup_turn_ids = set(session.get("followup_turn_ids") or [])
+        main_turns = [t for t in turns if t.get("turn_id") not in followup_turn_ids]
+        for t in main_turns:
             all_missing.extend(t.get("missing_elements", []))
         from collections import Counter
         freq = Counter(all_missing).most_common(3)
@@ -1236,11 +1252,11 @@ class InterviewEngine:
         }
         covered_counter = Counter()
         missing_counter = Counter()
-        for t in turns:
+        for t in main_turns:
             me = set(t.get("missing_elements") or [])
             covered_counter.update(set(star_labels) - me)
             missing_counter.update(me)
-        n_turns = max(1, len([t for t in turns if t.get("answer")]))
+        n_turns = max(1, len([t for t in main_turns if t.get("answer")]))
         strengths = [star_labels[e] for e, c in covered_counter.items() if c / n_turns >= 0.5]
         weaknesses = [star_labels[e] for e, c in missing_counter.items() if c / n_turns >= 0.3]
         strong_dims = [k for k, v in i_subscores.items() if v is not None and v >= 65]
