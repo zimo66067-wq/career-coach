@@ -49,6 +49,7 @@ def test_register_login_me_logout_flow(monkeypatch):
     user = resp.json
     assert user["name"] == "小张"
     assert user["role"] == "user"
+    assert user["last_login_at"] == user["created_at"]
     assert "password" not in json_dump(resp)
     assert "zy_session" in resp.headers.get("Set-Cookie", "")
 
