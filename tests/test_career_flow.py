@@ -485,6 +485,18 @@ def test_interview_questions_follow_the_gap_priority(client):
     assert started["targetJobId"] == target_id
 
 
+def test_target_job_ignores_stale_browser_gap_order(client):
+    job = _make_target_job(client)
+    target_id = job["targetJob"]["id"]
+    _analyse(client, target_id)
+    started = client.post("/api/wf04/start", json={
+        "targetJobId": target_id,
+        "matchGaps": [{"id": "stale", "type": "hard", "text": "旧页面缺口", "status": "missing"}],
+    }).get_json()
+    assert started["targets"] == ["gap-%s" % started["questionPlan"][0]["gap_id"]]
+    assert "旧页面缺口" not in started["firstQuestion"]
+
+
 def test_interview_without_a_target_job_is_unchanged(client):
     started = client.post("/api/wf04/start", json={})
     assert started.status_code == 200

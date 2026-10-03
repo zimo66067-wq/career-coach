@@ -300,6 +300,14 @@ class InterviewEngine:
             targets = []
             session["degraded"] = True
 
+        # The model can return a fluent question about a previous topic while
+        # naming the current gap as its target. Do not present that mismatch as
+        # evidence that the planned gap was assessed.
+        if question_text and gap and not self._question_addresses_gap(question_text, gap):
+            question_text = None
+            targets = []
+            session["degraded"] = True
+
         if question_text and self._is_repeated_question(session, question_text):
             question_text = None
             targets = []
@@ -343,8 +351,16 @@ class InterviewEngine:
             session["degraded"] = True
             session["unsafe_blocked"] = True
 
-        if not targets:
-            targets = [gap["id"]] if gap else ["generic"]
+        if gap:
+            # A final safety replacement may have removed the gap topic. Only
+            # label the turn with that gap when the emitted question covers it.
+            covers_gap = self._question_addresses_gap(question_text, gap)
+            covers_credential = self._is_credential_gap(gap) and bool(re.search(
+                r"学历|学位|毕业|院校|专业|学籍|课程|证书|资质", question_text
+            ))
+            targets = [gap["id"]] if covers_gap or covers_credential else ["generic"]
+        elif not targets:
+            targets = ["generic"]
 
         # basis 必须是“已脱敏回答的逐字子串”，且必须真的出现在最终题目里。
         # 如果安全闸门把题目换成了不引用回答的兜底题，就不能再声称有 basis。
@@ -418,7 +434,13 @@ class InterviewEngine:
         follow_up = None
         if (missing_elements
                 and session["current_followup_count"] < MAX_FOLLOWUPS_PER_QUESTION):
-            follow_up = self._generate_followup(answer, missing_elements)
+            follow_up = self._generate_followup(
+                answer, missing_elements, session.get("used_followup_elements", [])
+            )
+            if follow_up:
+                session.setdefault("used_followup_elements", []).append(
+                    follow_up["reason"].split(":", 1)[0].removeprefix("missing_")
+                )
         session["_current_followup"] = follow_up["question"] if follow_up else ""
 
         turn = {
@@ -560,6 +582,28 @@ class InterviewEngine:
                 return gap
         # 五道题不意味着必须循环旧缺口；后续从最近回答继续深挖。
         return None
+
+    @staticmethod
+    def _question_addresses_gap(question, gap):
+        """Require a visible subject overlap before trusting a model question.
+
+        Conservative rejection is acceptable here: the deterministic bank
+        still asks about the selected gap when a paraphrase cannot be proven.
+        """
+        subject = str(gap.get("text") or "")
+        question = str(question or "")
+        terms = re.findall(r"[A-Za-z][A-Za-z0-9+#.]*", subject)
+        terms = [term for term in terms if len(term) >= 2]
+        if any(re.search(r"(?<![A-Za-z0-9])%s(?![A-Za-z0-9])" % re.escape(term),
+                         question, re.IGNORECASE) for term in terms):
+            return True
+        chunks = re.findall(r"[\u4e00-\u9fff]{4,}", subject)
+        generic = {"相关经验", "实际项目", "工作经验", "岗位要求", "具体能力"}
+        return any(
+            chunk[index:index + 4] in question
+            and chunk[index:index + 4] not in generic
+            for chunk in chunks for index in range(len(chunk) - 3)
+        )
 
     @staticmethod
     def _is_credential_gap(gap):
@@ -771,6 +815,9 @@ class InterviewEngine:
             if not self._is_repeated_question(session, candidate):
                 return candidate, [safe_gap.get("id") or "credential"]
             safe_gap = None
+        if safe_gap and safe_gap.get("text"):
+            gap_question, targets = self._fallback_question_bank(session, safe_gap)
+            return prefix + "接下来核实另一项岗位要求。" + gap_question, targets
         focus_templates = {
             "action": "其中由你亲自完成的关键动作是什么，为什么选择这种做法？",
             "result": "这项工作的最终结果是什么，它怎样影响了项目或团队？",
@@ -966,7 +1013,7 @@ class InterviewEngine:
             "clarity": clarity,
         }
 
-    def _generate_followup(self, answer_text, missing_elements):
+    def _generate_followup(self, answer_text, missing_elements, used_elements=()):
         """基于回答缺失维度生成追问。
 
         Returns:
@@ -986,7 +1033,7 @@ class InterviewEngine:
         }
 
         for elem in missing_elements:
-            if elem in followup_map:
+            if elem in followup_map and elem not in used_elements:
                 anchor = self._safe_answer_anchor(answer_text)
                 prefix = (
                     "你刚才提到「%s」。" % anchor

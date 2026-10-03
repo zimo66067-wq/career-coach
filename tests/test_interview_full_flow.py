@@ -53,6 +53,22 @@ class CaptureRouter:
         }
 
 
+class OffTopicRouter:
+    def call(self, _task, _user_input, context=None):
+        return {
+            "status": "success",
+            "output": {"question": "请讲讲 MySQL 慢查询优化。", "targets": ["学历要求"]},
+        }
+
+
+class CorrectTopicWrongLabelRouter:
+    def call(self, _task, _user_input, context=None):
+        return {
+            "status": "success",
+            "output": {"question": "请讲讲 MySQL 索引设计。", "targets": ["学历要求"]},
+        }
+
+
 # ---------------------------------------------------------------- #
 # 正常流程：会话初始化
 # ---------------------------------------------------------------- #
@@ -102,6 +118,62 @@ def test_credential_gap_rejects_unrelated_technical_model_question():
     question = engine.next_question(session)["question"]
     assert "学历" in question
     assert "技术取舍" not in question
+
+
+def test_model_cannot_label_a_different_gap_as_the_current_target():
+    engine = InterviewEngine(model_router=CorrectTopicWrongLabelRouter())
+    session = make_session(engine, [
+        {"id": "mysql-gap", "type": "hard", "text": "熟悉 MySQL 索引设计", "status": "weak"},
+    ])
+    question = engine.next_question(session)
+    assert "MySQL" in question["question"]
+    assert question["targets"] == ["mysql-gap"]
+
+
+def test_off_topic_model_question_falls_back_to_the_selected_gap():
+    engine = InterviewEngine(model_router=OffTopicRouter())
+    session = make_session(engine, [
+        {"id": "testing-gap", "type": "hard", "text": "负责单元测试与故障排查", "status": "weak"},
+    ])
+    question = engine.next_question(session)
+    assert "单元测试与故障排查" in question["question"]
+    assert "MySQL" not in question["question"]
+    assert question["targets"] == ["testing-gap"]
+
+
+def test_followup_does_not_repeat_the_same_missing_dimension_across_questions():
+    engine = InterviewEngine()
+    session = make_session(engine, [
+        {"id": "G1", "type": "hard", "text": "性能治理", "status": "weak"},
+        {"id": "G2", "type": "hard", "text": "协作复盘", "status": "weak"},
+    ])
+    first = engine.next_question(session)
+    assert first["question"]
+    first_followup = engine.submit_answer(session, "我负责开发与优化，完成了目标。")
+    assert first_followup["follow_up"]
+    engine.submit_followup_answer(session, "我补充了场景和背景，负责实际开发。")
+    second = engine.next_question(session)
+    assert second["question"]
+    second_followup = engine.submit_answer(session, "我负责开发与优化，完成了目标。")
+    assert second_followup["follow_up"]
+    assert first_followup["follow_up"]["reason"] != second_followup["follow_up"]["reason"]
+
+
+def test_five_main_questions_keep_distinct_planned_gap_targets():
+    engine = InterviewEngine(model_router=OffTopicRouter())
+    subjects = ["Go 开发", "MySQL 索引", "单元测试与故障排查", "接口文档编写", "团队沟通与协作"]
+    session = make_session(engine, [
+        {"id": "G%d" % index, "type": "hard", "text": subject, "status": "weak"}
+        for index, subject in enumerate(subjects, 1)
+    ])
+    for index, subject in enumerate(subjects, 1):
+        question = engine.next_question(session)
+        assert question["targets"] == ["G%d" % index]
+        assert subject in question["question"] or (subject == "MySQL 索引" and "MySQL" in question["question"])
+        result = engine.submit_answer(
+            session, "在实习项目中我负责开发，采用优化方案，结果提升 30%，事后反思了方法。"
+        )
+        assert result["follow_up"] is None
 
 
 def test_team_collaboration_paraphrase_is_not_a_new_main_angle():

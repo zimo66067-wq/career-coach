@@ -26,7 +26,24 @@
 
   <!-- 空态 -->
   <div data-state-view="empty">
-    <div class="card empty-state resume-upload-card" id="resumeUploadCard">
+    <section class="card resume-consent-card" id="data-consent" aria-labelledby="resumeConsentTitle">
+      <h2 id="resumeConsentTitle">开始前，请先阅读数据处理说明</h2>
+      <p>确认后，才能继续简历诊断、目标岗位分析和模拟面试。</p>
+      <ul>
+        <li>我们会处理你提交的简历文本、目标岗位内容和面试回答，用于生成诊断、匹配、追问与报告；原始简历文件不会作为档案保留。</li>
+        <li>账号、去标识化的简历文本、目标岗位和面试记录会关联账号保留。连续 12 个月未登录的提前通知与清理尚未自动启用。</li>
+        <li>如需查阅、更正或申请删除个人信息，可联系 <a href="mailto:zimo66067@gmail.com">zimo66067@gmail.com</a>；申请需核验身份。请勿通过邮件发送密码或简历原件。</li>
+      </ul>
+      <label class="data-consent" for="resumeConsent">
+        <input id="resumeConsent" type="checkbox">
+        <span>我已阅读上述说明，并同意为求职辅助流程处理我提交的简历、岗位内容与面试回答。</span>
+      </label>
+      <div class="resume-consent-actions">
+        <button class="btn" id="confirmResumeConsent" type="button">同意并继续</button>
+        <p id="resumeConsentStatus" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+    <div class="card empty-state resume-upload-card" id="resumeUploadCard" hidden>
       <input class="visually-hidden" id="resumeFileInput" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain">
       <div class="resume-dropzone" id="resumeDropzone" role="button" tabindex="0" aria-label="简历文件投放区域" aria-describedby="resumeUploadHint resumeUploadStatus">
         <div class="art"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></div>
@@ -46,10 +63,6 @@
       <div class="resume-upload-actions">
         <button class="btn ghost" type="button" id="quickDemoF1">⚡ 一键体验（样例简历）</button>
       </div>
-      <label class="data-consent" for="resumeConsent">
-        <input id="resumeConsent" type="checkbox">
-        <span>我已阅读并同意仅为本次诊断处理我提交的简历内容。</span>
-      </label>
       <form class="resume-text-entry" id="resumeTextEntry" hidden>
         <label for="resumeTextInput">粘贴简历正文</label>
         <textarea id="resumeTextInput" rows="9" maxlength="200000" placeholder="请粘贴简历正文；确认后将直接进入诊断。"></textarea>

@@ -90,6 +90,21 @@
     }
   }
 
+  function hasCurrentConsent() {
+    var expiresAt = Number(getCache('consentExpiresAt'));
+    return !!getCache('consentToken') && isFinite(expiresAt) &&
+      expiresAt > Date.now() + 5000;
+  }
+
+  function isConsentError(result) {
+    return result && (result.error === 'consent_required' ||
+      result.error === 'consent_expired' || result.error === 'invalid_consent');
+  }
+
+  function clearConsent() {
+    clearCache(['consentToken', 'consentExpiresAt']);
+  }
+
   function clearCache(keys) {
     try {
       keys.forEach(function (key) { sessionStorage.removeItem(CACHE_PREFIX + key); });
@@ -681,6 +696,8 @@
       };
     }
 
+    if (isConsentError(res)) return res;
+
     // 缓存
     var cachedSid = getCache('sessionId');
     var cachedQuestion = getCache('firstQuestion');
@@ -764,6 +781,8 @@
         trace_id: res.trace_id || traceId
       };
     }
+
+    if (isConsentError(res)) return res;
 
     // 缓存
     var cached = getCache('interviewReport');
@@ -865,7 +884,12 @@
     });
 
     if (!res.error) {
-      if (res.consent_token) setCache('consentToken', res.consent_token);
+      if (res.consent_token) {
+        setCache('consentToken', res.consent_token);
+        var seconds = Number(res.expires_in_seconds);
+        setCache('consentExpiresAt', isFinite(seconds) && seconds > 0
+          ? Date.now() + seconds * 1000 : 0);
+      }
       if (res.guest_token) setCache('guestToken', res.guest_token);
       sessionStorage.removeItem('cb_session_deleted');
       return {
@@ -973,6 +997,8 @@
 
     // 隐私
     submitConsent: submitConsent,
+    hasCurrentConsent: hasCurrentConsent,
+    clearConsent: clearConsent,
     deleteAllData: deleteAllData,
 
     // F5 投递

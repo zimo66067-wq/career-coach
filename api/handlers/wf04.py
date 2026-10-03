@@ -128,8 +128,10 @@ def handle_wf04(route):
                 raise ApiError("invalid_request", "目标岗位 ID 无效。", 422)
             owner = _task_owner_key()
             gaps = target_job_service.interview_gaps(target_job_id, owner)
-            if not body.get("matchGaps"):
-                body["matchGaps"] = gaps
+            # A selected target job is authoritative. The browser may carry
+            # stale F2 gaps in a different order; using them makes the actual
+            # questions disagree with the server-side priority plan.
+            body["matchGaps"] = gaps
             plan = target_job_service.question_plan(target_job_id, owner)
 
         result = start_interview(body)
