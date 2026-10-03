@@ -53,6 +53,22 @@ class CaptureRouter:
         }
 
 
+class OffTopicRouter:
+    def call(self, _task, _user_input, context=None):
+        return {
+            "status": "success",
+            "output": {"question": "请讲讲 MySQL 慢查询优化。", "targets": ["学历要求"]},
+        }
+
+
+class CorrectTopicWrongLabelRouter:
+    def call(self, _task, _user_input, context=None):
+        return {
+            "status": "success",
+            "output": {"question": "请讲讲 MySQL 索引设计。", "targets": ["学历要求"]},
+        }
+
+
 # ---------------------------------------------------------------- #
 # 正常流程：会话初始化
 # ---------------------------------------------------------------- #
@@ -75,6 +91,159 @@ def test_gaps_padded_from_requirements():
     requirements = [{"id": "J%d" % i, "type": "hard", "text": "要求%d" % i} for i in range(5)]
     session = make_session(engine, [], requirements)
     assert len(session["match_gaps"]) == 5
+
+
+def test_stored_gap_and_requirement_with_same_text_are_not_asked_twice():
+    engine = InterviewEngine()
+    degree = "本科及以上学历，计算机相关专业"
+    session = make_session(
+        engine,
+        [{"id": "stored-1", "type": "hard", "text": degree, "status": "weak"}],
+        [
+            {"id": "req-1", "type": "hard", "text": degree},
+            {"id": "req-2", "type": "hard", "text": "熟悉 Go 开发"},
+        ],
+    )
+    assert [gap["text"] for gap in session["match_gaps"]].count(degree) == 1
+    session["used_gaps"] = [gap["id"] for gap in session["match_gaps"]]
+    assert engine._pick_gap(session) is None
+
+
+def test_rule_star_detects_concrete_actions_and_recovery_outcomes():
+    engine = InterviewEngine()
+    assert "action" not in engine._detect_star_gaps(
+        "我用慢查询日志定位 SQL，建立复合索引并调整查询字段。"
+    )
+    assert "action" not in engine._detect_star_gaps(
+        "我与前端同步字段，在评审会上画成状态图，更新文档并通知测试。"
+    )
+    incident = engine._detect_star_gaps(
+        "我定位错误并回滚分支，补了单元测试，随后观察错误率恢复。"
+    )
+    assert "action" not in incident
+    assert "result" not in incident
+    assert "result" not in engine._detect_star_gaps(
+        "回滚后错误率从 4% 降回 0.1% 以下。"
+    )
+    assert "result" not in engine._detect_star_gaps(
+        "相同测试条件下，P95 延迟从 700 毫秒降到 280 毫秒。"
+    )
+    assert "metric" not in engine._detect_star_gaps(
+        "联调返工从两轮减少到一轮，提前发现三处歧义。"
+    )
+    assert "reflection" not in engine._detect_star_gaps(
+        "我的复盘是上线后继续观察写入成本。"
+    )
+    assert "result" in engine._detect_star_gaps(
+        "我增加分页与超时控制，并用表驱动测试覆盖异常。"
+    )
+
+
+def test_credential_gap_is_not_scored_as_a_star_interview_question():
+    engine = InterviewEngine(model_router=CaptureRouter())
+    session = make_session(
+        engine,
+        [{"id": "degree", "type": "hard", "text": "本科及以上学历，计算机相关专业", "status": "weak"}],
+    )
+    question = engine.next_question(session)
+    assert question["targets"] == ["project_leadership"]
+    assert "学历" not in question["question"]
+
+
+def test_model_cannot_label_a_different_gap_as_the_current_target():
+    engine = InterviewEngine(model_router=CorrectTopicWrongLabelRouter())
+    session = make_session(engine, [
+        {"id": "mysql-gap", "type": "hard", "text": "熟悉 MySQL 索引设计", "status": "weak"},
+    ])
+    question = engine.next_question(session)
+    assert "MySQL" in question["question"]
+    assert question["targets"] == ["mysql-gap"]
+
+
+def test_off_topic_model_question_falls_back_to_the_selected_gap():
+    engine = InterviewEngine(model_router=OffTopicRouter())
+    session = make_session(engine, [
+        {"id": "testing-gap", "type": "hard", "text": "负责单元测试与故障排查", "status": "weak"},
+    ])
+    question = engine.next_question(session)
+    assert "单元测试与故障排查" in question["question"]
+    assert "MySQL" not in question["question"]
+    assert question["targets"] == ["testing-gap"]
+
+
+def test_followup_does_not_repeat_the_same_missing_dimension_across_questions():
+    engine = InterviewEngine()
+    session = make_session(engine, [
+        {"id": "G1", "type": "hard", "text": "性能治理", "status": "weak"},
+        {"id": "G2", "type": "hard", "text": "协作复盘", "status": "weak"},
+    ])
+    first = engine.next_question(session)
+    assert first["question"]
+    first_followup = engine.submit_answer(session, "我负责开发与优化，完成了目标。")
+    assert first_followup["follow_up"]
+    engine.submit_followup_answer(session, "我补充了场景和背景，负责实际开发。")
+    second = engine.next_question(session)
+    assert second["question"]
+    second_followup = engine.submit_answer(session, "我负责开发与优化，完成了目标。")
+    assert second_followup["follow_up"]
+    assert first_followup["follow_up"]["reason"] != second_followup["follow_up"]["reason"]
+
+
+def test_followup_evaluates_only_the_requested_detail():
+    from services.interview_service import build_turn_evaluation
+
+    engine = InterviewEngine()
+    session = make_session(engine, [
+        {"id": "docs", "type": "responsibility", "text": "接口文档协作", "status": "weak"},
+    ])
+    engine.next_question(session)
+    main = engine.submit_answer(
+        session,
+        "当时我负责接口文档协作，通过评审核对字段，结果减少返工，复盘后更新模板。",
+    )
+    assert main["follow_up"]["reason"].startswith("missing_metric:")
+    focus = session["_current_followup_focus"]
+    reply = engine.submit_followup_answer(
+        session, "虚构记录中发现三处字段歧义，返工由两轮降到一轮。"
+    )
+    assert reply["missing_elements"] == []
+    assert session["followup_turn_ids"] == [2]
+    feedback = build_turn_evaluation(reply, focus)
+    assert feedback["strengths"] == ["量化数据"]
+    assert feedback["weaknesses"] == []
+
+
+def test_five_main_questions_keep_distinct_planned_gap_targets():
+    engine = InterviewEngine(model_router=OffTopicRouter())
+    subjects = ["Go 开发", "MySQL 索引", "单元测试与故障排查", "接口文档编写", "团队沟通与协作"]
+    session = make_session(engine, [
+        {"id": "G%d" % index, "type": "hard", "text": subject, "status": "weak"}
+        for index, subject in enumerate(subjects, 1)
+    ])
+    for index, subject in enumerate(subjects, 1):
+        question = engine.next_question(session)
+        assert question["targets"] == ["G%d" % index]
+        assert subject in question["question"] or (subject == "MySQL 索引" and "MySQL" in question["question"])
+        result = engine.submit_answer(
+            session, "在实习项目中我负责开发，采用优化方案，结果提升 30%，事后反思了方法。"
+        )
+        assert result["follow_up"] is None
+
+
+def test_team_collaboration_paraphrase_is_not_a_new_main_angle():
+    engine = InterviewEngine()
+    previous = "请说明项目的技术环境、团队协作方式，以及上线时间压力。"
+    candidate = "当时团队是如何协作处理这个突发问题的？"
+    assert engine._is_repeated_question({"turns": [{"question": previous}]}, candidate)
+
+
+def test_answer_anchor_removes_test_label_and_does_not_cut_redaction_marker():
+    engine = InterviewEngine()
+    answer = "【合成测试回答】我负责慢查询定位与复合索引，前端[REDACTED_TITLE]负责页面。"
+    anchor = engine._safe_answer_anchor(answer)
+    assert anchor == "我负责慢查询定位与复合索引"
+    assert anchor in answer
+    assert "[RE" not in anchor
 
 
 # ---------------------------------------------------------------- #
@@ -125,7 +294,7 @@ def test_second_main_question_is_anchored_to_previous_answer_without_model():
     assert second["question"] != GENERIC_QUESTIONS[1]["question"]
 
 
-def test_model_receives_recent_answers_and_output_is_explicitly_anchored():
+def test_new_gap_receives_context_without_quoting_unrelated_answer():
     router = CaptureRouter()
     engine = InterviewEngine(model_router=router)
     session = make_session(
@@ -141,10 +310,13 @@ def test_model_receives_recent_answers_and_output_is_explicitly_anchored():
     second = engine.next_question(session)
 
     payload = router.inputs[-1]["user_input"]
-    assert "慢查询日志" in payload
-    assert '"must_reference_previous_answer":true' in payload
-    assert router.inputs[-1]["context"]["must_reference_previous_answer"] is True
-    assert second["basis"] in second["question"]
+    assert '"recent_turns":[]' in payload
+    assert "慢查询日志" not in payload
+    assert '"must_reference_previous_answer":false' in payload
+    assert router.inputs[-1]["context"]["must_reference_previous_answer"] is False
+    assert second["basis"] is None
+    assert "你刚才提到" not in second["question"]
+    assert second["targets"] == ["G2"]
 
 
 def test_repeated_model_question_uses_answer_driven_fallback():
@@ -201,8 +373,9 @@ def test_answer_context_is_deidentified_before_storage_and_model_use():
     )
     engine.next_question(session)
     assert "13800138000" not in session["turns"][0]["answer"]
+    assert "[REDACTED_PHONE]" in session["turns"][0]["answer"]
     assert "test@example.com" not in router.inputs[-1]["user_input"]
-    assert "[REDACTED_PHONE]" in router.inputs[-1]["user_input"]
+    assert '"recent_turns":[]' in router.inputs[-1]["user_input"]
 
 
 def test_followup_explicitly_references_the_answer():

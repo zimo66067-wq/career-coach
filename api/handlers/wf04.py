@@ -54,6 +54,10 @@ def handle_wf04(route):
         engine_session = payload
         answer_text = _validated_answer_text(body)
         asr_confidence = _coerce_asr_confidence(body.get("asr_confidence"))
+        followup_focus = (
+            engine_session.get("_current_followup_focus")
+            if engine_session.get("_current_followup") else None
+        )
 
         # 打字对话状态机（与 /wf04/answer 共用同一编排）：
         # 1) 有待回答追问 -> 本次输入为追问回答，记录后进入下一主问题；
@@ -82,7 +86,7 @@ def handle_wf04(route):
         if not full_text:
             full_text = "已收到回答，请继续。"
 
-        evaluation = build_turn_evaluation(result)
+        evaluation = build_turn_evaluation(result, followup_focus)
 
         def _sse_gen():
             chunk_size = 32
@@ -128,8 +132,15 @@ def handle_wf04(route):
                 raise ApiError("invalid_request", "目标岗位 ID 无效。", 422)
             owner = _task_owner_key()
             gaps = target_job_service.interview_gaps(target_job_id, owner)
-            if not body.get("matchGaps"):
-                body["matchGaps"] = gaps
+            # A selected target job is authoritative. The browser may carry
+            # stale F2 gaps in a different order; using them makes the actual
+            # questions disagree with the server-side priority plan.
+            body["matchGaps"] = gaps
+            # The selected target's gaps are authoritative; stale browser
+            # requirements must not pad the session with unrelated questions.
+            profile = body.get("jobProfile")
+            if isinstance(profile, dict):
+                body["jobProfile"] = {**profile, "requirements": []}
             plan = target_job_service.question_plan(target_job_id, owner)
 
         result = start_interview(body)

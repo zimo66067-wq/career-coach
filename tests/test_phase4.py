@@ -342,10 +342,9 @@ def test_wf04_stream_advances_to_next_question_after_followup(monkeypatch):
     assert done2["nextQuestion"] is not None
     assert done2["nextQuestion"].get("question")
     assert done2["nextQuestion"].get("done") is False
-    assert done2["nextQuestion"].get("adaptive") is True
-    assert done2["nextQuestion"].get("basis")
-    assert done2["nextQuestion"]["basis"] in followup_answer
-    assert done2["nextQuestion"]["basis"] in done2["nextQuestion"]["question"]
+    assert done2["nextQuestion"].get("adaptive") is False
+    assert done2["nextQuestion"].get("basis") is None
+    assert "你刚才提到" not in done2["nextQuestion"]["question"]
     assert done2["evaluation"] is not None
 
 
@@ -431,7 +430,8 @@ def test_wf04_stream_low_confidence_keeps_pending_followup(monkeypatch):
     )
     done3 = _parse_sse_done(resumed.get_data(as_text=True))
     assert done3["nextQuestion"] is not None
-    assert done3["nextQuestion"]["adaptive"] is True
+    assert done3["nextQuestion"]["adaptive"] is False
+    assert done3["nextQuestion"]["basis"] is None
 
 
 # ---------------------------------------------------------------- #

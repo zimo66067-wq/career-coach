@@ -198,6 +198,15 @@ a.card:hover, .card.hoverable:hover {
   text-align: left; color: var(--zy-ink-2); font-size: 13px; line-height: 1.55; cursor: pointer;
 }
 .data-consent input { flex: 0 0 auto; width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--zy-primary); }
+.resume-consent-card { max-width: 760px; margin: 0 auto 20px; padding: clamp(24px, 4vw, 38px); }
+.resume-consent-card[hidden], .resume-upload-card[hidden] { display: none; }
+.resume-consent-card h2 { margin: 0 0 10px; font-size: 21px; }
+.resume-consent-card p, .resume-consent-card li { color: var(--zy-ink-2); line-height: 1.7; }
+.resume-consent-card ul { padding-left: 21px; margin: 15px 0; }
+.resume-consent-card li + li { margin-top: 8px; }
+.resume-consent-card .data-consent { max-width: none; margin: 20px 0 0; color: var(--zy-ink); }
+.resume-consent-actions { margin-top: 18px; }
+.resume-consent-actions p { min-height: 1.5em; margin: 8px 0 0; font-size: 13px; }
 
 /* ---- F2 岗位描述输入：与 F1 采用同一文件接收规范，并补充术语解释 ---- */
 .job-help-card { padding: 24px; background: linear-gradient(160deg, var(--zy-surface), var(--zy-bg-cool)); }

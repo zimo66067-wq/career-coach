@@ -84,12 +84,12 @@ UNSAFE_QUESTION_PATTERNS = (
 STAR_KEYWORDS = {
     "situation":  ["场景", "情况", "当时", "背景", "项目背景", "context", "在.*项目中", "在.*工作中", "实习", "工作经历"],
     "task":       ["任务", "目标", "负责", "职责", "需要完成", "objective", "分工", "承担"],
-    "action":     ["采取", "实施", "做了", "使用", "通过", "方法", "工具", "approach", "采用", "实现", "编写", "开发", "设计", "搭建", "重构", "优化", "引入"],
-    "result":     ["结果", "效果", "提升", "降低", "减少", "增加", "完成",
-                   "实现", "达到", "改善", "优化", "节省", "缩短", "提高", "outcome", "上线", "交付", "部署"],
+    "action":     ["采取", "实施", "做了", "使用", "通过", "方法", "工具", "approach", "采用", "实现", "编写", "开发", "设计", "搭建", "重构", "优化", "引入",
+                   "定位", "排查", "收集", "查看", "建立", "调整", "同步", "写进", "画出", "画成", "标注", "更新", "通知", "分配", "核对", "复现", "回滚", "补了", "补充", "观察", "验证"],
+    "result":     ["结果", "效果", "提升", "降低", "减少", "达到", "改善", "节省", "缩短", "提高", "恢复", "降回", "降到", "降至", "降为", "回落", "outcome", "上线", "交付", "部署"],
     "metric":     ["%", "百分比", "数字", "倍", "万", "次", "小时", "天",
-                   "ms", "分钟", "秒", r"\d", "百万", "亿", "千"],
-    "reflection": ["反思", "总结", "学到", "经验", "教训", "下次", "改进", "回顾", "体会", "收获"],
+                   "ms", "分钟", "秒", r"\d", r"[二三四五六七八九十两][一二三四五六七八九十两零]*(?:处|轮|个|次|项|人)", "百万", "亿", "千"],
+    "reflection": ["反思", "复盘", "总结", "学到", "经验", "教训", "下次", "改进", "回顾", "体会", "收获"],
 }
 
 # ------------------------------------------------------------------ #
@@ -177,15 +177,21 @@ class InterviewEngine:
         """
         # 从 match_gaps 中提取 weakness/missing 项作为问题来源
         gaps = []
+        seen_texts = set()
         for g in (match_gaps or []):
             status = g.get("status", "")
             if status in ("missing", "weak"):
+                text_key = re.sub(r"[\s，。；;、]+", "", str(g.get("text", ""))).casefold()
+                if text_key and text_key in seen_texts:
+                    continue
                 gaps.append({
                     "id": g.get("id", ""),
                     "type": g.get("type", ""),
                     "text": g.get("text", ""),
                     "status": status,
                 })
+                if text_key:
+                    seen_texts.add(text_key)
 
         # 如果缺口不足 5 个，从 job_profile requirements 补充
         if len(gaps) < MAX_MAIN_QUESTIONS:
@@ -195,13 +201,17 @@ class InterviewEngine:
                 if len(gaps) >= MAX_MAIN_QUESTIONS:
                     break
                 rid = req.get("id", "")
-                if rid and rid not in existing_ids:
+                text_key = re.sub(r"[\s，。；;、]+", "", str(req.get("text", ""))).casefold()
+                if rid and rid not in existing_ids and (not text_key or text_key not in seen_texts):
                     gaps.append({
                         "id": rid,
                         "type": req.get("type", ""),
                         "text": req.get("text", ""),
                         "status": "weak",
                     })
+                    existing_ids.add(rid)
+                    if text_key:
+                        seen_texts.add(text_key)
 
         session = {
             "state": "SETUP",
@@ -213,6 +223,7 @@ class InterviewEngine:
             "current_followup_count": 0,
             "question_type_index": 0,
             "used_gaps": [],
+            "followup_turn_ids": [],
             "degraded": False,
             "unsafe_blocked": False,
             "router_error": None,
@@ -236,7 +247,9 @@ class InterviewEngine:
         gap = self._pick_gap(session)
         recent_turns = self._recent_turn_context(session)
         answer_anchor = self._latest_answer_anchor(session)
-        is_adaptive = bool(recent_turns)
+        # A new gap is a new topic. Quoting the previous answer in that
+        # question can make unrelated facts look like evidence for the gap.
+        is_adaptive = bool(recent_turns) and gap is None
 
         # 尝试动态生成
         question_text = None
@@ -279,6 +292,24 @@ class InterviewEngine:
             targets = []
             session["degraded"] = True
             session["unsafe_blocked"] = True
+
+        # A degree/credential gap cannot justify an unrelated technical
+        # question.  Reject that model output before an answer anchor or gap
+        # bridge can make it appear grounded.
+        if question_text and self._is_credential_gap(gap) and not re.search(
+            r"学历|学位|毕业|院校|专业|学籍|课程|证书|资质", question_text
+        ):
+            question_text = None
+            targets = []
+            session["degraded"] = True
+
+        # The model can return a fluent question about a previous topic while
+        # naming the current gap as its target. Do not present that mismatch as
+        # evidence that the planned gap was assessed.
+        if question_text and gap and not self._question_addresses_gap(question_text, gap):
+            question_text = None
+            targets = []
+            session["degraded"] = True
 
         if question_text and self._is_repeated_question(session, question_text):
             question_text = None
@@ -323,8 +354,16 @@ class InterviewEngine:
             session["degraded"] = True
             session["unsafe_blocked"] = True
 
-        if not targets:
-            targets = [gap["id"]] if gap else ["generic"]
+        if gap:
+            # A final safety replacement may have removed the gap topic. Only
+            # label the turn with that gap when the emitted question covers it.
+            covers_gap = self._question_addresses_gap(question_text, gap)
+            covers_credential = self._is_credential_gap(gap) and bool(re.search(
+                r"学历|学位|毕业|院校|专业|学籍|课程|证书|资质", question_text
+            ))
+            targets = [gap["id"]] if covers_gap or covers_credential else ["generic"]
+        elif not targets:
+            targets = ["generic"]
 
         # basis 必须是“已脱敏回答的逐字子串”，且必须真的出现在最终题目里。
         # 如果安全闸门把题目换成了不引用回答的兜底题，就不能再声称有 basis。
@@ -398,8 +437,18 @@ class InterviewEngine:
         follow_up = None
         if (missing_elements
                 and session["current_followup_count"] < MAX_FOLLOWUPS_PER_QUESTION):
-            follow_up = self._generate_followup(answer, missing_elements)
+            follow_up = self._generate_followup(
+                answer, missing_elements, session.get("used_followup_elements", [])
+            )
+            if follow_up:
+                session.setdefault("used_followup_elements", []).append(
+                    follow_up["reason"].split(":", 1)[0].removeprefix("missing_")
+                )
         session["_current_followup"] = follow_up["question"] if follow_up else ""
+        session["_current_followup_focus"] = (
+            follow_up["reason"].split(":", 1)[0].removeprefix("missing_")
+            if follow_up else ""
+        )
 
         turn = {
             "turn_id": turn_id,
@@ -445,7 +494,12 @@ class InterviewEngine:
 
         turn_id = len(session["turns"]) + 1
         answer_quote = self._extract_quote(answer)
-        missing_elements = self._detect_star_gaps(answer)
+        # A follow-up asks for one missing detail. Do not require a fresh,
+        # complete STAR story in the reply to that narrow question.
+        focus = session.get("_current_followup_focus", "")
+        missing_elements = (
+            [focus] if focus in self._detect_star_gaps(answer) else []
+        ) if focus in STAR_KEYWORDS else self._detect_star_gaps(answer)
 
         # 追问回答的子分数: followup_adaptation 提升权重
         subscores = self._assess_subscores(answer, missing_elements, is_followup=True)
@@ -462,9 +516,11 @@ class InterviewEngine:
             "subscores": subscores,
         }
         session["turns"].append(turn)
+        session.setdefault("followup_turn_ids", []).append(turn_id)
         session["current_followup_count"] += 1
         # 追问已回答，清除待回答标记，下一轮输入视为新的主问题回答
         session["_current_followup"] = ""
+        session["_current_followup_focus"] = ""
 
         return {
             "turn_id": turn_id,
@@ -534,15 +590,40 @@ class InterviewEngine:
     # ================================================================ #
 
     def _pick_gap(self, session):
-        """从 match_gaps 中选取尚未使用过的缺口。"""
+        """选取可在经历题中核实的缺口；学历事实留给 F1/F2 核验。"""
         for gap in session["match_gaps"]:
-            if gap["id"] not in session["used_gaps"]:
+            if gap["id"] not in session["used_gaps"] and not self._is_credential_gap(gap):
                 return gap
-        # 全部用完则循环复用
-        if session["match_gaps"]:
-            idx = session["current_main"] % len(session["match_gaps"])
-            return session["match_gaps"][idx]
+        # 五道题不意味着必须循环旧缺口；后续从最近回答继续深挖。
         return None
+
+    @staticmethod
+    def _question_addresses_gap(question, gap):
+        """Require a visible subject overlap before trusting a model question.
+
+        Conservative rejection is acceptable here: the deterministic bank
+        still asks about the selected gap when a paraphrase cannot be proven.
+        """
+        subject = str(gap.get("text") or "")
+        question = str(question or "")
+        terms = re.findall(r"[A-Za-z][A-Za-z0-9+#.]*", subject)
+        terms = [term for term in terms if len(term) >= 2]
+        if any(re.search(r"(?<![A-Za-z0-9])%s(?![A-Za-z0-9])" % re.escape(term),
+                         question, re.IGNORECASE) for term in terms):
+            return True
+        chunks = re.findall(r"[\u4e00-\u9fff]{4,}", subject)
+        generic = {"相关经验", "实际项目", "工作经验", "岗位要求", "具体能力"}
+        return any(
+            chunk[index:index + 4] in question
+            and chunk[index:index + 4] not in generic
+            for chunk in chunks for index in range(len(chunk) - 3)
+        )
+
+    @staticmethod
+    def _is_credential_gap(gap):
+        return bool(gap and re.search(
+            r"学历|学位|毕业|院校|学籍|相关专业", str(gap.get("text", ""))
+        ))
 
     @staticmethod
     def _compact_text(value, limit=240):
@@ -608,6 +689,12 @@ class InterviewEngine:
         for prior in previous:
             if not prior:
                 continue
+            # Rewording "how did the team collaborate" after an earlier
+            # team-collaboration question is not a new interview angle.
+            coordination = r"团队.{0,10}协作|协作.{0,10}团队"
+            if (re.search(coordination, core) and re.search(coordination, prior)
+                    and not re.search(r"冲突|意见不一致", core)):
+                return True
             if core == prior:
                 return True
             # Exact comparison misses cosmetic rewrites such as adding
@@ -636,6 +723,14 @@ class InterviewEngine:
         if not quote or quote not in answer:
             quote = self._compact_text(self._extract_quote(answer), 80)
         quote = quote.strip("“”\"'「」《》 ")
+        # Synthetic acceptance labels are not part of the candidate fact.
+        quote = quote.removeprefix("【合成测试回答】")
+        # Never expose a chopped privacy placeholder such as "[RE" in a
+        # question.  Prefer a complete earlier clause from the same answer.
+        if "[REDACTED_" in quote:
+            before = quote.split("[REDACTED_", 1)[0]
+            clauses = [part.strip() for part in re.split(r"[，,。；;]", before) if len(part.strip()) >= 8]
+            quote = max(clauses, key=len) if clauses else ""
         # 危险 anchor（用户回答里自带注入语句）同样不得回显为题目
         if self._check_sensitive(quote) or self._check_unsafe_generated_question(quote):
             return ""
@@ -643,7 +738,11 @@ class InterviewEngine:
             # Keep the anchor a literal substring of the stored answer.  An
             # appended ellipsis would turn a display abbreviation into fake
             # verbatim evidence and break the answer-quote invariant.
-            quote = quote[:42].rstrip("，,。；;：: ")
+            shortened = quote[:42]
+            breaks = [shortened.rfind(char) for char in "，,。；;：:"]
+            last_break = max(breaks)
+            quote = shortened[:last_break] if last_break >= 12 else shortened
+            quote = quote.rstrip("，,。；;：: ")
         # 最终不变量：anchor 必须是原始回答的逐字子串
         if not quote or quote not in raw:
             return ""
@@ -722,6 +821,17 @@ class InterviewEngine:
             or self._check_unsafe_generated_question(str(gap.get("text", "")))
         ):
             safe_gap = None
+        if self._is_credential_gap(safe_gap):
+            candidate = (
+                prefix + "先核实岗位所需的学历与专业事实：你的最高学历、"
+                "专业背景及可核验的证明分别是什么？"
+            )
+            if not self._is_repeated_question(session, candidate):
+                return candidate, [safe_gap.get("id") or "credential"]
+            safe_gap = None
+        if safe_gap and safe_gap.get("text"):
+            gap_question, targets = self._fallback_question_bank(session, safe_gap)
+            return prefix + "接下来核实另一项岗位要求。" + gap_question, targets
         focus_templates = {
             "action": "其中由你亲自完成的关键动作是什么，为什么选择这种做法？",
             "result": "这项工作的最终结果是什么，它怎样影响了项目或团队？",
@@ -784,8 +894,8 @@ class InterviewEngine:
             "target_gap": self._safe_gap_payload(gap),
             "question_type": qtype,
             "main_question_number": session.get("current_main", 0) + 1,
-            "recent_turns": self._recent_turn_context(session),
-            "must_reference_previous_answer": bool(session.get("turns")),
+            "recent_turns": self._recent_turn_context(session) if gap is None else [],
+            "must_reference_previous_answer": bool(session.get("turns")) and gap is None,
         }
         return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
@@ -804,7 +914,7 @@ class InterviewEngine:
         for element, keywords in STAR_KEYWORDS.items():
             found = False
             for kw in keywords:
-                if "." in kw or "\\" in kw:
+                if "." in kw or "\\" in kw or "[" in kw:
                     # 含正则元字符的模式
                     if re.search(kw, text):
                         found = True
@@ -917,7 +1027,7 @@ class InterviewEngine:
             "clarity": clarity,
         }
 
-    def _generate_followup(self, answer_text, missing_elements):
+    def _generate_followup(self, answer_text, missing_elements, used_elements=()):
         """基于回答缺失维度生成追问。
 
         Returns:
@@ -937,7 +1047,7 @@ class InterviewEngine:
         }
 
         for elem in missing_elements:
-            if elem in followup_map:
+            if elem in followup_map and elem not in used_elements:
                 anchor = self._safe_answer_anchor(answer_text)
                 prefix = (
                     "你刚才提到「%s」。" % anchor
@@ -967,6 +1077,13 @@ class InterviewEngine:
         gtype = gap.get("type", "generic")
         gtext = gap.get("text", "该要求")
         gid = gap.get("id", "unknown")
+
+        if self._is_credential_gap(gap):
+            return (
+                "请说明与你申请岗位相关的最高学历、专业背景，"
+                "以及可以核验的学历或专业证明。",
+                [gid] if gid != "unknown" else ["credential"],
+            )
 
         # status × type 二维模板表
         templates = {
@@ -1107,7 +1224,9 @@ class InterviewEngine:
         # 高频问题预备
         lines.append("## 3. High-Frequency Question Prep")
         all_missing = []
-        for t in turns:
+        followup_turn_ids = set(session.get("followup_turn_ids") or [])
+        main_turns = [t for t in turns if t.get("turn_id") not in followup_turn_ids]
+        for t in main_turns:
             all_missing.extend(t.get("missing_elements", []))
         from collections import Counter
         freq = Counter(all_missing).most_common(3)
@@ -1133,11 +1252,11 @@ class InterviewEngine:
         }
         covered_counter = Counter()
         missing_counter = Counter()
-        for t in turns:
+        for t in main_turns:
             me = set(t.get("missing_elements") or [])
             covered_counter.update(set(star_labels) - me)
             missing_counter.update(me)
-        n_turns = max(1, len([t for t in turns if t.get("answer")]))
+        n_turns = max(1, len([t for t in main_turns if t.get("answer")]))
         strengths = [star_labels[e] for e, c in covered_counter.items() if c / n_turns >= 0.5]
         weaknesses = [star_labels[e] for e, c in missing_counter.items() if c / n_turns >= 0.3]
         strong_dims = [k for k, v in i_subscores.items() if v is not None and v >= 65]

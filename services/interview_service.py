@@ -32,13 +32,18 @@ STAR_LABELS = {
 }
 
 
-def build_turn_evaluation(result):
+def build_turn_evaluation(result, followup_focus=None):
     """将引擎单轮结果转换为前端可展示的 优点/不足/子分 结构。"""
     missing = result.get("missing_elements") or []
-    covered = [STAR_LABELS[k] for k in STAR_LABELS if k not in missing]
+    if followup_focus in STAR_LABELS:
+        covered = [STAR_LABELS[followup_focus]] if followup_focus not in missing else []
+        weaknesses = [STAR_LABELS[followup_focus]] if followup_focus in missing else []
+    else:
+        covered = [STAR_LABELS[k] for k in STAR_LABELS if k not in missing]
+        weaknesses = [STAR_LABELS.get(k, k) for k in missing]
     return {
         "strengths": covered,
-        "weaknesses": [STAR_LABELS.get(k, k) for k in missing],
+        "weaknesses": weaknesses,
         "missing_elements": missing,
         "subscores": result.get("subscores"),
         "answer_quote": result.get("answer_quote", ""),

@@ -63,18 +63,63 @@
     });
   }
 
+  function consentEntryUrl() {
+    var fromPages = /\/pages\//.test(location.pathname || "");
+    return (fromPages ? "" : "pages/") +
+      "resume-evidence.html?continue=interview#data-consent";
+  }
+
+  function hasInterviewConsent() {
+    return !!(window.DataBridge &&
+      typeof window.DataBridge.hasCurrentConsent === "function" &&
+      window.DataBridge.hasCurrentConsent());
+  }
+
+  function ensureInterviewConsent() {
+    if (isDemoMode() || hasInterviewConsent()) return true;
+    goToInterviewConsent();
+    return false;
+  }
+
+  function goToInterviewConsent() {
+    location.href = consentEntryUrl();
+  }
+
+  function mountInterviewEntryGate() {
+    document.addEventListener("click", function (event) {
+      var link = event.target && event.target.closest && event.target.closest("a[href]");
+      if (!link || !/interview-practice\.html(?:[?#]|$)/.test(link.getAttribute("href") || "")) return;
+      if (!hasInterviewConsent() && !isDemoMode()) {
+        event.preventDefault();
+        goToInterviewConsent();
+      }
+    }, true);
+    document.addEventListener("zy:auth", function () {
+      if (document.body.getAttribute("data-page") === "interview" &&
+          !isDemoMode() && !hasInterviewConsent()) goToInterviewConsent();
+    });
+    // A saved or manually entered interview URL follows the same preflight.
+    if (document.body.getAttribute("data-page") === "interview" &&
+        !isDemoMode() && !hasInterviewConsent()) {
+      location.replace(consentEntryUrl());
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     var s = getState();
     document.body.setAttribute("data-state", s);
     mountDemoNotice();
     mountFab();
     mountNav(document.body.getAttribute("data-page"));
+    mountInterviewEntryGate();
   });
 
   window.APP = {
     getState: getState,
     setState: setState,
     isDemoMode: isDemoMode,
+    ensureInterviewConsent: ensureInterviewConsent,
+    goToInterviewConsent: goToInterviewConsent,
     STATES: STATES,
     LABELS: LABELS
   };

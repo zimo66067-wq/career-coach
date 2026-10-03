@@ -25,6 +25,24 @@
         ? window.DataBridge._cache.get("consentToken") : null;
     } catch (e) { return null; }
   }
+  function isConsentError(error) {
+    return error === "consent_required" || error === "consent_expired" ||
+      error === "invalid_consent";
+  }
+  function pauseForConsent(answer) {
+    if (answer) {
+      state.pendingAnswer = answer;
+      var last = state.turns[state.turns.length - 1];
+      if (last && !last.evaluation) last.answer = null;
+    }
+    saveSnapshot();
+    if (window.DataBridge && typeof window.DataBridge.clearConsent === "function") {
+      window.DataBridge.clearConsent();
+    }
+    if (window.APP && typeof window.APP.goToInterviewConsent === "function") {
+      window.APP.goToInterviewConsent();
+    }
+  }
   function guestToken() {
     try {
       var context = window.DataBridge && typeof window.DataBridge.getSessionContext === "function"
@@ -165,7 +183,19 @@
       credentials: "include",
       body: JSON.stringify({ session_id: state.sessionId, answer_text: turn.answer })
     }).then(function (r) {
-      if (!r.ok || !r.body) { throw new Error("HTTP " + r.status); }
+      if (!r.ok) {
+        return r.json().catch(function () { return {}; }).then(function (body) {
+          if (isConsentError(body.error)) {
+            pauseForConsent(turn.answer);
+            return null;
+          }
+          throw new Error("HTTP " + r.status);
+        });
+      }
+      return r;
+    }).then(function (r) {
+      if (!r) return;
+      if (!r.body) { throw new Error("面试流不可用"); }
       var reader = r.body.getReader();
       var decoder = new TextDecoder("utf-8");
       var buf = "";
@@ -215,6 +245,11 @@
     if (!state.sessionId) return;
     text = (text !== undefined && text !== null ? String(text) : (input ? input.value : "")).trim();
     if (!text) return;
+    if (!window.DataBridge || !window.DataBridge.hasCurrentConsent ||
+        !window.DataBridge.hasCurrentConsent()) {
+      pauseForConsent(text);
+      return;
+    }
     var turn = state.turns[state.turns.length - 1];
     if (!turn) return;
     turn.answer = text;
@@ -227,10 +262,8 @@
   function startInterview() {
     var DB = window.DataBridge;
     if (!DB || typeof DB.startInterview !== "function") return;
-    if (!consentToken()) {
-      setView("error");
-      var consentMsg = $("f3ErrorMsg");
-      if (consentMsg) consentMsg.textContent = "请先在简历证据页明确确认数据处理同意，再开始面试。";
+    if (!window.APP || typeof window.APP.ensureInterviewConsent !== "function" ||
+        !window.APP.ensureInterviewConsent()) {
       return;
     }
     setView("processing");
@@ -244,6 +277,10 @@
       return DB.startInterview(jobProfile || {}, resumeProfile || {}, gaps, targetId);
     }).then(function (res) {
       if (!res || res.error || !res.firstQuestion) {
+        if (res && isConsentError(res.error)) {
+          pauseForConsent();
+          return;
+        }
         setView("error");
         var msg = $("f3ErrorMsg");
         if (msg) msg.textContent = (res && res.message) || "未能开始面试，请稍后重试。";
@@ -287,7 +324,7 @@
   function renderQuestionPlan(res) {
     var box = $("f3QuestionPlan");
     if (!box) return;
-    var plan = res && Array.isArray(res.questionPlan) ? res.questionPlan : null;
+    var plan = res && Array.isArray(res.questionPlan) ? res.questionPlan.slice(0, 5) : null;
     if (!plan || !plan.length) {
       box.hidden = true;
       box.innerHTML = "";
@@ -303,8 +340,8 @@
     box.innerHTML = '<div class="f3-plan-head">本次出题顺序：来自目标岗位的未解决缺口，P0 → P1' +
       (targetId ? "（岗位 #" + esc(String(targetId)) + "，缺口按优先级排序）" : "") + "</div>" +
       '<div class="f3-plan-chips">' + chips + "</div>" +
-      '<div class="f3-plan-note">顺序即优先级 —— 这就是「按缺口定向出题」，不是通用题库轮询。' +
-      "缺口全部解决后，题目会回落到证据验证与行为问题。</div>";
+      '<div class="f3-plan-note">本轮最多 5 题，按缺口优先级出题；学历、学位和证书请在简历证据与岗位匹配环节核验。' +
+      "没有新的可面试缺口时，将围绕前一回答继续深挖。</div>";
     box.hidden = false;
   }
 
@@ -352,6 +389,10 @@
     }
     setView("processing");
     DB.endInterview(state.sessionId).then(function (res) {
+      if (res && isConsentError(res.error)) {
+        pauseForConsent();
+        return;
+      }
       state.ended = true;
       saveSnapshot();
       renderReport(res);
@@ -379,10 +420,18 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    if (!window.DataBridge || !window.DataBridge.hasCurrentConsent ||
+        !window.DataBridge.hasCurrentConsent()) return;
     wire();
     var snap = restoreSnapshot();
     if (snap && snap.sessionId) {
       state = snap;
+      if (state.pendingAnswer) {
+        var input = $("f3Answer");
+        if (input) input.value = state.pendingAnswer;
+        delete state.pendingAnswer;
+        saveSnapshot();
+      }
       if (state.ended && state.report) {
         renderReport(state.report);
         setView("report");

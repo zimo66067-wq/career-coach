@@ -283,7 +283,71 @@
     var retryButton = document.getElementById("retryResumeDiagnosis");
     var returnButton = document.getElementById("returnToResumeUpload");
     var consentCheckbox = document.getElementById("resumeConsent");
+    var consentPanel = document.getElementById("data-consent");
+    var consentButton = document.getElementById("confirmResumeConsent");
+    var consentStatus = document.getElementById("resumeConsentStatus");
     if (!card || !dropzone || !input || !chooseButton || !startButton || !status) return;
+
+    function currentConsent() {
+      return !!(window.DataBridge &&
+        typeof window.DataBridge.hasCurrentConsent === "function" &&
+        window.DataBridge.hasCurrentConsent());
+    }
+
+    function showConsent() {
+      card.hidden = true;
+      if (consentPanel) consentPanel.hidden = false;
+      if (consentCheckbox) consentCheckbox.checked = false;
+    }
+
+    function showWorkflow() {
+      if (consentPanel) consentPanel.hidden = true;
+      card.hidden = false;
+    }
+
+    if (currentConsent()) {
+      if (consentCheckbox) consentCheckbox.checked = true;
+      showWorkflow();
+    } else {
+      showConsent();
+    }
+    document.addEventListener("zy:auth", function () {
+      if (!currentConsent()) showConsent();
+    });
+
+    if (consentButton) consentButton.addEventListener("click", async function () {
+      if (!consentCheckbox || !consentCheckbox.checked) {
+        if (consentStatus) consentStatus.textContent = "请先阅读说明并自行勾选同意。";
+        return;
+      }
+      if (!window.DataBridge || typeof window.DataBridge.submitConsent !== "function") {
+        if (consentStatus) consentStatus.textContent = "同意记录服务暂不可用，请稍后重试。";
+        return;
+      }
+      consentButton.disabled = true;
+      if (consentStatus) consentStatus.textContent = "正在确认同意记录…";
+      try {
+        var result = await window.DataBridge.submitConsent("career_workflow");
+        if (!result || result.error || result.status !== "ACCEPTED" || !currentConsent()) {
+          if (consentStatus) consentStatus.textContent = (result && result.message) || "确认失败，请稍后重试。";
+          return;
+        }
+        if (/[?&]continue=interview(?:&|$)/.test(location.search || "")) {
+          location.href = "interview-practice.html";
+          return;
+        }
+        showWorkflow();
+        if (consentStatus) consentStatus.textContent = "已确认。";
+        if (/[?&]quick=1(?:&|$)/.test(location.search || "") &&
+            window.QuickDemo && typeof window.QuickDemo.startF1 === "function") {
+          window.QuickDemo.startF1();
+        }
+      } catch (error) {
+        if (consentStatus) consentStatus.textContent = "确认失败，请稍后重试。";
+      } finally {
+        consentButton.disabled = false;
+      }
+    });
 
     var selectedFile = null;
     var lastAttempt = null;
@@ -304,19 +368,9 @@
         setStatus("正在上传… " + percent + "%", false);
       },
       ensureConsent: async function () {
-        if (!consentCheckbox || !consentCheckbox.checked) {
-          return { ok: false, error: "consent_required", message: "请先阅读并勾选数据处理说明。" };
-        }
-        if (!window.DataBridge || typeof window.DataBridge.submitConsent !== "function") {
-          return { ok: false, error: "consent_unavailable", message: "同意记录服务暂不可用，请稍后重试。" };
-        }
-        var consent = await window.DataBridge.submitConsent("resume_session");
-        if (consent && !consent.error && consent.status === "ACCEPTED") return { ok: true };
-        return {
-          ok: false,
-          error: (consent && consent.error) || "consent_unavailable",
-          message: (consent && consent.message) || "同意记录服务暂不可用，请稍后重试。"
-        };
+        if (currentConsent()) return { ok: true };
+        showConsent();
+        return { ok: false, error: "consent_required", message: "请先阅读并确认数据处理说明。" };
       }
     });
 

@@ -7,7 +7,7 @@
  * 用法：
  *   <button id="quickDemoF1" type="button">一键体验 F1</button>
  *   <script src="js/quick-demo.js"></script>
- *   或直接访问 resume-evidence.html?quick=1 自动执行。
+ *   或访问 resume-evidence.html?quick=1，在本人确认同意后执行。
  */
 (function () {
   'use strict';
@@ -51,11 +51,20 @@
 
   // ---------- F1 ----------
   function startF1() {
+    var bridge = window.DataBridge;
+    if ($('resumeConsent') &&
+        (!bridge || typeof bridge.hasCurrentConsent !== 'function' ||
+         !bridge.hasCurrentConsent())) {
+      var notice = $('resumeConsentStatus');
+      if (notice) notice.textContent = '请先阅读数据处理说明并自行确认同意。';
+      var panel = $('data-consent');
+      if (panel && typeof panel.scrollIntoView === 'function') panel.scrollIntoView();
+      return;
+    }
     var text = resumeText();
     if (!text) { alert('演示数据未加载，请刷新后重试。'); return; }
     var entry = $('resumeTextEntry');
     var input = $('resumeTextInput');
-    var consent = $('resumeConsent');
     var textButton = $('openResumeText');
 
     // 生产页（resume-upload.js）：填充并提交真实流程
@@ -63,7 +72,6 @@
       if (textButton && entry.hidden) textButton.click();
       entry.hidden = false;
       input.value = text;
-      if (consent) consent.checked = true;
       if (!hasApiBase()) enableDemoParam();   // 纯静态/本地演示环境退回合成结果
       showDemoBadge();
       entry.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -133,7 +141,9 @@
     if (b1) b1.addEventListener('click', startF1);
     if (!isQuick()) return;
     var page = (document.body.getAttribute('data-page') || '').toLowerCase();
-    if (page.indexOf('f1') === 0) startF1();
+    if ((page === 'resume' || page.indexOf('f1') === 0) && window.DataBridge &&
+        typeof window.DataBridge.hasCurrentConsent === 'function' &&
+        window.DataBridge.hasCurrentConsent()) startF1();
   }
 
   if (document.readyState === 'loading') {

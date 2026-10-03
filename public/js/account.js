@@ -276,6 +276,11 @@
       .then(function (user) {
         setBusy(f, false);
         setMsg('', false);
+        // Consent belongs to the person who clicked it in this browser tab.
+        // A new login must make the next user confirm for themselves.
+        if (window.DataBridge && typeof window.DataBridge.clearConsent === 'function') {
+          window.DataBridge.clearConsent();
+        }
         renderUser(user);   // 先落登录态：closeAuth 在强制态下要靠 currentUser 放行
         closeAuth();
         refreshAuth();
@@ -292,6 +297,9 @@
   function logout() {
     api('/auth/logout', { method: 'POST' }).catch(function () { /* ignore */ })
       .then(function () {
+        if (window.DataBridge && typeof window.DataBridge.clearConsent === 'function') {
+          window.DataBridge.clearConsent();
+        }
         renderUser(null);
         renderHistory([]);
         notify('zy:auth', { user: null });   // 退出即重新上锁：门禁要重新拦

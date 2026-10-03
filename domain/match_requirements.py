@@ -94,10 +94,13 @@ def evidence_clause_coverage(requirement, evidence):
     if not verify_evidence(requirement, evidence):
         return 0.0
     parts = re.split(r"、|[，,]|和|并(?=排查|参与|负责|完成|开展|进行|维护|设计|编写|处理|输出|分析|解决|优化)", requirement)
-    evidence_terms = set(tokenize(evidence)) - VERIFY_STOP - VERIFY_GENERIC
+    # Words describing the shared work shape cannot prove every subject in a
+    # compound requirement.  "订单接口" does not establish "库存接口".
+    clause_generic = {"接口", "接口开发", "链路", "核心链路", "链路接口"}
+    evidence_terms = set(tokenize(evidence)) - VERIFY_STOP - VERIFY_GENERIC - clause_generic
     meaningful = []
     for part in parts:
-        terms = set(tokenize(part)) - VERIFY_STOP - VERIFY_GENERIC
+        terms = set(tokenize(part)) - VERIFY_STOP - VERIFY_GENERIC - clause_generic
         if terms:
             meaningful.append(terms)
     if not meaningful:

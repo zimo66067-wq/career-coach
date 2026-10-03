@@ -210,6 +210,19 @@ def test_compound_requirement_needs_both_parts_for_full_coverage():
     assert all(item["status"] != "covered" for item in result["requirements"])
 
 
+def test_order_evidence_does_not_cover_inventory_clause_in_preview_sample():
+    profile = {
+        "user_confirmed": True,
+        "requirements": [{
+            "id": "r1", "type": "responsibility",
+            "text": "参与订单、库存核心链路接口开发；",
+        }],
+    }
+    resume = "负责订单中心微服务开发，使用 Go 语言和 Gin 框架实现订单查询接口"
+    item = api_module.match_job_profile(resume, profile)["requirements"][0]
+    assert item["status"] != "covered"
+
+
 def test_compound_requirement_can_be_covered_with_complete_evidence():
     profile = {
         "user_confirmed": True,

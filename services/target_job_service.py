@@ -530,6 +530,7 @@ def interview_gaps(target_job_id, owner_key):
     因为那是 ``interview_engine.start()`` 的既有契约；它与缺口生命周期状态同名不同义。
     """
     from domain.target_job import OPEN_GAP_STATUSES
+    from domain.interview_engine import InterviewEngine
 
     get_target_job(target_job_id, owner_key)
     requirements = {row["id"]: row for row in repo.list_requirements(target_job_id)}
@@ -538,11 +539,16 @@ def interview_gaps(target_job_id, owner_key):
         if gap.get("status") not in OPEN_GAP_STATUSES:
             continue
         requirement = requirements.get(gap.get("requirement_id")) or {}
+        requirement_text = requirement.get("text") or gap.get("reason") or ""
+        # Factual credentials belong in F1/F2 evidence review. An interview
+        # answer cannot prove them and the STAR rubric does not fit them.
+        if InterviewEngine._is_credential_gap({"text": requirement_text}):
+            continue
         ordered.append({
             "id": "gap-%s" % gap["id"],
             "gapId": gap["id"],
             "type": requirement.get("req_type") or "hard",
-            "text": requirement.get("text") or gap.get("reason") or "",
+            "text": requirement_text,
             "status": gap["gap_type"],
             "priority": gap["priority"],
         })
@@ -553,18 +559,13 @@ def interview_gaps(target_job_id, owner_key):
 def question_plan(target_job_id, owner_key):
     """出题计划（含题型），用来证明优先级确实生效。
 
-    **注意键名冲突**：``interview_gaps()`` 返回给引擎的 ``status`` 是
-    ``gap_type``（``missing`` / ``weak``）—— 那是引擎的既有契约；而
-    ``domain.interview.plan_question_order()`` 里的 ``status`` 指缺口生命周期
-    （``open`` / ``doing``）。两者同名不同义，所以这里**从库里的原始缺口行**构造计划，
-    绝不能把引擎形态的列表喂给它（否则会被当成"已关闭"全部过滤掉）。
+    和实际引擎消费的缺口保持同源，并只显示本轮最多五道题。
     """
     from domain.interview import plan_question_order
-    from domain.target_job import OPEN_GAP_STATUSES
+    from domain.interview_engine import MAX_MAIN_QUESTIONS
 
-    get_target_job(target_job_id, owner_key)
-    open_rows = [
-        gap for gap in repo.list_gaps(target_job_id)
-        if gap.get("status") in OPEN_GAP_STATUSES
-    ]
-    return plan_question_order(open_rows)
+    selected = interview_gaps(target_job_id, owner_key)[:MAX_MAIN_QUESTIONS]
+    return plan_question_order([
+        {"id": item["gapId"], "priority": item["priority"], "status": "open"}
+        for item in selected
+    ])

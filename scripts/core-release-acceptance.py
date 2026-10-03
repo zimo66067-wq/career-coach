@@ -145,6 +145,7 @@ class Acceptance:
             start = self.request("POST", "/api/wf04/start", {"session_id": sid, "targetJobId": target_id}, token)
             self.check("TC03 first question nonempty", bool(start.get("firstQuestion")))
             previous_questions = {start["firstQuestion"]}
+            previous_main_targets = start.get("targets") or []
             for answer in ANSWERS:
                 turn = self.request("POST", "/api/wf04/answer", {"session_id": sid, "answer_text": answer}, token)
                 next_q = turn.get("followUp") or (turn.get("turn") or {}).get("follow_up") or turn.get("nextQuestion") or {}
@@ -152,11 +153,21 @@ class Acceptance:
                     question = next_q.get("question") or ""
                     self.check("TC03 next question not repeated", bool(question) and question not in previous_questions)
                     previous_questions.add(question)
-                    anchor = next_q.get("basis") or next_q.get("answer_quote") or ""
-                    if not anchor:
-                        quoted = re.search(r"「([^」]+)」", question)
-                        anchor = quoted.group(1) if quoted else ""
-                    self.check("TC03 next question references actual answer", bool(anchor) and anchor in answer and anchor in question)
+                    if turn.get("followUp") or next_q.get("adaptive"):
+                        anchor = next_q.get("basis") or next_q.get("answer_quote") or ""
+                        if not anchor:
+                            quoted = re.search(r"「([^」]+)」", question)
+                            anchor = quoted.group(1) if quoted else ""
+                        self.check("TC03 follow-up references actual answer", bool(anchor) and anchor in answer and anchor in question)
+                    else:
+                        targets = next_q.get("targets") or []
+                        self.check(
+                            "TC03 new gap avoids stale answer quote",
+                            bool(targets) and targets != previous_main_targets
+                            and not next_q.get("basis") and "你刚才提到" not in question,
+                        )
+                    if turn.get("nextQuestion") and not turn["nextQuestion"].get("done"):
+                        previous_main_targets = turn["nextQuestion"].get("targets") or []
             ended = self.request("POST", "/api/wf04/end", {"session_id": sid, "targetJobId": target_id}, token)
             self.observations.append({"round": index, "interview_extraction_degraded": (ended.get("candidateEvidence") or {}).get("degraded")})
             current = self.request("GET", "/api/profile", token=token)
