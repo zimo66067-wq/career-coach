@@ -1208,18 +1208,19 @@ def delete_session_data(session_id, owner_key=None):
 # ------------------------------------------------------------------ #
 
 def create_user(phone, email, password_hash, display_name, role="user"):
-    """Insert a new user.  Raises on duplicate phone/email."""
+    """Insert a new user with an initial activity anchor for retention."""
     init_db()
     conn = _get_conn()
     try:
+        created_at = _utc_iso()
         return _insert_returning_id(
             conn,
             """
             INSERT INTO users (phone, email, password_hash, display_name,
-                               role, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+                               role, created_at, last_login_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (phone, email, password_hash, display_name, role, _utc_iso()),
+            (phone, email, password_hash, display_name, role, created_at, created_at),
         )
     finally:
         conn.close()
